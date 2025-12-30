@@ -587,10 +587,240 @@ def create_attention_layer(config: AttentionConfig, attention_type: str = "stand
     
     return attention
 
+# ============================================================
+# STANDALONE ATTENTION FUNCTIONS
+# ============================================================
+
+def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+                                mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Scaled Dot-Product Attention mechanism.
+
+    Computes attention weights and outputs using:
+    Attention(Q, K, V) = softmax(QK^T / sqrt(d_k))V
+
+    Args:
+        Q: Query tensor of shape (batch_size, seq_len, d_k)
+        K: Key tensor of shape (batch_size, seq_len, d_k)
+        V: Value tensor of shape (batch_size, seq_len, d_v)
+        mask: Optional mask tensor to prevent attention to certain positions
+
+    Returns:
+        Tuple of (attention_output, attention_weights)
+    """
+    d_k = Q.size(-1)
+    scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
+
+    if mask is not None:
+        scores.masked_fill_(mask == 0, -1e9)
+
+    attention_weights = F.softmax(scores, dim=-1)
+    output = torch.matmul(attention_weights, V)
+
+    return output, attention_weights
+
+
+# ============================================================
+# TRANSFORMER COMPONENTS
+# ============================================================
+
+class MultiHeadAttention(nn.Module):
+    """
+    Multi-Head Attention mechanism.
+
+    Concatenates multiple attention heads to capture different aspects of the input.
+    Each head learns to attend to different parts of the sequence.
+
+    Args:
+        d_model: Model dimension
+        num_heads: Number of attention heads
+    """
+    def __init__(self, d_model: int, num_heads: int):
+        super().__init__()
+        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+
+        # Linear projections for Q, K, V
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)
+
+    def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Forward pass of Multi-Head Attention.
+
+        Args:
+            Q: Query tensor
+            K: Key tensor
+            V: Value tensor
+            mask: Optional attention mask
+
+        Returns:
+            Multi-head attention output
+        """
+        batch_size = Q.size(0)
+
+        # Linear projections
+        Q = self.W_q(Q)
+        K = self.W_k(K)
+        V = self.W_v(V)
+
+        # Reshape for multi-head attention
+        Q = Q.view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        K = K.view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+        V = V.view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
+
+        # Scaled dot-product attention
+        attn_output, _ = scaled_dot_product_attention(Q, K, V, mask)
+
+        # Concatenate heads and apply final linear transformation
+        attn_output = attn_output.transpose(1, 2).contiguous().view(
+            batch_size, -1, self.d_model
+        )
+        output = self.W_o(attn_output)
+
+        return output
+
+
+class FeedForwardNetwork(nn.Module):
+    """
+    Feed-Forward Network component of Transformer.
+
+    Consists of two linear transformations with a ReLU activation in between.
+    Applied to each position separately and identically.
+
+    Args:
+        d_model: Model dimension
+        d_ff: Hidden layer dimension
+        activation: Activation function to use
+    """
+    def __init__(self, d_model: int, d_ff: int, activation: str = 'relu'):
+        super().__init__()
+        self.linear1 = nn.Linear(d_model, d_ff)
+        self.linear2 = nn.Linear(d_ff, d_model)
+
+        if activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'gelu':
+            self.activation = nn.GELU()
+        else:
+            raise ValueError(f"Unsupported activation: {activation}")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of Feed-Forward Network.
+
+        Args:
+            x: Input tensor
+
+        Returns:
+            FFN output
+        """
+        return self.linear2(self.activation(self.linear1(x)))
+
+
+class LayerNorm(nn.Module):
+    """
+    Layer Normalization.
+
+    Normalizes across the feature dimension to stabilize training.
+    Unlike BatchNorm, it normalizes per-sample rather than per-batch.
+
+    Args:
+        d_model: Model dimension
+        eps: Epsilon for numerical stability
+    """
+    def __init__(self, d_model: int, eps: float = 1e-6):
+        super().__init__()
+        self.d_model = d_model
+        self.eps = eps
+        self.gamma = nn.Parameter(torch.ones(d_model))
+        self.beta = nn.Parameter(torch.zeros(d_model))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of Layer Normalization.
+
+        Args:
+            x: Input tensor
+
+        Returns:
+            Normalized tensor
+        """
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True, unbiased=False)
+        normalized = (x - mean) / (std + self.eps)
+        return self.gamma * normalized + self.beta
+
+
+class TransformerBlock(nn.Module):
+    """
+    Single Transformer Block (Encoder).
+
+    Combines Multi-Head Attention, Feed-Forward Network, and residual connections
+    with Layer Normalization.
+
+    Args:
+        d_model: Model dimension
+        num_heads: Number of attention heads
+        d_ff: Hidden dimension for FFN
+        dropout: Dropout rate
+    """
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float = 0.1):
+        super().__init__()
+        self.attention = MultiHeadAttention(d_model, num_heads)
+        self.norm1 = LayerNorm(d_model)
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.ffn = FeedForwardNetwork(d_model, d_ff)
+        self.norm2 = LayerNorm(d_model)
+        self.dropout2 = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of Transformer Block.
+
+        Args:
+            x: Input tensor
+
+        Returns:
+            Transformer block output
+        """
+        # Multi-head attention with residual connection
+        attn_output = self.attention(x, x, x)
+        x = self.norm1(x + self.dropout1(attn_output))
+
+        # Feed-forward network with residual connection
+        ffn_output = self.ffn(x)
+        x = self.norm2(x + self.dropout2(ffn_output))
+
+        return x
+
+
+# ============================================================
+# EXPORTS
+# ============================================================
+
+__all__ = [
+    # Attention mechanisms
+    'scaled_dot_product_attention', 'MultiHeadAttention',
+    # Transformer components
+    'TransformerBlock', 'FeedForwardNetwork', 'LayerNorm',
+    # Original attention classes
+    'AttentionConfig', 'RotaryPositionEmbedding', 'AttentionMechanism',
+    'MultiQueryAttention', 'GroupedQueryAttention', 'FlashAttentionWrapper',
+    'create_attention_layer'
+]
+
 if __name__ == "__main__":
     # Test Driver
     logging.basicConfig(level=logging.INFO)
-    
+
     config = AttentionConfig(
         hidden_size=256,
         num_attention_heads=8,
@@ -598,14 +828,34 @@ if __name__ == "__main__":
         attention_dropout=0.1,
         use_flash_attention=False
     )
-    
+
     print("Testing Standard Attention...")
     attn = create_attention_layer(config, "standard")
     x = torch.randn(2, 10, 256)
     out, _, _ = attn(x)
     print(f"Output: {out.shape}")
-    
+
     print("\nTesting Grouped Query Attention...")
     attn_gqa = create_attention_layer(config, "grouped_query")
     out_gqa, _, _ = attn_gqa(x)
     print(f"Output: {out_gqa.shape}")
+
+    # Test the new components
+    print("\nTesting Scaled Dot-Product Attention...")
+    Q = torch.randn(2, 10, 64)
+    K = torch.randn(2, 15, 64)
+    V = torch.randn(2, 15, 64)
+    output, attention_weights = scaled_dot_product_attention(Q, K, V)
+    print(f"SDPA Output: {output.shape}, Attention Weights: {attention_weights.shape}")
+
+    print("\nTesting MultiHeadAttention...")
+    mha = MultiHeadAttention(d_model=512, num_heads=8)
+    x = torch.randn(4, 20, 512)
+    output = mha(x, x, x)
+    print(f"MHA Output: {output.shape}")
+
+    print("\nTesting TransformerBlock...")
+    block = TransformerBlock(d_model=256, num_heads=8, d_ff=512)
+    x = torch.randn(2, 15, 256)
+    output = block(x)
+    print(f"TransformerBlock Output: {output.shape}")

@@ -3,6 +3,10 @@
 ## Project Status: 100% Complete
 
 All planned modules, case studies, and notebooks have been implemented following the White-Box approach.
+Recent updates (Phase 6) include full English implementation of:
+- **Synthetic Data Generation**: Comprehensive datasets for testing.
+- **Advanced Attention Mechanisms**: RoPE, GQA, and FlashAttention support.
+- **Advanced RAG**: A dedicated notebook for GraphRAG and Hybrid Search.
 
 ### 1. Modules Implemented (`src/`)
 - **Core**: Probability, Optimization, Math Operations (All from scratch).

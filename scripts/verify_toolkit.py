@@ -43,7 +43,7 @@ def verify_core():
             print(f"  Math Check: dot_product NOT FOUND")
         
         # Test Prob
-        g = Gaussian(mu=0, sigma=1)
+        g = Gaussian(mean=0, std=1)
         pdf = g.pdf(0)
         print(f"  Prob Check: Gaussian(0) = {pdf:.4f}")
         
@@ -114,6 +114,36 @@ def verify_production():
         traceback.print_exc()
         return False
 
+def verify_phase6_features():
+    print("\n--- Verifying Phase 6 Features (Advanced RAG & Data) ---")
+    try:
+        # 1. Synthetic Data
+        from scripts.data_preprocessing.generate_synthetic_data import SyntheticDataGenerator
+        gen = SyntheticDataGenerator(seed=42)
+        df_cust = gen.generate_customer_data(n_samples=5)
+        print(f"  Data Check: Generated {len(df_cust)} customers")
+        
+        # 2. Advanced Attention
+        from src.llm.attention import create_attention_layer, AttentionConfig
+        config = AttentionConfig(hidden_size=32, num_attention_heads=4, head_dim=8)
+        attn = create_attention_layer(config, "grouped_query")
+        print(f"  Attention Check: GQA Layer initialized")
+        
+        # 3. Notebook Existence
+        nb_path = os.path.join(project_root, "notebooks", "week_11", "03_rag_advanced_techniques.ipynb")
+        if os.path.exists(nb_path):
+             print(f"  Notebook Check: Found RAG Advanced Notebook")
+        else:
+             print(f"  Notebook Check: FAIL - Notebook not found at {nb_path}")
+             return False
+
+        print("[OK] Phase 6 Features OK")
+        return True
+    except Exception as e:
+        print(f"[FAIL] Phase 6 Features Failed: {e}")
+        traceback.print_exc()
+        return False
+
 def main():
     print(f"Starting Toolkit Verification... Root: {project_root}")
     
@@ -124,7 +154,8 @@ def main():
         verify_core(),
         verify_ml(),
         verify_llm(),
-        verify_production()
+        verify_production(),
+        verify_phase6_features()
     ]
     
     if all(results):
