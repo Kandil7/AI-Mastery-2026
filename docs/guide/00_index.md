@@ -3,6 +3,22 @@
 
 Welcome to the complete guide for the `AI-Mastery-2026` toolkit. This documentation provides a deep dive into the architecture, modules, and workflows of the project.
 
+## Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/your-repo/AI-Mastery-2026.git
+cd AI-Mastery-2026
+make install
+
+# Train models and start API
+python scripts/train_save_models.py
+make run
+
+# Or use Docker
+make docker-run
+```
+
 ## Table of Contents
 
 1.  **[Getting Started](./01_getting_started.md)**
@@ -29,3 +45,35 @@ Welcome to the complete guide for the `AI-Mastery-2026` toolkit. This documentat
 
 6.  **[Deployment Guide](./09_deployment_guide.md)**
     *   Instructions for deploying the application using Docker and `docker-compose`.
+
+7.  **[Capstone Project: GitHub Issue Classifier](./10_capstone_project.md)** ⭐ NEW
+    *   Complete end-to-end project building a production ML application.
+
+---
+
+## Architecture Overview
+
+```
+AI-Mastery-2026/
+├── src/
+│   ├── core/          # Mathematical foundations
+│   ├── ml/            # Classical & deep learning
+│   ├── llm/           # LLM, RAG, fine-tuning
+│   └── production/    # API, monitoring, vector DB
+├── research/          # 17-week learning notebooks
+├── scripts/           # Utility scripts
+├── tests/             # Unit tests
+├── config/            # Prometheus, Grafana configs
+└── app/               # Streamlit web UI
+```
+
+## Key Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| **API** | `src/production/api.py` | FastAPI with real model inference |
+| **RAG** | `src/llm/rag.py` | Dense/Sparse/Hybrid retrieval |
+| **Neural Net** | `src/ml/deep_learning.py` | Dense, LSTM, Conv2D layers |
+| **Classical ML** | `src/ml/classical.py` | LR, SVM, Tree, RandomForest |
+| **Web UI** | `app/main.py` | Streamlit chat interface |
+
