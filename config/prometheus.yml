@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # AI-Mastery API
+  - job_name: "ai-mastery-api"
+    static_configs:
+      - targets: ["api:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # FastAPI metrics (if using prometheus-client)
+  - job_name: "fastapi"
+    static_configs:
+      - targets: ["api:8000"]
+    metrics_path: "/metrics"
+
+  # Docker containers (if using docker exporter)
+  - job_name: "docker"
+    static_configs:
+      - targets: ["docker-exporter:9323"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "docker"
