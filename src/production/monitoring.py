@@ -1,608 +1,494 @@
 """
-Model Monitoring Module
-=======================
-Drift detection, performance monitoring, and alerting.
+Monitoring Module
 
-Concepts:
-- Data Drift: Input distribution changes
-- Concept Drift: P(y|X) changes
-- Model Performance Degradation
-
-Methods:
-- KS Test (Kolmogorov-Smirnov)
-- PSI (Population Stability Index)
-- Chi-square test for categorical
-- Performance metrics tracking
-
-Author: AI-Mastery-2026
+This module implements monitoring and observability for ML models in production,
+including metrics collection, logging, and alerting.
 """
 
-import numpy as np
-from typing import List, Dict, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from datetime import datetime
-from collections import deque
-import json
+import time
 import logging
+from typing import Dict, Any, List, Optional, Callable
+from dataclasses import dataclass
+from enum import Enum
+import numpy as np
+import json
+from datetime import datetime
+import threading
+import queue
+import psutil
+import GPUtil
+from collections import defaultdict, deque
+import statistics
 
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ============================================================
-# DATA STRUCTURES
-# ============================================================
-
-@dataclass
-class DriftResult:
-    """Result of drift detection test."""
-    feature_name: str
-    drift_detected: bool
-    statistic: float
-    p_value: float
-    threshold: float
-    method: str
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+class MetricType(Enum):
+    """Enumeration of metric types."""
+    COUNTER = "counter"
+    GAUGE = "gauge"
+    HISTOGRAM = "histogram"
+    SUMMARY = "summary"
 
 
 @dataclass
-class PerformanceMetrics:
-    """Model performance metrics."""
-    accuracy: Optional[float] = None
-    precision: Optional[float] = None
-    recall: Optional[float] = None
-    f1_score: Optional[float] = None
-    mse: Optional[float] = None
-    mae: Optional[float] = None
-    latency_p50_ms: Optional[float] = None
-    latency_p95_ms: Optional[float] = None
-    latency_p99_ms: Optional[float] = None
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+class Metric:
+    """Data class for metrics."""
+    name: str
+    value: float
+    type: MetricType
+    labels: Dict[str, str]
+    timestamp: float
 
 
-# ============================================================
-# STATISTICAL TESTS
-# ============================================================
-
-def ks_test(reference: np.ndarray, current: np.ndarray) -> Tuple[float, float]:
-    """
-    Kolmogorov-Smirnov Test for continuous variables.
-    
-    Tests if two samples come from the same distribution.
-    
-    Statistic: D = max|F_ref(x) - F_cur(x)|
-    
-    Args:
-        reference: Reference (training) distribution
-        current: Current (production) distribution
-    
-    Returns:
-        Tuple of (KS statistic, p-value)
-    
-    Interpretation:
-        - D close to 0: Distributions are similar
-        - D close to 1: Distributions are very different
-        - p-value < 0.05: Reject null hypothesis (different distributions)
-    """
-    from scipy import stats
-    statistic, p_value = stats.ks_2samp(reference, current)
-    return float(statistic), float(p_value)
-
-
-def ks_test_manual(reference: np.ndarray, current: np.ndarray) -> float:
-    """
-    Manual implementation of KS test statistic.
-    
-    For educational purposes.
-    """
-    ref_sorted = np.sort(reference)
-    cur_sorted = np.sort(current)
-    
-    # Combine and sort all values
-    all_values = np.concatenate([ref_sorted, cur_sorted])
-    all_values = np.sort(np.unique(all_values))
-    
-    # Compute empirical CDFs
-    n_ref, n_cur = len(reference), len(current)
-    
-    max_diff = 0
-    for v in all_values:
-        cdf_ref = np.sum(reference <= v) / n_ref
-        cdf_cur = np.sum(current <= v) / n_cur
-        max_diff = max(max_diff, abs(cdf_ref - cdf_cur))
-    
-    return max_diff
-
-
-def psi(reference: np.ndarray, current: np.ndarray, buckets: int = 10) -> float:
-    """
-    Population Stability Index (PSI).
-    
-    Measures shift between two distributions using binning.
-    
-    PSI = Σ (Actual% - Expected%) × ln(Actual% / Expected%)
-    
-    Interpretation:
-        - PSI < 0.1: No significant change
-        - 0.1 ≤ PSI < 0.2: Slight change
-        - PSI ≥ 0.2: Significant change (drift detected)
-    
-    Args:
-        reference: Reference distribution
-        current: Current distribution
-        buckets: Number of bins
-    
-    Returns:
-        PSI value
-    """
-    # Create bins from reference distribution
-    min_val = min(reference.min(), current.min())
-    max_val = max(reference.max(), current.max())
-    bins = np.linspace(min_val, max_val, buckets + 1)
-    
-    # Bin counts
-    ref_counts, _ = np.histogram(reference, bins)
-    cur_counts, _ = np.histogram(current, bins)
-    
-    # Convert to percentages (add epsilon to avoid division by zero)
-    epsilon = 1e-10
-    ref_pct = ref_counts / len(reference) + epsilon
-    cur_pct = cur_counts / len(current) + epsilon
-    
-    # PSI calculation
-    psi_value = np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct))
-    
-    return float(psi_value)
-
-
-def chi_square_test(reference: np.ndarray, current: np.ndarray) -> Tuple[float, float]:
-    """
-    Chi-square test for categorical variables.
-    
-    Tests if observed frequencies differ from expected.
-    
-    Args:
-        reference: Reference category counts
-        current: Current category counts
-    
-    Returns:
-        Tuple of (chi-square statistic, p-value)
-    """
-    from scipy import stats
-    
-    # Get unique categories
-    categories = np.unique(np.concatenate([reference, current]))
-    
-    # Count occurrences
-    ref_counts = np.array([np.sum(reference == c) for c in categories])
-    cur_counts = np.array([np.sum(current == c) for c in categories])
-    
-    # Expected counts under null hypothesis
-    total_ref = len(reference)
-    total_cur = len(current)
-    expected = ref_counts * (total_cur / total_ref)
-    
-    # Chi-square test
-    statistic, p_value = stats.chisquare(cur_counts, expected)
-    
-    return float(statistic), float(p_value)
-
-
-# ============================================================
-# DRIFT DETECTOR
-# ============================================================
-
-class DriftDetector:
-    """
-    Unified drift detection for multiple features.
-    
-    Monitors data drift and concept drift in production.
-    
-    Example:
-        >>> detector = DriftDetector()
-        >>> detector.set_reference(X_train)
-        >>> 
-        >>> # In production
-        >>> current_batch = get_production_data()
-        >>> results = detector.detect_drift(current_batch)
-        >>> 
-        >>> for result in results:
-        ...     if result.drift_detected:
-        ...         alert(f"Drift in {result.feature_name}")
-    """
-    
-    def __init__(self, 
-                 method: str = 'ks',
-                 threshold: float = 0.05,
-                 feature_names: Optional[List[str]] = None):
-        """
-        Args:
-            method: 'ks' (KS test), 'psi' (Population Stability Index)
-            threshold: p-value threshold for KS, or PSI threshold
-            feature_names: Optional names for features
-        """
-        self.method = method
-        self.threshold = threshold
-        self.feature_names = feature_names
-        self.reference_data: Optional[np.ndarray] = None
-        self.reference_stats: Dict[str, Dict] = {}
-    
-    def set_reference(self, data: np.ndarray):
-        """
-        Set reference (training) data distribution.
-        
-        Args:
-            data: Training data (n_samples, n_features)
-        """
-        self.reference_data = np.asarray(data)
-        
-        # Compute and store statistics
-        n_features = data.shape[1] if data.ndim > 1 else 1
-        
-        if self.feature_names is None:
-            self.feature_names = [f"feature_{i}" for i in range(n_features)]
-        
-        for i, name in enumerate(self.feature_names):
-            feature_data = data[:, i] if data.ndim > 1 else data
-            self.reference_stats[name] = {
-                'mean': float(np.mean(feature_data)),
-                'std': float(np.std(feature_data)),
-                'min': float(np.min(feature_data)),
-                'max': float(np.max(feature_data)),
-                'median': float(np.median(feature_data))
-            }
-        
-        logger.info(f"Reference data set: {len(data)} samples, {n_features} features")
-    
-    def detect_drift(self, current_data: np.ndarray) -> List[DriftResult]:
-        """
-        Detect drift in current data compared to reference.
-        
-        Args:
-            current_data: Current production data
-        
-        Returns:
-            List of DriftResult for each feature
-        """
-        if self.reference_data is None:
-            raise ValueError("Reference data not set. Call set_reference() first.")
-        
-        current_data = np.asarray(current_data)
-        results = []
-        
-        n_features = current_data.shape[1] if current_data.ndim > 1 else 1
-        
-        for i in range(n_features):
-            ref_feature = self.reference_data[:, i] if self.reference_data.ndim > 1 else self.reference_data
-            cur_feature = current_data[:, i] if current_data.ndim > 1 else current_data
-            
-            if self.method == 'ks':
-                statistic, p_value = ks_test(ref_feature, cur_feature)
-                drift_detected = p_value < self.threshold
-            elif self.method == 'psi':
-                statistic = psi(ref_feature, cur_feature)
-                p_value = 1.0 - min(statistic / 0.2, 1.0)  # Approximate
-                drift_detected = statistic >= self.threshold
-            else:
-                raise ValueError(f"Unknown method: {self.method}")
-            
-            result = DriftResult(
-                feature_name=self.feature_names[i],
-                drift_detected=drift_detected,
-                statistic=statistic,
-                p_value=p_value,
-                threshold=self.threshold,
-                method=self.method
-            )
-            results.append(result)
-        
-        # Log alerts
-        drifted_features = [r.feature_name for r in results if r.drift_detected]
-        if drifted_features:
-            logger.warning(f"Drift detected in features: {drifted_features}")
-        
-        return results
-    
-    def get_reference_stats(self) -> Dict[str, Dict]:
-        """Get reference data statistics."""
-        return self.reference_stats
-
-
-# ============================================================
-# PERFORMANCE MONITOR
-# ============================================================
-
-class PerformanceMonitor:
-    """
-    Monitor model performance over time.
-    
-    Tracks:
-    - Prediction latencies (p50, p95, p99)
-    - Classification metrics (accuracy, precision, recall, F1)
-    - Regression metrics (MSE, MAE, R²)
-    - Error rates
-    
-    Example:
-        >>> monitor = PerformanceMonitor(window_size=1000)
-        >>> 
-        >>> # Record predictions
-        >>> monitor.record_prediction(y_true=1, y_pred=1, latency_ms=50)
-        >>> 
-        >>> # Get metrics
-        >>> metrics = monitor.get_metrics()
-        >>> print(f"Accuracy: {metrics.accuracy}")
-    """
-    
-    def __init__(self, window_size: int = 1000):
-        """
-        Args:
-            window_size: Number of recent predictions to track
-        """
-        self.window_size = window_size
-        
-        # Use deque for efficient sliding window
-        self.y_true_history = deque(maxlen=window_size)
-        self.y_pred_history = deque(maxlen=window_size)
-        self.latency_history = deque(maxlen=window_size)
-        
-        self.total_predictions = 0
-        self.total_errors = 0
-    
-    def record_prediction(self, y_true: Optional[float] = None,
-                          y_pred: Optional[float] = None,
-                          latency_ms: Optional[float] = None,
-                          error: bool = False):
-        """
-        Record a prediction for monitoring.
-        
-        Args:
-            y_true: Ground truth (if available)
-            y_pred: Model prediction
-            latency_ms: Inference latency in milliseconds
-            error: Whether an error occurred
-        """
-        self.total_predictions += 1
-        
-        if y_true is not None:
-            self.y_true_history.append(y_true)
-        if y_pred is not None:
-            self.y_pred_history.append(y_pred)
-        if latency_ms is not None:
-            self.latency_history.append(latency_ms)
-        if error:
-            self.total_errors += 1
-    
-    def get_metrics(self, task: str = 'classification') -> PerformanceMetrics:
-        """
-        Compute current performance metrics.
-        
-        Args:
-            task: 'classification' or 'regression'
-        
-        Returns:
-            PerformanceMetrics dataclass
-        """
-        metrics = PerformanceMetrics()
-        
-        # Latency metrics
-        if self.latency_history:
-            latencies = list(self.latency_history)
-            metrics.latency_p50_ms = float(np.percentile(latencies, 50))
-            metrics.latency_p95_ms = float(np.percentile(latencies, 95))
-            metrics.latency_p99_ms = float(np.percentile(latencies, 99))
-        
-        # Label-based metrics
-        if self.y_true_history and self.y_pred_history:
-            y_true = np.array(list(self.y_true_history))
-            y_pred = np.array(list(self.y_pred_history))
-            
-            if task == 'classification':
-                metrics.accuracy = float(np.mean(y_true == y_pred))
-                
-                # Binary classification metrics
-                if len(np.unique(y_true)) == 2:
-                    tp = np.sum((y_true == 1) & (y_pred == 1))
-                    fp = np.sum((y_true == 0) & (y_pred == 1))
-                    fn = np.sum((y_true == 1) & (y_pred == 0))
-                    
-                    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-                    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-                    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-                    
-                    metrics.precision = float(precision)
-                    metrics.recall = float(recall)
-                    metrics.f1_score = float(f1)
-            
-            elif task == 'regression':
-                metrics.mse = float(np.mean((y_true - y_pred) ** 2))
-                metrics.mae = float(np.mean(np.abs(y_true - y_pred)))
-        
-        return metrics
-    
-    def get_error_rate(self) -> float:
-        """Get overall error rate."""
-        if self.total_predictions == 0:
-            return 0.0
-        return self.total_errors / self.total_predictions
-    
-    def check_degradation(self, 
-                          metric_name: str,
-                          threshold: float,
-                          comparison: str = 'lt') -> bool:
-        """
-        Check if a metric has degraded past threshold.
-        
-        Args:
-            metric_name: Name of metric to check
-            threshold: Threshold value
-            comparison: 'lt' (less than) or 'gt' (greater than)
-        
-        Returns:
-            True if degradation detected
-        """
-        metrics = self.get_metrics()
-        value = getattr(metrics, metric_name, None)
-        
-        if value is None:
-            return False
-        
-        if comparison == 'lt':
-            return value < threshold
-        else:
-            return value > threshold
-    
-    def reset(self):
-        """Reset all tracked metrics."""
-        self.y_true_history.clear()
-        self.y_pred_history.clear()
-        self.latency_history.clear()
-        self.total_predictions = 0
-        self.total_errors = 0
-
-
-# ============================================================
-# ALERTING
-# ============================================================
-
-class AlertManager:
-    """
-    Simple alerting system for monitoring.
-    
-    In production, integrate with:
-    - PagerDuty
-    - Slack
-    - Email
-    - AWS SNS
-    
-    Example:
-        >>> alert_manager = AlertManager()
-        >>> alert_manager.add_handler(slack_handler)
-        >>> alert_manager.add_handler(email_handler)
-        >>> 
-        >>> alert_manager.alert(
-        ...     severity="critical",
-        ...     message="Model accuracy dropped below 80%",
-        ...     metadata={"model": "fraud_detection", "accuracy": 0.75}
-        ... )
-    """
+class MetricsCollector:
+    """Collects and stores metrics."""
     
     def __init__(self):
-        self.handlers: List[Callable] = []
-        self.alert_history: List[Dict] = []
+        self.metrics: Dict[str, List[Metric]] = defaultdict(list)
+        self.lock = threading.Lock()
     
-    def add_handler(self, handler: Callable):
-        """Add an alert handler function."""
-        self.handlers.append(handler)
-    
-    def alert(self, severity: str, message: str, 
-              metadata: Optional[Dict[str, Any]] = None):
-        """
-        Send an alert.
+    def record_metric(self, name: str, value: float, metric_type: MetricType, labels: Dict[str, str] = None):
+        """Record a metric."""
+        if labels is None:
+            labels = {}
         
-        Args:
-            severity: 'info', 'warning', 'critical'
-            message: Alert message
-            metadata: Additional context
-        """
-        alert_data = {
-            'severity': severity,
-            'message': message,
-            'metadata': metadata or {},
-            'timestamp': datetime.now().isoformat()
+        with self.lock:
+            metric = Metric(
+                name=name,
+                value=value,
+                type=metric_type,
+                labels=labels,
+                timestamp=time.time()
+            )
+            self.metrics[name].append(metric)
+    
+    def get_metrics(self, name: str) -> List[Metric]:
+        """Get metrics by name."""
+        return self.metrics.get(name, [])
+    
+    def get_latest_value(self, name: str) -> Optional[float]:
+        """Get the latest value for a metric."""
+        metrics = self.get_metrics(name)
+        if metrics:
+            return metrics[-1].value
+        return None
+    
+    def get_recent_values(self, name: str, seconds: int = 60) -> List[float]:
+        """Get recent values for a metric."""
+        cutoff_time = time.time() - seconds
+        metrics = self.get_metrics(name)
+        return [m.value for m in metrics if m.timestamp >= cutoff_time]
+
+
+class ModelMonitor:
+    """Monitors model performance and system resources."""
+    
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.metrics_collector = MetricsCollector()
+        self.prediction_times = deque(maxlen=1000)  # Keep last 1000 prediction times
+        self.prediction_count = 0
+        self.error_count = 0
+        self.start_time = time.time()
+        
+        # Initialize system monitoring
+        self.system_monitor = SystemMonitor()
+    
+    def record_prediction(self, input_data: np.ndarray, prediction: Any, execution_time: float):
+        """Record a prediction event."""
+        self.prediction_count += 1
+        self.prediction_times.append(execution_time)
+        
+        # Record metrics
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_prediction_count",
+            value=self.prediction_count,
+            metric_type=MetricType.COUNTER,
+            labels={"model": self.model_name}
+        )
+        
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_prediction_time",
+            value=execution_time,
+            metric_type=MetricType.HISTOGRAM,
+            labels={"model": self.model_name}
+        )
+        
+        # Record input statistics
+        if isinstance(input_data, np.ndarray):
+            self.metrics_collector.record_metric(
+                name=f"{self.model_name}_input_mean",
+                value=float(np.mean(input_data)),
+                metric_type=MetricType.GAUGE,
+                labels={"model": self.model_name}
+            )
+            self.metrics_collector.record_metric(
+                name=f"{self.model_name}_input_std",
+                value=float(np.std(input_data)),
+                metric_type=MetricType.GAUGE,
+                labels={"model": self.model_name}
+            )
+    
+    def record_error(self):
+        """Record an error event."""
+        self.error_count += 1
+        
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_error_count",
+            value=self.error_count,
+            metric_type=MetricType.COUNTER,
+            labels={"model": self.model_name}
+        )
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics."""
+        if not self.prediction_times:
+            return {}
+        
+        return {
+            "model_name": self.model_name,
+            "prediction_count": self.prediction_count,
+            "error_count": self.error_count,
+            "error_rate": self.error_count / max(self.prediction_count, 1),
+            "avg_prediction_time": statistics.mean(self.prediction_times),
+            "p50_prediction_time": statistics.median(self.prediction_times),
+            "p95_prediction_time": float(np.percentile(self.prediction_times, 95)),
+            "p99_prediction_time": float(np.percentile(self.prediction_times, 99)),
+            "uptime_seconds": time.time() - self.start_time
         }
-        
-        self.alert_history.append(alert_data)
-        
-        # Log
-        log_method = {
-            'info': logger.info,
-            'warning': logger.warning,
-            'critical': logger.critical
-        }.get(severity, logger.info)
-        
-        log_method(f"[{severity.upper()}] {message}")
-        
-        # Send to handlers
-        for handler in self.handlers:
-            try:
-                handler(alert_data)
-            except Exception as e:
-                logger.error(f"Alert handler failed: {e}")
     
-    def get_alerts(self, severity: Optional[str] = None,
-                   limit: int = 100) -> List[Dict]:
-        """Get recent alerts, optionally filtered by severity."""
-        alerts = self.alert_history[-limit:]
+    def check_drift(self, new_data: np.ndarray, reference_data: np.ndarray, threshold: float = 0.1) -> bool:
+        """Check for data drift."""
+        # Simple statistical drift detection
+        new_mean = np.mean(new_data)
+        ref_mean = np.mean(reference_data)
         
-        if severity:
-            alerts = [a for a in alerts if a['severity'] == severity]
+        drift_detected = abs(new_mean - ref_mean) > threshold * max(abs(ref_mean), 1e-8)
         
-        return alerts
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_drift_detected",
+            value=int(drift_detected),
+            metric_type=MetricType.GAUGE,
+            labels={"model": self.model_name}
+        )
+        
+        return drift_detected
 
 
-# ============================================================
-# PROMETHEUS INTEGRATION
-# ============================================================
+class SystemMonitor:
+    """Monitors system resources."""
+    
+    def __init__(self):
+        self.metrics_collector = MetricsCollector()
+        self.resource_history = deque(maxlen=100)  # Keep last 100 readings
+    
+    def collect_system_metrics(self) -> Dict[str, float]:
+        """Collect system resource metrics."""
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory_percent = psutil.virtual_memory().percent
+        disk_percent = psutil.disk_usage('/').percent
+        
+        # GPU metrics if available
+        gpu_percent = 0.0
+        gpu_memory_percent = 0.0
+        try:
+            gpus = GPUtil.getGPUs()
+            if gpus:
+                gpu = gpus[0]  # Use first GPU
+                gpu_percent = gpu.load * 100
+                gpu_memory_percent = gpu.memoryUtil * 100
+        except:
+            pass  # GPU not available
+        
+        # Record metrics
+        self.metrics_collector.record_metric(
+            name="system_cpu_percent",
+            value=cpu_percent,
+            metric_type=MetricType.GAUGE
+        )
+        
+        self.metrics_collector.record_metric(
+            name="system_memory_percent",
+            value=memory_percent,
+            metric_type=MetricType.GAUGE
+        )
+        
+        self.metrics_collector.record_metric(
+            name="system_disk_percent",
+            value=disk_percent,
+            metric_type=MetricType.GAUGE
+        )
+        
+        if gpu_percent > 0:
+            self.metrics_collector.record_metric(
+                name="system_gpu_percent",
+                value=gpu_percent,
+                metric_type=MetricType.GAUGE
+            )
+            
+            self.metrics_collector.record_metric(
+                name="system_gpu_memory_percent",
+                value=gpu_memory_percent,
+                metric_type=MetricType.GAUGE
+            )
+        
+        # Store in history
+        self.resource_history.append({
+            "timestamp": time.time(),
+            "cpu": cpu_percent,
+            "memory": memory_percent,
+            "disk": disk_percent,
+            "gpu": gpu_percent,
+            "gpu_memory": gpu_memory_percent
+        })
+        
+        return {
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory_percent,
+            "disk_percent": disk_percent,
+            "gpu_percent": gpu_percent,
+            "gpu_memory_percent": gpu_memory_percent
+        }
+    
+    def get_system_health(self) -> Dict[str, Any]:
+        """Get system health summary."""
+        if not self.resource_history:
+            return {"status": "no_data", "timestamp": time.time()}
+        
+        recent_data = list(self.resource_history)[-10:]  # Last 10 readings
+        
+        avg_cpu = statistics.mean([d["cpu"] for d in recent_data])
+        avg_memory = statistics.mean([d["memory"] for d in recent_data])
+        avg_disk = statistics.mean([d["disk"] for d in recent_data])
+        
+        # Determine health status
+        if avg_cpu > 90 or avg_memory > 90 or avg_disk > 90:
+            status = "critical"
+        elif avg_cpu > 75 or avg_memory > 75 or avg_disk > 75:
+            status = "warning"
+        else:
+            status = "healthy"
+        
+        return {
+            "status": status,
+            "avg_cpu_percent": avg_cpu,
+            "avg_memory_percent": avg_memory,
+            "avg_disk_percent": avg_disk,
+            "timestamp": time.time()
+        }
 
-def generate_prometheus_metrics(monitor: PerformanceMonitor,
-                                 detector: Optional[DriftDetector] = None) -> str:
-    """
-    Generate Prometheus-compatible metrics string.
+
+class AlertManager:
+    """Manages alerts based on metrics."""
     
-    Example output:
-        # HELP model_latency_seconds Model inference latency
-        # TYPE model_latency_seconds histogram
-        model_latency_p50_ms 45.2
-        model_latency_p95_ms 120.5
+    def __init__(self):
+        self.alerts = []
+        self.rules = []
     
-    Args:
-        monitor: PerformanceMonitor instance
-        detector: Optional DriftDetector instance
+    def add_alert_rule(self, metric_name: str, condition: Callable[[float], bool], message: str):
+        """Add an alert rule."""
+        self.rules.append({
+            "metric_name": metric_name,
+            "condition": condition,
+            "message": message
+        })
     
-    Returns:
-        Prometheus metrics string
-    """
-    lines = []
-    metrics = monitor.get_metrics()
+    def check_alerts(self, metrics_collector: MetricsCollector):
+        """Check all alert rules against current metrics."""
+        for rule in self.rules:
+            latest_value = metrics_collector.get_latest_value(rule["metric_name"])
+            if latest_value is not None and rule["condition"](latest_value):
+                alert = {
+                    "timestamp": time.time(),
+                    "metric_name": rule["metric_name"],
+                    "value": latest_value,
+                    "message": rule["message"]
+                }
+                self.alerts.append(alert)
+                logger.warning(f"Alert: {rule['message']} (value: {latest_value})")
     
-    # Latency metrics
-    if metrics.latency_p50_ms is not None:
-        lines.append("# HELP model_latency_ms Model inference latency in milliseconds")
-        lines.append("# TYPE model_latency_ms gauge")
-        lines.append(f'model_latency_p50_ms {metrics.latency_p50_ms}')
-        lines.append(f'model_latency_p95_ms {metrics.latency_p95_ms}')
-        lines.append(f'model_latency_p99_ms {metrics.latency_p99_ms}')
-    
-    # Accuracy
-    if metrics.accuracy is not None:
-        lines.append("# HELP model_accuracy Classification accuracy")
-        lines.append("# TYPE model_accuracy gauge")
-        lines.append(f'model_accuracy {metrics.accuracy}')
-    
-    # Error rate
-    error_rate = monitor.get_error_rate()
-    lines.append("# HELP model_error_rate Prediction error rate")
-    lines.append("# TYPE model_error_rate gauge")
-    lines.append(f'model_error_rate {error_rate}')
-    
-    # Total predictions
-    lines.append("# HELP model_predictions_total Total predictions made")
-    lines.append("# TYPE model_predictions_total counter")
-    lines.append(f'model_predictions_total {monitor.total_predictions}')
-    
-    return '\n'.join(lines)
+    def get_active_alerts(self) -> List[Dict[str, Any]]:
+        """Get active alerts."""
+        return self.alerts
 
 
-# ============================================================
-# EXPORTS
-# ============================================================
+class ModelDriftDetector:
+    """Detects model drift in production."""
+    
+    def __init__(self, model_name: str, reference_data: np.ndarray, threshold: float = 0.1):
+        self.model_name = model_name
+        self.reference_data = reference_data
+        self.threshold = threshold
+        self.metrics_collector = MetricsCollector()
+    
+    def detect_drift(self, current_data: np.ndarray) -> Dict[str, Any]:
+        """Detect drift between reference and current data."""
+        # Calculate statistical differences
+        ref_mean = np.mean(self.reference_data)
+        ref_std = np.std(self.reference_data)
+        curr_mean = np.mean(current_data)
+        curr_std = np.std(current_data)
+        
+        mean_diff = abs(ref_mean - curr_mean)
+        std_diff = abs(ref_std - curr_std)
+        
+        # Use Kolmogorov-Smirnov test for distribution comparison
+        from scipy import stats
+        ks_stat, p_value = stats.ks_2samp(self.reference_data.flatten(), current_data.flatten())
+        
+        drift_detected = ks_stat > self.threshold
+        
+        # Record metrics
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_drift_mean_diff",
+            value=mean_diff,
+            metric_type=MetricType.GAUGE
+        )
+        
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_drift_std_diff",
+            value=std_diff,
+            metric_type=MetricType.GAUGE
+        )
+        
+        self.metrics_collector.record_metric(
+            name=f"{self.model_name}_drift_ks_stat",
+            value=ks_stat,
+            metric_type=MetricType.GAUGE
+        )
+        
+        return {
+            "drift_detected": drift_detected,
+            "mean_difference": mean_diff,
+            "std_difference": std_diff,
+            "ks_statistic": ks_stat,
+            "p_value": p_value,
+            "threshold": self.threshold
+        }
 
-__all__ = [
-    # Data structures
-    'DriftResult', 'PerformanceMetrics',
-    # Statistical tests
-    'ks_test', 'ks_test_manual', 'psi', 'chi_square_test',
-    # Monitors
-    'DriftDetector', 'PerformanceMonitor', 'AlertManager',
-    # Utils
-    'generate_prometheus_metrics',
-]
+
+class PerformanceTracker:
+    """Tracks model performance over time."""
+    
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.metrics_collector = MetricsCollector()
+        self.predictions = []
+        self.targets = []
+    
+    def add_prediction(self, prediction: float, target: float):
+        """Add a prediction-target pair."""
+        self.predictions.append(prediction)
+        self.targets.append(target)
+        
+        # Calculate and record metrics
+        if len(self.predictions) >= 2:
+            mse = np.mean((np.array(self.predictions) - np.array(self.targets)) ** 2)
+            mae = np.mean(np.abs(np.array(self.predictions) - np.array(self.targets)))
+            
+            self.metrics_collector.record_metric(
+                name=f"{self.model_name}_mse",
+                value=mse,
+                metric_type=MetricType.GAUGE
+            )
+            
+            self.metrics_collector.record_metric(
+                name=f"{self.model_name}_mae",
+                value=mae,
+                metric_type=MetricType.GAUGE
+            )
+    
+    def get_accuracy_metrics(self) -> Dict[str, float]:
+        """Get accuracy metrics."""
+        if len(self.predictions) < 2:
+            return {}
+        
+        predictions = np.array(self.predictions)
+        targets = np.array(self.targets)
+        
+        mse = np.mean((predictions - targets) ** 2)
+        mae = np.mean(np.abs(predictions - targets))
+        rmse = np.sqrt(mse)
+        
+        # R-squared
+        ss_res = np.sum((targets - predictions) ** 2)
+        ss_tot = np.sum((targets - np.mean(targets)) ** 2)
+        r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+        
+        return {
+            "mse": float(mse),
+            "mae": float(mae),
+            "rmse": float(rmse),
+            "r2": float(r2)
+        }
+
+
+# Global monitoring instances
+model_monitors: Dict[str, ModelMonitor] = {}
+system_monitor = SystemMonitor()
+alert_manager = AlertManager()
+
+
+def initialize_monitoring():
+    """Initialize monitoring components."""
+    # Add some default alert rules
+    alert_manager.add_alert_rule(
+        "system_cpu_percent",
+        lambda x: x > 90,
+        "High CPU usage detected"
+    )
+    
+    alert_manager.add_alert_rule(
+        "system_memory_percent",
+        lambda x: x > 90,
+        "High memory usage detected"
+    )
+    
+    alert_manager.add_alert_rule(
+        f"model_prediction_time",
+        lambda x: x > 1.0,  # More than 1 second
+        "Slow prediction time detected"
+    )
+
+
+def get_monitor(model_name: str) -> ModelMonitor:
+    """Get or create a monitor for a model."""
+    if model_name not in model_monitors:
+        model_monitors[model_name] = ModelMonitor(model_name)
+    return model_monitors[model_name]
+
+
+def log_prediction(model_name: str, input_data: np.ndarray, prediction: Any, execution_time: float):
+    """Log a prediction event."""
+    monitor = get_monitor(model_name)
+    monitor.record_prediction(input_data, prediction, execution_time)
+
+
+def log_error(model_name: str):
+    """Log an error event."""
+    monitor = get_monitor(model_name)
+    monitor.record_error()
+
+
+def get_model_performance(model_name: str) -> Dict[str, Any]:
+    """Get performance metrics for a model."""
+    monitor = get_monitor(model_name)
+    return monitor.get_performance_metrics()
+
+
+def get_system_metrics() -> Dict[str, Any]:
+    """Get system metrics."""
+    return system_monitor.collect_system_metrics()
+
+
+def get_system_health() -> Dict[str, Any]:
+    """Get system health."""
+    return system_monitor.get_system_health()
+
+
+# Initialize monitoring when module is loaded
+initialize_monitoring()

@@ -1,599 +1,477 @@
 """
 Vector Database Module
-======================
-Approximate Nearest Neighbor (ANN) search implementations.
 
-Includes:
-- Brute force (exact) search
-- HNSW (Hierarchical Navigable Small World) - from scratch
-- LSH (Locality-Sensitive Hashing)
-- Product Quantization basics
-
-Used in:
-- Semantic search
-- RAG (Retrieval-Augmented Generation)
-- Recommendation systems
-
-Author: AI-Mastery-2026
+This module implements vector storage and similarity search capabilities,
+including HNSW (Hierarchical Navigable Small World) and basic vector operations.
 """
 
 import numpy as np
-from typing import List, Tuple, Optional, Dict, Any, Callable
+from typing import List, Tuple, Dict, Any, Optional, Union
+from collections import defaultdict
+import heapq
+import math
 from dataclasses import dataclass
-from heapq import heappush, heappop, nlargest, nsmallest
-import random
-import logging
+import pickle
+import os
 
-logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# DISTANCE FUNCTIONS
-# ============================================================
-
-def cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
-    """Cosine distance = 1 - cosine_similarity."""
-    dot = np.dot(v1, v2)
-    norm = np.linalg.norm(v1) * np.linalg.norm(v2)
-    if norm == 0:
-        return 1.0
-    return 1.0 - (dot / norm)
-
-
-def euclidean_distance(v1: np.ndarray, v2: np.ndarray) -> float:
-    """Euclidean (L2) distance."""
-    return float(np.sqrt(np.sum((v1 - v2) ** 2)))
-
-
-def inner_product_distance(v1: np.ndarray, v2: np.ndarray) -> float:
-    """Negative inner product (for similarity ranking)."""
-    return -float(np.dot(v1, v2))
-
-
-DISTANCE_FUNCTIONS = {
-    'cosine': cosine_distance,
-    'euclidean': euclidean_distance,
-    'l2': euclidean_distance,
-    'ip': inner_product_distance,
-    'inner_product': inner_product_distance,
-}
-
-
-# ============================================================
-# DATA STRUCTURES
-# ============================================================
 
 @dataclass
-class SearchResult:
-    """Result from a vector search."""
-    id: Any
-    score: float
-    vector: Optional[np.ndarray] = None
-    metadata: Optional[Dict[str, Any]] = None
+class VectorItem:
+    """Represents an item with vector embedding and metadata."""
+    id: str
+    vector: np.ndarray
+    metadata: Dict[str, Any]
+    created_at: float
 
 
-# ============================================================
-# BRUTE FORCE (EXACT) SEARCH
-# ============================================================
-
-class BruteForceIndex:
-    """
-    Exact nearest neighbor search using brute force.
+class VectorIndex:
+    """Base class for vector indexing."""
     
-    Complexity: O(n × d) per query
-    Space: O(n × d)
-    
-    Use for:
-    - Small datasets (< 100K vectors)
-    - Baseline comparison
-    - Exact results required
-    
-    Example:
-        >>> index = BruteForceIndex(metric='cosine')
-        >>> index.add(vectors, ids=ids)
-        >>> results = index.search(query_vector, k=10)
-    """
-    
-    def __init__(self, metric: str = 'cosine'):
+    def __init__(self, dim: int, metric: str = 'cosine'):
         """
+        Initialize vector index.
+        
         Args:
-            metric: Distance metric ('cosine', 'euclidean', 'ip')
+            dim: Dimension of vectors
+            metric: Distance metric ('cosine', 'euclidean', 'dot')
         """
+        self.dim = dim
         self.metric = metric
-        self.distance_fn = DISTANCE_FUNCTIONS[metric]
-        self.vectors: Optional[np.ndarray] = None
-        self.ids: Optional[List[Any]] = None
-        self.metadata: Optional[List[Dict]] = None
+        self.items: Dict[str, VectorItem] = {}
     
-    def add(self, vectors: np.ndarray, 
-            ids: Optional[List[Any]] = None,
-            metadata: Optional[List[Dict]] = None):
-        """
-        Add vectors to the index.
+    def add(self, id: str, vector: np.ndarray, metadata: Dict[str, Any] = None):
+        """Add a vector to the index."""
+        if metadata is None:
+            metadata = {}
         
-        Args:
-            vectors: Array of shape (n, d)
-            ids: Optional list of IDs
-            metadata: Optional list of metadata dicts
-        """
-        vectors = np.asarray(vectors)
+        if vector.shape[0] != self.dim:
+            raise ValueError(f"Vector dimension {vector.shape[0]} does not match index dimension {self.dim}")
         
-        if self.vectors is None:
-            self.vectors = vectors
-            self.ids = ids if ids else list(range(len(vectors)))
-            self.metadata = metadata if metadata else [{}] * len(vectors)
+        # Normalize vector for cosine similarity
+        if self.metric == 'cosine':
+            vector = vector / (np.linalg.norm(vector) + 1e-12)
+        
+        self.items[id] = VectorItem(
+            id=id,
+            vector=vector,
+            metadata=metadata,
+            created_at=time.time()
+        )
+    
+    def remove(self, id: str):
+        """Remove a vector from the index."""
+        if id in self.items:
+            del self.items[id]
+    
+    def similarity(self, v1: np.ndarray, v2: np.ndarray) -> float:
+        """Calculate similarity between two vectors."""
+        if self.metric == 'cosine':
+            return np.dot(v1, v2)  # Already normalized
+        elif self.metric == 'euclidean':
+            return -np.linalg.norm(v1 - v2)  # Negative for similarity (higher is more similar)
+        elif self.metric == 'dot':
+            return np.dot(v1, v2)
         else:
-            self.vectors = np.vstack([self.vectors, vectors])
-            new_ids = ids if ids else list(range(len(self.ids), len(self.ids) + len(vectors)))
-            self.ids.extend(new_ids)
-            new_meta = metadata if metadata else [{}] * len(vectors)
-            self.metadata.extend(new_meta)
+            raise ValueError(f"Unknown metric: {self.metric}")
     
-    def search(self, query: np.ndarray, k: int = 10,
-               filter_fn: Optional[Callable] = None) -> List[SearchResult]:
-        """
-        Search for k nearest neighbors.
-        
-        Args:
-            query: Query vector
-            k: Number of results
-            filter_fn: Optional function to filter results
-        
-        Returns:
-            List of SearchResult sorted by distance
-        """
-        if self.vectors is None:
-            return []
-        
-        query = np.asarray(query)
-        
-        # Compute all distances
-        distances = [self.distance_fn(query, v) for v in self.vectors]
-        
-        # Get top k
-        indices = np.argsort(distances)[:k * 2]  # Get more to allow for filtering
-        
-        results = []
-        for idx in indices:
-            if filter_fn and not filter_fn(self.metadata[idx]):
-                continue
-            
-            results.append(SearchResult(
-                id=self.ids[idx],
-                score=distances[idx],
-                vector=self.vectors[idx],
-                metadata=self.metadata[idx]
-            ))
-            
-            if len(results) >= k:
-                break
-        
-        return results
+    def search(self, query: np.ndarray, k: int = 10) -> List[Tuple[str, float, Dict[str, Any]]]:
+        """Search for k nearest neighbors."""
+        raise NotImplementedError("Subclasses must implement search method")
     
-    def __len__(self) -> int:
-        return len(self.vectors) if self.vectors is not None else 0
+    def save(self, path: str):
+        """Save the index to disk."""
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+    
+    @classmethod
+    def load(cls, path: str):
+        """Load the index from disk."""
+        with open(path, 'rb') as f:
+            return pickle.load(f)
 
 
-# ============================================================
-# HNSW (Hierarchical Navigable Small World)
-# ============================================================
+class LinearVectorIndex(VectorIndex):
+    """Simple linear search index for small datasets."""
+    
+    def search(self, query: np.ndarray, k: int = 10) -> List[Tuple[str, float, Dict[str, Any]]]:
+        """Linear search for k nearest neighbors."""
+        if self.metric == 'cosine':
+            query = query / (np.linalg.norm(query) + 1e-12)
+        
+        # Calculate similarities with all vectors
+        similarities = []
+        for item_id, item in self.items.items():
+            sim = self.similarity(query, item.vector)
+            similarities.append((item_id, sim, item.metadata))
+        
+        # Sort by similarity (descending) and return top k
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return similarities[:k]
+
 
 class HNSWNode:
     """Node in HNSW graph."""
     
-    def __init__(self, id: Any, vector: np.ndarray, level: int):
+    def __init__(self, id: str, vector: np.ndarray, level: int):
         self.id = id
         self.vector = vector
         self.level = level
-        self.neighbors: Dict[int, List['HNSWNode']] = {l: [] for l in range(level + 1)}
+        self.connections: Dict[int, List[Tuple[str, float]]] = defaultdict(list)  # level -> [(neighbor_id, distance)]
 
 
-class HNSW:
+class HNSWIndex(VectorIndex):
     """
-    Hierarchical Navigable Small World Graph.
-    
-    State-of-the-art ANN algorithm used by:
-    - Pinecone, Qdrant, Milvus, Weaviate
-    - Facebook FAISS
-    
-    Complexity:
-    - Build: O(n log n)
-    - Search: O(log n)
-    
-    Key parameters:
-    - M: Max connections per node
-    - ef_construction: Beam width during build
-    - ef_search: Beam width during search
-    
-    Algorithm:
-    1. Multi-layer graph with exponentially decreasing density
-    2. Start search from top layer, greedily navigate down
-    3. At bottom layer, do beam search for precision
-    
-    Example:
-        >>> hnsw = HNSW(dim=384, M=16, ef_construction=200)
-        >>> hnsw.add_items(vectors, ids)
-        >>> results = hnsw.search(query, k=10, ef=100)
+    Hierarchical Navigable Small World (HNSW) index implementation.
+    This provides efficient approximate nearest neighbor search.
     """
     
-    def __init__(self, dim: int, 
-                 M: int = 16,
-                 ef_construction: int = 200,
-                 metric: str = 'cosine',
-                 ml: float = 1.0 / np.log(16)):
+    def __init__(self, dim: int, metric: str = 'cosine', max_level: int = 16, 
+                 ef_construction: int = 200, M: int = 16):
         """
-        Args:
-            dim: Vector dimensionality
-            M: Max edges per node (default 16)
-            ef_construction: Beam width for construction
-            metric: Distance metric
-            ml: Level multiplier (controls layer distribution)
-        """
-        self.dim = dim
-        self.M = M
-        self.M0 = 2 * M  # Max edges at level 0
-        self.ef_construction = ef_construction
-        self.ml = ml
-        self.metric = metric
-        self.distance_fn = DISTANCE_FUNCTIONS[metric]
+        Initialize HNSW index.
         
-        self.nodes: Dict[Any, HNSWNode] = {}
-        self.entry_point: Optional[HNSWNode] = None
-        self.max_level = 0
+        Args:
+            dim: Dimension of vectors
+            metric: Distance metric
+            max_level: Maximum level in the hierarchy
+            ef_construction: Size of the dynamic list for construction
+            M: Number of connections
+        """
+        super().__init__(dim, metric)
+        self.max_level = max_level
+        self.ef_construction = ef_construction
+        self.M = M
+        self.M0 = M * 2
+        self.level_mult = 1 / np.log(M)
+        
+        self.nodes: Dict[str, HNSWNode] = {}
+        self.entry_point: Optional[str] = None
+        self.current_max_level = -1
+        
+        # Random state for level generation
+        self.random_state = np.random.RandomState(42)
     
     def _random_level(self) -> int:
-        """Generate random level for new node."""
-        level = 0
-        while random.random() < self.ml and level < 32:
-            level += 1
-        return level
+        """Generate a random level for a new node."""
+        return int(-np.log(self.random_state.random()) * self.level_mult)
     
-    def _distance(self, node1: HNSWNode, node2: HNSWNode) -> float:
-        """Compute distance between two nodes."""
-        return self.distance_fn(node1.vector, node2.vector)
+    def _distance(self, v1: np.ndarray, v2: np.ndarray) -> float:
+        """Calculate distance between two vectors."""
+        if self.metric == 'cosine':
+            # Cosine distance = 1 - cosine similarity
+            return 1 - np.dot(v1, v2)
+        elif self.metric == 'euclidean':
+            return np.linalg.norm(v1 - v2)
+        elif self.metric == 'dot':
+            # Negative dot product as distance
+            return -np.dot(v1, v2)
+        else:
+            raise ValueError(f"Unknown metric: {self.metric}")
     
-    def _search_layer(self, query: np.ndarray, 
-                      entry: HNSWNode,
-                      ef: int,
-                      level: int) -> List[Tuple[float, HNSWNode]]:
-        """
-        Search single layer using greedy beam search.
+    def add(self, id: str, vector: np.ndarray, metadata: Dict[str, Any] = None):
+        """Add a vector to the HNSW index."""
+        if metadata is None:
+            metadata = {}
         
-        Args:
-            query: Query vector
-            entry: Entry point node
-            ef: Beam width
-            level: Layer level
+        if vector.shape[0] != self.dim:
+            raise ValueError(f"Vector dimension {vector.shape[0]} does not match index dimension {self.dim}")
         
-        Returns:
-            List of (distance, node) tuples
-        """
-        visited = {entry.id}
-        candidates = [(self.distance_fn(query, entry.vector), entry)]
-        results = [(candidates[0][0], entry)]
+        # Normalize vector for cosine similarity
+        if self.metric == 'cosine':
+            vector = vector / (np.linalg.norm(vector) + 1e-12)
         
-        while candidates:
-            # Get closest candidate
-            dist, current = heappop(candidates)
-            
-            # Get furthest result
-            furthest_dist = max(r[0] for r in results) if results else float('inf')
-            
-            if dist > furthest_dist:
-                break
-            
-            # Explore neighbors
-            for neighbor in current.neighbors.get(level, []):
-                if neighbor.id in visited:
-                    continue
-                
-                visited.add(neighbor.id)
-                neighbor_dist = self.distance_fn(query, neighbor.vector)
-                
-                if neighbor_dist < furthest_dist or len(results) < ef:
-                    heappush(candidates, (neighbor_dist, neighbor))
-                    results.append((neighbor_dist, neighbor))
-                    
-                    # Keep only ef best
-                    if len(results) > ef:
-                        results = nsmallest(ef, results, key=lambda x: x[0])
-        
-        return results
-    
-    def _select_neighbors(self, candidates: List[Tuple[float, HNSWNode]],
-                          M: int) -> List[HNSWNode]:
-        """Select M best neighbors from candidates."""
-        sorted_candidates = sorted(candidates, key=lambda x: x[0])
-        return [node for _, node in sorted_candidates[:M]]
-    
-    def add(self, vector: np.ndarray, id: Any):
-        """
-        Add a single vector to the index.
-        
-        Args:
-            vector: Vector to add
-            id: ID for the vector
-        """
-        vector = np.asarray(vector)
+        # Generate random level for the new node
         level = self._random_level()
-        node = HNSWNode(id, vector, level)
+        level = min(level, self.max_level)
         
-        if self.entry_point is None:
-            # First node
-            self.entry_point = node
-            self.max_level = level
-            self.nodes[id] = node
+        # Create new node
+        new_node = HNSWNode(id, vector, level)
+        self.nodes[id] = new_node
+        
+        # Add to base index
+        super().add(id, vector, metadata)
+        
+        # Update entry point if this is the first node or has higher level
+        if self.entry_point is None or level > self.current_max_level:
+            self.entry_point = id
+            self.current_max_level = level
+        
+        # Insert the new node into the graph structure
+        self._insert_node(new_node)
+    
+    def _insert_node(self, new_node: HNSWNode):
+        """Insert a new node into the HNSW graph."""
+        if len(self.nodes) == 1:
+            # First node, nothing to connect to
             return
         
-        entry = self.entry_point
+        # Find nearest neighbors at each level
+        ep_id = self.entry_point
+        ep_vector = self.nodes[ep_id].vector
         
-        # Descend from top to level+1, finding closest entry
-        for l in range(self.max_level, level, -1):
-            results = self._search_layer(vector, entry, ef=1, level=l)
-            if results:
-                entry = min(results, key=lambda x: x[0])[1]
-        
-        # Insert at each level from level down to 0
-        for l in range(min(level, self.max_level), -1, -1):
-            # Find ef_construction nearest neighbors
-            results = self._search_layer(vector, entry, 
-                                         ef=self.ef_construction, level=l)
+        # Start from the highest level and go down
+        for level in range(self.current_max_level, -1, -1):
+            # Search for nearest neighbors at this level
+            ep_id = self._search_layer(new_node.vector, ep_id, level, 1)[0][0]
             
-            # Select M best as neighbors
-            M = self.M if l > 0 else self.M0
-            neighbors = self._select_neighbors(results, M)
-            
-            # Add bidirectional edges
-            node.neighbors[l] = neighbors
-            for neighbor in neighbors:
-                neighbor.neighbors[l].append(node)
+            # Connect the new node to neighbors at this level
+            if level <= new_node.level:
+                # Get nearest neighbors to connect to
+                neighbors = self._select_neighbors(new_node.vector, self.nodes[ep_id].vector, level)
                 
-                # Prune if too many edges
-                if len(neighbor.neighbors[l]) > M:
-                    # Keep M closest
-                    neighbor.neighbors[l] = self._select_neighbors(
-                        [(self._distance(node, n), n) for n in neighbor.neighbors[l]], M
-                    )
+                # Connect new node to neighbors
+                for neighbor_id, _ in neighbors:
+                    neighbor_node = self.nodes[neighbor_id]
+                    dist = self._distance(new_node.vector, neighbor_node.vector)
+                    
+                    # Add connection from new node to neighbor
+                    new_node.connections[level].append((neighbor_id, dist))
+                    
+                    # Add connection from neighbor to new node
+                    neighbor_node.connections[level].append((new_node.id, dist))
+                
+                # Limit number of connections
+                if len(new_node.connections[level]) > self.M:
+                    # Prune connections to maintain graph quality
+                    self._prune_connections(new_node, level)
+    
+    def _search_layer(self, query: np.ndarray, ep_id: str, level: int, k: int) -> List[Tuple[str, float]]:
+        """Search for nearest neighbors in a specific level."""
+        visited = set()
+        candidate_set = [(self._distance(query, self.nodes[ep_id].vector), ep_id)]
+        heapq.heapify(candidate_set)
+        
+        visited.add(ep_id)
+        results = [(self._distance(query, self.nodes[ep_id].vector), ep_id)]
+        
+        while candidate_set:
+            dist, current_id = heapq.heappop(candidate_set)
             
-            if results:
-                entry = min(results, key=lambda x: x[0])[1]
-        
-        # Update entry point if new node has higher level
-        if level > self.max_level:
-            self.entry_point = node
-            self.max_level = level
-        
-        self.nodes[id] = node
-    
-    def add_items(self, vectors: np.ndarray, ids: Optional[List[Any]] = None):
-        """
-        Add multiple vectors to the index.
-        
-        Args:
-            vectors: Array of vectors (n, d)
-            ids: Optional list of IDs
-        """
-        vectors = np.asarray(vectors)
-        if ids is None:
-            ids = list(range(len(vectors)))
-        
-        for i, (vector, id_) in enumerate(zip(vectors, ids)):
-            self.add(vector, id_)
+            # Check if we can terminate early
+            if dist > results[0][0] and len(results) >= k:
+                break
             
-            if (i + 1) % 1000 == 0:
-                logger.info(f"Indexed {i + 1}/{len(vectors)} vectors")
-    
-    def search(self, query: np.ndarray, k: int = 10,
-               ef: Optional[int] = None) -> List[SearchResult]:
-        """
-        Search for k nearest neighbors.
-        
-        Args:
-            query: Query vector
-            k: Number of results
-            ef: Search beam width (default: k)
-        
-        Returns:
-            List of SearchResult sorted by distance
-        """
-        if self.entry_point is None:
-            return []
-        
-        query = np.asarray(query)
-        ef = ef or max(k, 10)
-        
-        entry = self.entry_point
-        
-        # Descend from top to level 1
-        for l in range(self.max_level, 0, -1):
-            results = self._search_layer(query, entry, ef=1, level=l)
-            if results:
-                entry = min(results, key=lambda x: x[0])[1]
-        
-        # Search at level 0 with full ef
-        results = self._search_layer(query, entry, ef=ef, level=0)
-        
-        # Return top k
-        results = sorted(results, key=lambda x: x[0])[:k]
-        
-        return [
-            SearchResult(id=node.id, score=dist, vector=node.vector)
-            for dist, node in results
-        ]
-    
-    def __len__(self) -> int:
-        return len(self.nodes)
-
-
-# ============================================================
-# LSH (Locality-Sensitive Hashing)
-# ============================================================
-
-class LSH:
-    """
-    Locality-Sensitive Hashing for approximate nearest neighbors.
-    
-    Uses random hyperplane projections to hash similar vectors
-    to the same buckets with high probability.
-    
-    Complexity:
-    - Build: O(n × d × num_tables)
-    - Search: O(num_tables × bucket_size)
-    
-    Trade-offs:
-    - More tables = higher recall, more memory
-    - More bits = higher precision, sparser buckets
-    
-    Example:
-        >>> lsh = LSH(dim=384, num_tables=10, num_bits=8)
-        >>> lsh.add_items(vectors, ids)
-        >>> results = lsh.search(query, k=10)
-    """
-    
-    def __init__(self, dim: int, num_tables: int = 10, num_bits: int = 8):
-        """
-        Args:
-            dim: Vector dimensionality
-            num_tables: Number of hash tables
-            num_bits: Bits per hash (determines bucket granularity)
-        """
-        self.dim = dim
-        self.num_tables = num_tables
-        self.num_bits = num_bits
-        
-        # Random projection matrices for each table
-        self.projections = [
-            np.random.randn(num_bits, dim) 
-            for _ in range(num_tables)
-        ]
-        
-        # Hash tables: table_idx -> bucket_hash -> list of (id, vector)
-        self.tables: List[Dict[str, List[Tuple[Any, np.ndarray]]]] = [
-            {} for _ in range(num_tables)
-        ]
-    
-    def _hash(self, vector: np.ndarray, table_idx: int) -> str:
-        """Compute LSH hash for a vector."""
-        projection = self.projections[table_idx]
-        bits = (projection @ vector > 0).astype(int)
-        return ''.join(map(str, bits))
-    
-    def add(self, vector: np.ndarray, id: Any):
-        """Add a single vector."""
-        vector = np.asarray(vector)
-        
-        for i, table in enumerate(self.tables):
-            hash_key = self._hash(vector, i)
-            if hash_key not in table:
-                table[hash_key] = []
-            table[hash_key].append((id, vector))
-    
-    def add_items(self, vectors: np.ndarray, ids: Optional[List[Any]] = None):
-        """Add multiple vectors."""
-        vectors = np.asarray(vectors)
-        if ids is None:
-            ids = list(range(len(vectors)))
-        
-        for vector, id_ in zip(vectors, ids):
-            self.add(vector, id_)
-    
-    def search(self, query: np.ndarray, k: int = 10) -> List[SearchResult]:
-        """Search for k nearest neighbors."""
-        query = np.asarray(query)
-        
-        # Collect candidates from all tables
-        candidates = {}  # id -> vector
-        
-        for i, table in enumerate(self.tables):
-            hash_key = self._hash(query, i)
+            current_node = self.nodes[current_id]
             
-            if hash_key in table:
-                for id_, vector in table[hash_key]:
-                    if id_ not in candidates:
-                        candidates[id_] = vector
+            # Check neighbors at this level
+            for neighbor_id, _ in current_node.connections[level]:
+                if neighbor_id not in visited:
+                    visited.add(neighbor_id)
+                    neighbor_dist = self._distance(query, self.nodes[neighbor_id].vector)
+                    
+                    if len(results) < k:
+                        heapq.heappush(results, (-neighbor_dist, neighbor_id))
+                    elif neighbor_dist < -results[0][0]:
+                        heapq.heapreplace(results, (-neighbor_dist, neighbor_id))
+                    
+                    heapq.heappush(candidate_set, (neighbor_dist, neighbor_id))
         
-        if not candidates:
-            return []
-        
-        # Compute exact distances for candidates
-        results = []
-        for id_, vector in candidates.items():
-            dist = cosine_distance(query, vector)
-            results.append(SearchResult(id=id_, score=dist, vector=vector))
-        
-        # Return top k
-        results.sort(key=lambda x: x.score)
+        # Convert to positive distances and return top k
+        results = [(-dist, node_id) for dist, node_id in results]
+        results.sort()  # Sort by distance (ascending)
         return results[:k]
     
-    def __len__(self) -> int:
-        # Count unique vectors across all tables (approximation)
-        all_ids = set()
-        for table in self.tables:
-            for bucket in table.values():
-                for id_, _ in bucket:
-                    all_ids.add(id_)
-        return len(all_ids)
-
-
-# ============================================================
-# VECTOR INDEX FACTORY
-# ============================================================
-
-class VectorIndex:
-    """
-    Factory for creating vector indexes.
-    
-    Unified interface for different index types.
-    
-    Example:
-        >>> index = VectorIndex.create('hnsw', dim=384)
-        >>> index.add_items(vectors, ids)
-        >>> results = index.search(query, k=10)
-    """
-    
-    @staticmethod
-    def create(index_type: str, dim: int, **kwargs) -> Any:
-        """
-        Create a vector index.
+    def _select_neighbors(self, query: np.ndarray, ep_vector: np.ndarray, level: int) -> List[Tuple[str, float]]:
+        """Select neighbors to connect to."""
+        # For simplicity, return the closest M connections
+        # In a full implementation, this would use more sophisticated selection
+        neighbors = []
+        for node_id, node in self.nodes.items():
+            if node.level >= level:
+                dist = self._distance(query, node.vector)
+                neighbors.append((node_id, dist))
         
-        Args:
-            index_type: 'brute_force', 'hnsw', 'lsh'
-            dim: Vector dimensionality
-            **kwargs: Index-specific parameters
+        # Sort by distance and return top M
+        neighbors.sort(key=lambda x: x[1])
+        return neighbors[:self.M]
+    
+    def _prune_connections(self, node: HNSWNode, level: int):
+        """Prune connections to maintain graph quality."""
+        # Simple pruning: keep only the M closest connections
+        connections = node.connections[level]
+        if len(connections) <= self.M:
+            return
         
-        Returns:
-            Vector index instance
-        """
-        if index_type == 'brute_force':
-            return BruteForceIndex(metric=kwargs.get('metric', 'cosine'))
-        elif index_type == 'hnsw':
-            return HNSW(
-                dim=dim,
-                M=kwargs.get('M', 16),
-                ef_construction=kwargs.get('ef_construction', 200),
-                metric=kwargs.get('metric', 'cosine')
-            )
-        elif index_type == 'lsh':
-            return LSH(
-                dim=dim,
-                num_tables=kwargs.get('num_tables', 10),
-                num_bits=kwargs.get('num_bits', 8)
-            )
+        # Calculate distances to all connections and keep closest M
+        connections_with_dist = []
+        for neighbor_id, _ in connections:
+            neighbor_node = self.nodes[neighbor_id]
+            dist = self._distance(node.vector, neighbor_node.vector)
+            connections_with_dist.append((neighbor_id, dist))
+        
+        # Sort by distance and keep top M
+        connections_with_dist.sort(key=lambda x: x[1])
+        node.connections[level] = connections_with_dist[:self.M]
+    
+    def search(self, query: np.ndarray, k: int = 10) -> List[Tuple[str, float, Dict[str, Any]]]:
+        """Search for k nearest neighbors using HNSW."""
+        if not self.nodes:
+            return []
+        
+        if self.metric == 'cosine':
+            query = query / (np.linalg.norm(query) + 1e-12)
+        
+        # Start from entry point
+        ep_id = self.entry_point
+        ep_vector = self.nodes[ep_id].vector
+        
+        # Search from top level down
+        for level in range(self.current_max_level, -1, -1):
+            # Search in this level
+            ep_id = self._search_layer(query, ep_id, level, 1)[0][0]
+        
+        # Now perform search at the base level to get k nearest
+        results = self._search_layer(query, ep_id, 0, k)
+        
+        # Convert to the expected format: (id, distance, metadata)
+        final_results = []
+        for dist, node_id in results:
+            item = self.items[node_id]
+            # Convert distance back to similarity (higher is better)
+            if self.metric == 'cosine':
+                similarity = 1 - dist  # Convert cosine distance back to similarity
+            else:
+                similarity = -dist  # Negative distance for similarity
+            final_results.append((item.id, similarity, item.metadata))
+        
+        return final_results
+
+
+class VectorDB:
+    """Vector database with multiple indexes and advanced features."""
+    
+    def __init__(self):
+        self.indexes: Dict[str, VectorIndex] = {}
+        self.default_index: Optional[str] = None
+    
+    def create_index(self, name: str, dim: int, metric: str = 'cosine', 
+                     index_type: str = 'hnsw', **kwargs) -> VectorIndex:
+        """Create a new vector index."""
+        if index_type == 'hnsw':
+            index = HNSWIndex(dim, metric, **kwargs)
+        elif index_type == 'linear':
+            index = LinearVectorIndex(dim, metric)
         else:
             raise ValueError(f"Unknown index type: {index_type}")
+        
+        self.indexes[name] = index
+        
+        # Set as default if this is the first index
+        if self.default_index is None:
+            self.default_index = name
+        
+        return index
+    
+    def get_index(self, name: str = None) -> VectorIndex:
+        """Get an index by name or return default."""
+        if name is None:
+            name = self.default_index
+        
+        if name not in self.indexes:
+            raise ValueError(f"Index {name} does not exist")
+        
+        return self.indexes[name]
+    
+    def add(self, id: str, vector: np.ndarray, metadata: Dict[str, Any] = None, 
+            index_name: str = None):
+        """Add a vector to the specified index."""
+        index = self.get_index(index_name)
+        index.add(id, vector, metadata)
+    
+    def search(self, query: np.ndarray, k: int = 10, index_name: str = None) -> List[Tuple[str, float, Dict[str, Any]]]:
+        """Search for nearest neighbors in the specified index."""
+        index = self.get_index(index_name)
+        return index.search(query, k)
+    
+    def remove(self, id: str, index_name: str = None):
+        """Remove a vector from the specified index."""
+        index = self.get_index(index_name)
+        index.remove(id)
+    
+    def save(self, path: str):
+        """Save the entire database to disk."""
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+    
+    @classmethod
+    def load(cls, path: str):
+        """Load the database from disk."""
+        with open(path, 'rb') as f:
+            return pickle.load(f)
 
 
-# ============================================================
-# EXPORTS
-# ============================================================
+# Additional utility functions for vector operations
 
-__all__ = [
-    # Distance functions
-    'cosine_distance', 'euclidean_distance', 'inner_product_distance',
-    # Data structures
-    'SearchResult',
-    # Index implementations
-    'BruteForceIndex', 'HNSW', 'LSH',
-    # Factory
-    'VectorIndex',
-]
+def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors."""
+    v1_norm = v1 / (np.linalg.norm(v1) + 1e-12)
+    v2_norm = v2 / (np.linalg.norm(v2) + 1e-12)
+    return np.dot(v1_norm, v2_norm)
+
+
+def euclidean_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+    """Calculate Euclidean distance between two vectors."""
+    return np.linalg.norm(v1 - v2)
+
+
+def dot_product(v1: np.ndarray, v2: np.ndarray) -> float:
+    """Calculate dot product of two vectors."""
+    return np.dot(v1, v2)
+
+
+def normalize_vector(v: np.ndarray) -> np.ndarray:
+    """Normalize a vector to unit length."""
+    norm = np.linalg.norm(v)
+    if norm == 0:
+        return v
+    return v / norm
+
+
+def batch_similarity(vectors1: np.ndarray, vectors2: np.ndarray, metric: str = 'cosine') -> np.ndarray:
+    """
+    Calculate similarity between batches of vectors.
+    
+    Args:
+        vectors1: Array of shape (n, dim)
+        vectors2: Array of shape (m, dim)
+        metric: Similarity metric ('cosine', 'euclidean', 'dot')
+        
+    Returns:
+        Similarity matrix of shape (n, m)
+    """
+    if metric == 'cosine':
+        # Normalize vectors
+        v1_norm = vectors1 / (np.linalg.norm(vectors1, axis=1, keepdims=True) + 1e-12)
+        v2_norm = vectors2 / (np.linalg.norm(vectors2, axis=1, keepdims=True) + 1e-12)
+        return np.dot(v1_norm, v2_norm.T)
+    elif metric == 'dot':
+        return np.dot(vectors1, vectors2.T)
+    elif metric == 'euclidean':
+        # Calculate pairwise distances
+        diff = vectors1[:, np.newaxis, :] - vectors2[np.newaxis, :, :]
+        return -np.linalg.norm(diff, axis=2)  # Negative for similarity
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+
+
+# For timing operations
+import time
+
+
+def benchmark_index(index: VectorIndex, queries: List[np.ndarray], k: int = 10, num_iterations: int = 10) -> Dict[str, float]:
+    """Benchmark index performance."""
+    times = []
+    
+    for _ in range(num_iterations):
+        start_time = time.time()
+        for query in queries:
+            index.search(query, k)
+        end_time = time.time()
+        times.append(end_time - start_time)
+    
+    return {
+        "avg_time_per_query": np.mean(times) / len(queries),
+        "std_time_per_query": np.std(times) / len(queries),
+        "total_time": np.mean(times),
+        "qps": len(queries) / np.mean(times)
+    }

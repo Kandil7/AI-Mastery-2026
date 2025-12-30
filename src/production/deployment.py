@@ -1,806 +1,716 @@
 """
-Production Deployment Module
-============================
-Deployment utilities for ML models including serialization,
-health checks, load balancing, and configuration.
+Deployment Module
 
-Production Considerations:
-- Model versioning and rollback
-- Graceful shutdown
-- Blue-green deployments
-- Canary releases
-
-Author: AI-Mastery-2026
+This module implements deployment strategies for ML models in production,
+including model versioning, A/B testing, canary deployments, and model serving.
 """
 
 import os
-import sys
 import json
-import time
-import signal
-import logging
-import hashlib
-from typing import Any, Dict, Optional, List, Callable, Union
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from pathlib import Path
-from enum import Enum
-import threading
 import pickle
+import yaml
+import hashlib
+import time
+from typing import Dict, Any, List, Optional, Callable, Union
+from dataclasses import dataclass
+from enum import Enum
+import subprocess
+import docker
+from docker.types import Mount
+import kubernetes
+from kubernetes import client, config
+import requests
+import threading
+from pathlib import Path
+import logging
+from datetime import datetime
 
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ============================================================
-# DEPLOYMENT CONFIGURATION
-# ============================================================
+class ModelStatus(Enum):
+    """Enumeration of model statuses."""
+    PENDING = "pending"
+    TRAINING = "training"
+    EVALUATING = "evaluating"
+    DEPLOYING = "deploying"
+    SERVING = "serving"
+    FAILED = "failed"
+    RETIRED = "retired"
 
-class Environment(Enum):
-    """Deployment environments."""
-    DEVELOPMENT = "development"
-    STAGING = "staging"
-    PRODUCTION = "production"
+
+class DeploymentStrategy(Enum):
+    """Enumeration of deployment strategies."""
+    BLUE_GREEN = "blue_green"
+    CANARY = "canary"
+    ROLLING = "rolling"
+    A_B_TESTING = "a_b_testing"
+
+
+@dataclass
+class ModelVersion:
+    """Represents a version of a model."""
+    version_id: str
+    model_path: str
+    metadata: Dict[str, Any]
+    created_at: float
+    accuracy: Optional[float] = None
+    performance_metrics: Optional[Dict[str, float]] = None
 
 
 @dataclass
 class DeploymentConfig:
-    """
-    Deployment configuration for ML services.
-    
-    Can be loaded from environment variables or config files.
-    """
-    # Service settings
-    service_name: str = "ml-service"
-    service_version: str = "1.0.0"
-    environment: Environment = Environment.DEVELOPMENT
-    
-    # Server settings
-    host: str = "0.0.0.0"
-    port: int = 8000
-    workers: int = 4
-    timeout: int = 30
-    
-    # Model settings
-    model_path: str = ""
-    model_version: str = "v1"
-    
-    # Feature flags
-    enable_metrics: bool = True
-    enable_tracing: bool = False
-    enable_caching: bool = True
-    
-    # Resource limits
-    max_batch_size: int = 32
-    max_request_size_mb: int = 10
-    rate_limit_per_minute: int = 1000
-    
-    # Health check
-    health_check_path: str = "/health"
-    readiness_check_path: str = "/ready"
-    liveness_check_path: str = "/live"
-    
-    @classmethod
-    def from_env(cls) -> 'DeploymentConfig':
-        """Load configuration from environment variables."""
-        env_str = os.getenv("ENVIRONMENT", "development").lower()
-        
-        return cls(
-            service_name=os.getenv("SERVICE_NAME", "ml-service"),
-            service_version=os.getenv("SERVICE_VERSION", "1.0.0"),
-            environment=Environment(env_str),
-            host=os.getenv("HOST", "0.0.0.0"),
-            port=int(os.getenv("PORT", "8000")),
-            workers=int(os.getenv("WORKERS", "4")),
-            timeout=int(os.getenv("TIMEOUT", "30")),
-            model_path=os.getenv("MODEL_PATH", ""),
-            model_version=os.getenv("MODEL_VERSION", "v1"),
-            enable_metrics=os.getenv("ENABLE_METRICS", "true").lower() == "true",
-            enable_tracing=os.getenv("ENABLE_TRACING", "false").lower() == "true",
-            enable_caching=os.getenv("ENABLE_CACHING", "true").lower() == "true",
-            max_batch_size=int(os.getenv("MAX_BATCH_SIZE", "32")),
-            rate_limit_per_minute=int(os.getenv("RATE_LIMIT", "1000")),
-        )
-    
-    @classmethod
-    def from_file(cls, path: str) -> 'DeploymentConfig':
-        """Load configuration from JSON file."""
-        with open(path, 'r') as f:
-            data = json.load(f)
-        
-        # Handle environment enum
-        if 'environment' in data:
-            data['environment'] = Environment(data['environment'])
-        
-        return cls(**data)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        d = asdict(self)
-        d['environment'] = self.environment.value
-        return d
-    
-    def save(self, path: str):
-        """Save configuration to JSON file."""
-        with open(path, 'w') as f:
-            json.dump(self.to_dict(), f, indent=2)
-
-
-# ============================================================
-# MODEL SERIALIZATION
-# ============================================================
-
-class ModelFormat(Enum):
-    """Supported model serialization formats."""
-    PICKLE = "pickle"
-    JOBLIB = "joblib"
-    ONNX = "onnx"
-    TORCH = "torch"
-    TENSORFLOW = "tensorflow"
-
-
-@dataclass
-class ModelMetadata:
-    """Metadata for serialized models."""
+    """Configuration for model deployment."""
     model_name: str
     model_version: str
-    format: ModelFormat
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
-    input_schema: Optional[Dict[str, Any]] = None
-    output_schema: Optional[Dict[str, Any]] = None
-    metrics: Optional[Dict[str, float]] = None
-    tags: List[str] = field(default_factory=list)
-    description: str = ""
+    strategy: DeploymentStrategy
+    replicas: int = 1
+    resources: Dict[str, str] = None  # CPU, memory limits
+    environment: Dict[str, str] = None
+    health_check_path: str = "/health"
+    readiness_check_path: str = "/ready"
+    port: int = 8000
     
-    def to_dict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        d['format'] = self.format.value
-        return d
+    def __post_init__(self):
+        if self.resources is None:
+            self.resources = {"cpu": "500m", "memory": "1Gi"}
+        if self.environment is None:
+            self.environment = {}
 
 
-class ModelSerializer:
-    """
-    Unified model serialization across formats.
+class ModelRegistry:
+    """Manages model versions and metadata."""
     
-    Supports pickle, joblib, ONNX, PyTorch, and TensorFlow.
+    def __init__(self, registry_path: str = "./model_registry"):
+        self.registry_path = Path(registry_path)
+        self.registry_path.mkdir(exist_ok=True)
+        self.models_file = self.registry_path / "models.json"
+        
+        # Load existing models
+        self.models: Dict[str, List[ModelVersion]] = self._load_models()
     
-    Example:
-        >>> serializer = ModelSerializer()
-        >>> serializer.save(model, "model.pkl", format=ModelFormat.PICKLE)
-        >>> loaded_model = serializer.load("model.pkl")
-    """
-    
-    @staticmethod
-    def save(
-        model: Any,
-        path: str,
-        format: ModelFormat = ModelFormat.PICKLE,
-        metadata: Optional[ModelMetadata] = None,
-        compress: bool = True
-    ) -> str:
-        """
-        Save model to file.
-        
-        Args:
-            model: Model object to save
-            path: Output file path
-            format: Serialization format
-            metadata: Optional model metadata
-            compress: Whether to compress (for pickle/joblib)
-        
-        Returns:
-            Path to saved model
-        """
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        
-        if format == ModelFormat.PICKLE:
-            with open(path, 'wb') as f:
-                pickle.dump(model, f)
-        
-        elif format == ModelFormat.JOBLIB:
-            import joblib
-            joblib.dump(model, path, compress=compress)
-        
-        elif format == ModelFormat.ONNX:
-            # Model should already be in ONNX format
-            with open(path, 'wb') as f:
-                f.write(model.SerializeToString())
-        
-        elif format == ModelFormat.TORCH:
-            import torch
-            torch.save(model.state_dict() if hasattr(model, 'state_dict') else model, path)
-        
-        elif format == ModelFormat.TENSORFLOW:
-            model.save(str(path))
-        
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-        
-        # Save metadata alongside model
-        if metadata:
-            metadata_path = path.with_suffix('.meta.json')
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata.to_dict(), f, indent=2)
-        
-        logger.info(f"Saved model to {path}")
-        return str(path)
-    
-    @staticmethod
-    def load(
-        path: str,
-        format: Optional[ModelFormat] = None,
-        model_class: Optional[type] = None
-    ) -> Any:
-        """
-        Load model from file.
-        
-        Args:
-            path: Model file path
-            format: Format (auto-detected if not specified)
-            model_class: For PyTorch, the model class to instantiate
-        
-        Returns:
-            Loaded model
-        """
-        path = Path(path)
-        
-        # Auto-detect format from extension
-        if format is None:
-            ext = path.suffix.lower()
-            format_map = {
-                '.pkl': ModelFormat.PICKLE,
-                '.pickle': ModelFormat.PICKLE,
-                '.joblib': ModelFormat.JOBLIB,
-                '.onnx': ModelFormat.ONNX,
-                '.pt': ModelFormat.TORCH,
-                '.pth': ModelFormat.TORCH,
-            }
-            format = format_map.get(ext, ModelFormat.PICKLE)
-        
-        if format == ModelFormat.PICKLE:
-            with open(path, 'rb') as f:
-                return pickle.load(f)
-        
-        elif format == ModelFormat.JOBLIB:
-            import joblib
-            return joblib.load(path)
-        
-        elif format == ModelFormat.ONNX:
-            import onnx
-            return onnx.load(str(path))
-        
-        elif format == ModelFormat.TORCH:
-            import torch
-            state_dict = torch.load(path, map_location='cpu')
-            if model_class:
-                model = model_class()
-                model.load_state_dict(state_dict)
-                return model
-            return state_dict
-        
-        elif format == ModelFormat.TENSORFLOW:
-            import tensorflow as tf
-            return tf.keras.models.load_model(str(path))
-        
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-    
-    @staticmethod
-    def get_metadata(path: str) -> Optional[ModelMetadata]:
-        """Load model metadata if available."""
-        metadata_path = Path(path).with_suffix('.meta.json')
-        
-        if not metadata_path.exists():
-            return None
-        
-        with open(metadata_path, 'r') as f:
-            data = json.load(f)
-        
-        data['format'] = ModelFormat(data['format'])
-        return ModelMetadata(**data)
-
-
-# ============================================================
-# HEALTH CHECKS
-# ============================================================
-
-class HealthStatus(Enum):
-    """Health check status."""
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-
-
-@dataclass
-class HealthCheckResult:
-    """Result of a health check."""
-    name: str
-    status: HealthStatus
-    message: str = ""
-    latency_ms: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-class HealthChecker:
-    """
-    Health check system for ML services.
-    
-    Supports multiple check types:
-        - Liveness: Is the service running?
-        - Readiness: Can the service handle requests?
-        - Dependency: Are external dependencies healthy?
-    
-    Example:
-        >>> checker = HealthChecker()
-        >>> checker.add_check("model", lambda: model is not None)
-        >>> checker.add_check("redis", check_redis_connection)
-        >>> result = checker.run_all()
-    """
-    
-    def __init__(self):
-        self.checks: Dict[str, Callable[[], HealthCheckResult]] = {}
-        self._start_time = time.time()
-    
-    def add_check(
-        self,
-        name: str,
-        check_fn: Callable[[], Union[bool, HealthCheckResult]],
-        critical: bool = True
-    ):
-        """
-        Add a health check.
-        
-        Args:
-            name: Check name
-            check_fn: Function that returns True/False or HealthCheckResult
-            critical: If True, service is unhealthy when check fails
-        """
-        def wrapper():
-            start = time.time()
-            try:
-                result = check_fn()
-                latency = (time.time() - start) * 1000
-                
-                if isinstance(result, HealthCheckResult):
-                    result.latency_ms = latency
-                    return result
-                
-                return HealthCheckResult(
-                    name=name,
-                    status=HealthStatus.HEALTHY if result else HealthStatus.UNHEALTHY,
-                    latency_ms=latency
-                )
-            except Exception as e:
-                return HealthCheckResult(
-                    name=name,
-                    status=HealthStatus.UNHEALTHY,
-                    message=str(e),
-                    latency_ms=(time.time() - start) * 1000
-                )
-        
-        self.checks[name] = wrapper
-    
-    def run_check(self, name: str) -> HealthCheckResult:
-        """Run a specific check."""
-        if name not in self.checks:
-            return HealthCheckResult(
-                name=name,
-                status=HealthStatus.UNHEALTHY,
-                message=f"Check '{name}' not found"
-            )
-        
-        return self.checks[name]()
-    
-    def run_all(self) -> Dict[str, Any]:
-        """
-        Run all health checks.
-        
-        Returns comprehensive health status.
-        """
-        results = {}
-        overall_status = HealthStatus.HEALTHY
-        
-        for name, check_fn in self.checks.items():
-            result = check_fn()
-            results[name] = {
-                "status": result.status.value,
-                "message": result.message,
-                "latency_ms": result.latency_ms
-            }
-            
-            if result.status == HealthStatus.UNHEALTHY:
-                overall_status = HealthStatus.UNHEALTHY
-            elif result.status == HealthStatus.DEGRADED and overall_status == HealthStatus.HEALTHY:
-                overall_status = HealthStatus.DEGRADED
-        
-        return {
-            "status": overall_status.value,
-            "uptime_seconds": time.time() - self._start_time,
-            "timestamp": datetime.utcnow().isoformat(),
-            "checks": results
-        }
-    
-    def is_ready(self) -> bool:
-        """Quick check if service is ready."""
-        for check_fn in self.checks.values():
-            result = check_fn()
-            if result.status == HealthStatus.UNHEALTHY:
-                return False
-        return True
-    
-    def is_alive(self) -> bool:
-        """Quick liveness check."""
-        return True  # Service is running if we can execute this
-
-
-# ============================================================
-# GRACEFUL SHUTDOWN
-# ============================================================
-
-class GracefulShutdown:
-    """
-    Handles graceful shutdown for ML services.
-    
-    Features:
-        - Catches SIGTERM and SIGINT
-        - Waits for in-flight requests
-        - Runs cleanup callbacks
-    
-    Example:
-        >>> shutdown = GracefulShutdown()
-        >>> shutdown.add_cleanup(lambda: model.unload())
-        >>> shutdown.register_signals()
-    """
-    
-    def __init__(self, timeout: int = 30):
-        """
-        Args:
-            timeout: Maximum seconds to wait for shutdown
-        """
-        self.timeout = timeout
-        self._shutdown_requested = threading.Event()
-        self._cleanup_callbacks: List[Callable[[], None]] = []
-        self._active_requests = 0
-        self._lock = threading.Lock()
-    
-    def register_signals(self):
-        """Register signal handlers for graceful shutdown."""
-        signal.signal(signal.SIGTERM, self._handle_signal)
-        signal.signal(signal.SIGINT, self._handle_signal)
-        logger.info("Registered shutdown signal handlers")
-    
-    def _handle_signal(self, signum, frame):
-        """Handle shutdown signal."""
-        logger.info(f"Received signal {signum}, initiating graceful shutdown")
-        self._shutdown_requested.set()
-        self._do_shutdown()
-    
-    def add_cleanup(self, callback: Callable[[], None]):
-        """Add a cleanup callback to run on shutdown."""
-        self._cleanup_callbacks.append(callback)
-    
-    def request_started(self):
-        """Track that a request has started."""
-        with self._lock:
-            self._active_requests += 1
-    
-    def request_finished(self):
-        """Track that a request has finished."""
-        with self._lock:
-            self._active_requests -= 1
-    
-    @property
-    def is_shutting_down(self) -> bool:
-        """Check if shutdown has been requested."""
-        return self._shutdown_requested.is_set()
-    
-    def _do_shutdown(self):
-        """Perform graceful shutdown."""
-        logger.info("Starting graceful shutdown...")
-        
-        # Wait for active requests
-        start_time = time.time()
-        while self._active_requests > 0:
-            if time.time() - start_time > self.timeout:
-                logger.warning(f"Timeout waiting for {self._active_requests} requests")
-                break
-            time.sleep(0.1)
-        
-        # Run cleanup callbacks
-        for callback in self._cleanup_callbacks:
-            try:
-                callback()
-            except Exception as e:
-                logger.error(f"Cleanup callback failed: {e}")
-        
-        logger.info("Graceful shutdown complete")
-        sys.exit(0)
-
-
-# ============================================================
-# MODEL VERSION MANAGEMENT
-# ============================================================
-
-@dataclass
-class ModelVersion:
-    """Represents a model version."""
-    version: str
-    path: str
-    created_at: datetime
-    is_active: bool = False
-    metrics: Dict[str, float] = field(default_factory=dict)
-
-
-class ModelVersionManager:
-    """
-    Manages multiple model versions for safe deployments.
-    
-    Supports:
-        - Blue-green deployments
-        - Canary releases
-        - Quick rollbacks
-    
-    Example:
-        >>> manager = ModelVersionManager("./models")
-        >>> manager.register("v2.0", model, metrics={"accuracy": 0.95})
-        >>> manager.activate("v2.0")  # Blue-green switch
-        >>> manager.rollback()  # Quick rollback to previous
-    """
-    
-    def __init__(self, base_path: str):
-        """
-        Args:
-            base_path: Directory to store model versions
-        """
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(parents=True, exist_ok=True)
-        self.versions: Dict[str, ModelVersion] = {}
-        self._active_version: Optional[str] = None
-        self._previous_version: Optional[str] = None
-        self._load_registry()
-    
-    def _registry_path(self) -> Path:
-        return self.base_path / "versions.json"
-    
-    def _load_registry(self):
-        """Load version registry from disk."""
-        registry_path = self._registry_path()
-        if registry_path.exists():
-            with open(registry_path, 'r') as f:
+    def _load_models(self) -> Dict[str, List[ModelVersion]]:
+        """Load models from registry file."""
+        if self.models_file.exists():
+            with open(self.models_file, 'r') as f:
                 data = json.load(f)
-            
-            for version, info in data.get('versions', {}).items():
-                self.versions[version] = ModelVersion(
-                    version=version,
-                    path=info['path'],
-                    created_at=datetime.fromisoformat(info['created_at']),
-                    is_active=info.get('is_active', False),
-                    metrics=info.get('metrics', {})
-                )
-                if info.get('is_active'):
-                    self._active_version = version
+                
+                # Convert dict back to ModelVersion objects
+                models = {}
+                for model_name, versions_data in data.items():
+                    versions = []
+                    for v_data in versions_data:
+                        version = ModelVersion(
+                            version_id=v_data['version_id'],
+                            model_path=v_data['model_path'],
+                            metadata=v_data['metadata'],
+                            created_at=v_data['created_at'],
+                            accuracy=v_data.get('accuracy'),
+                            performance_metrics=v_data.get('performance_metrics')
+                        )
+                        versions.append(version)
+                    models[model_name] = versions
+                return models
+        return {}
     
-    def _save_registry(self):
-        """Save version registry to disk."""
-        data = {
-            'versions': {
-                v.version: {
-                    'path': v.path,
-                    'created_at': v.created_at.isoformat(),
-                    'is_active': v.is_active,
-                    'metrics': v.metrics
+    def _save_models(self):
+        """Save models to registry file."""
+        # Convert ModelVersion objects to dict
+        data = {}
+        for model_name, versions in self.models.items():
+            versions_data = []
+            for version in versions:
+                v_data = {
+                    'version_id': version.version_id,
+                    'model_path': version.model_path,
+                    'metadata': version.metadata,
+                    'created_at': version.created_at,
+                    'accuracy': version.accuracy,
+                    'performance_metrics': version.performance_metrics
                 }
-                for v in self.versions.values()
-            }
-        }
+                versions_data.append(v_data)
+            data[model_name] = versions_data
         
-        with open(self._registry_path(), 'w') as f:
+        with open(self.models_file, 'w') as f:
             json.dump(data, f, indent=2)
     
-    def register(
-        self,
-        version: str,
-        model: Any,
-        metrics: Optional[Dict[str, float]] = None,
-        format: ModelFormat = ModelFormat.JOBLIB
-    ) -> str:
-        """
-        Register a new model version.
+    def register_model(self, model_name: str, model_path: str, metadata: Dict[str, Any], 
+                      accuracy: Optional[float] = None, performance_metrics: Optional[Dict[str, float]] = None) -> str:
+        """Register a new model version."""
+        version_id = f"{model_name}-v{len(self.models.get(model_name, [])) + 1}-{int(time.time())}"
         
-        Args:
-            version: Version string (e.g., "v2.0")
-            model: Model object
-            metrics: Model performance metrics
-            format: Serialization format
-        
-        Returns:
-            Path to saved model
-        """
-        version_dir = self.base_path / version
-        version_dir.mkdir(exist_ok=True)
-        
-        model_path = version_dir / f"model.{format.value}"
-        
-        # Save model
-        serializer = ModelSerializer()
-        serializer.save(model, str(model_path), format=format)
-        
-        # Register version
-        self.versions[version] = ModelVersion(
-            version=version,
-            path=str(model_path),
-            created_at=datetime.utcnow(),
-            metrics=metrics or {}
+        version = ModelVersion(
+            version_id=version_id,
+            model_path=model_path,
+            metadata=metadata,
+            created_at=time.time(),
+            accuracy=accuracy,
+            performance_metrics=performance_metrics
         )
         
-        self._save_registry()
-        logger.info(f"Registered model version {version}")
+        if model_name not in self.models:
+            self.models[model_name] = []
         
-        return str(model_path)
+        self.models[model_name].append(version)
+        self._save_models()
+        
+        logger.info(f"Registered model {model_name} with version {version_id}")
+        return version_id
     
-    def activate(self, version: str) -> bool:
-        """
-        Activate a model version (blue-green switch).
-        
-        Args:
-            version: Version to activate
-        
-        Returns:
-            True if successful
-        """
-        if version not in self.versions:
-            logger.error(f"Version {version} not found")
-            return False
-        
-        # Deactivate current
-        if self._active_version:
-            self._previous_version = self._active_version
-            self.versions[self._active_version].is_active = False
-        
-        # Activate new
-        self.versions[version].is_active = True
-        self._active_version = version
-        
-        self._save_registry()
-        logger.info(f"Activated model version {version}")
-        
-        return True
-    
-    def rollback(self) -> bool:
-        """
-        Rollback to previous version.
-        
-        Returns:
-            True if successful
-        """
-        if not self._previous_version:
-            logger.error("No previous version to rollback to")
-            return False
-        
-        return self.activate(self._previous_version)
-    
-    def get_active(self) -> Optional[ModelVersion]:
-        """Get currently active version."""
-        if self._active_version:
-            return self.versions.get(self._active_version)
+    def get_model_version(self, model_name: str, version_id: str) -> Optional[ModelVersion]:
+        """Get a specific model version."""
+        if model_name in self.models:
+            for version in self.models[model_name]:
+                if version.version_id == version_id:
+                    return version
         return None
     
-    def load_active(self) -> Optional[Any]:
-        """Load the currently active model."""
-        active = self.get_active()
-        if not active:
+    def get_latest_version(self, model_name: str) -> Optional[ModelVersion]:
+        """Get the latest version of a model."""
+        if model_name in self.models and self.models[model_name]:
+            return self.models[model_name][-1]
+        return None
+    
+    def list_versions(self, model_name: str) -> List[ModelVersion]:
+        """List all versions of a model."""
+        return self.models.get(model_name, [])
+
+
+class ModelDeployer:
+    """Handles model deployment to various platforms."""
+    
+    def __init__(self, registry: ModelRegistry):
+        self.registry = registry
+        self.active_deployments: Dict[str, Dict[str, Any]] = {}
+        self.deployment_lock = threading.Lock()
+    
+    def deploy_model(self, config: DeploymentConfig) -> str:
+        """Deploy a model with the specified configuration."""
+        with self.deployment_lock:
+            deployment_id = f"{config.model_name}-{config.model_version}-{int(time.time())}"
+            
+            logger.info(f"Deploying model {config.model_name} version {config.model_version}")
+            
+            # Get model from registry
+            model_version = self.registry.get_model_version(config.model_name, config.model_version)
+            if not model_version:
+                raise ValueError(f"Model {config.model_name} version {config.model_version} not found in registry")
+            
+            # Deploy based on strategy
+            if config.strategy == DeploymentStrategy.BLUE_GREEN:
+                deployment_info = self._blue_green_deploy(config, model_version)
+            elif config.strategy == DeploymentStrategy.CANARY:
+                deployment_info = self._canary_deploy(config, model_version)
+            elif config.strategy == DeploymentStrategy.ROLLING:
+                deployment_info = self._rolling_deploy(config, model_version)
+            elif config.strategy == DeploymentStrategy.A_B_TESTING:
+                deployment_info = self._ab_testing_deploy(config, model_version)
+            else:
+                raise ValueError(f"Unknown deployment strategy: {config.strategy}")
+            
+            # Store deployment info
+            self.active_deployments[deployment_id] = {
+                "config": config,
+                "model_version": model_version,
+                "deployment_info": deployment_info,
+                "status": ModelStatus.DEPLOYING,
+                "deployed_at": time.time()
+            }
+            
+            logger.info(f"Model deployed with ID: {deployment_id}")
+            return deployment_id
+    
+    def _blue_green_deploy(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Deploy using blue-green strategy."""
+        logger.info("Starting blue-green deployment")
+        
+        # In a real implementation, this would:
+        # 1. Deploy the new version (green) alongside the current version (blue)
+        # 2. Run health checks on the new version
+        # 3. Switch traffic to the new version
+        # 4. Keep the old version as backup
+        
+        # For this implementation, we'll simulate the deployment
+        deployment_info = {
+            "strategy": "blue-green",
+            "blue_endpoint": f"http://blue-{config.model_name}:{config.port}",
+            "green_endpoint": f"http://green-{config.model_name}:{config.port}",
+            "status": "active"
+        }
+        
+        return deployment_info
+    
+    def _canary_deploy(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Deploy using canary strategy."""
+        logger.info("Starting canary deployment")
+        
+        # In a real implementation, this would:
+        # 1. Deploy the new version to a small subset of instances
+        # 2. Gradually increase traffic to the new version based on metrics
+        # 3. Roll back if issues are detected
+        
+        deployment_info = {
+            "strategy": "canary",
+            "primary_endpoint": f"http://primary-{config.model_name}:{config.port}",
+            "canary_endpoint": f"http://canary-{config.model_name}:{config.port}",
+            "canary_traffic_percentage": 10,  # Start with 10% traffic
+            "status": "active"
+        }
+        
+        return deployment_info
+    
+    def _rolling_deploy(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Deploy using rolling strategy."""
+        logger.info("Starting rolling deployment")
+        
+        # In a real implementation, this would:
+        # 1. Gradually replace instances of the old version with the new version
+        # 2. Monitor health during the process
+        # 3. Pause or rollback if issues are detected
+        
+        deployment_info = {
+            "strategy": "rolling",
+            "endpoint": f"http://{config.model_name}:{config.port}",
+            "replicas": config.replicas,
+            "status": "active"
+        }
+        
+        return deployment_info
+    
+    def _ab_testing_deploy(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Deploy using A/B testing strategy."""
+        logger.info("Starting A/B testing deployment")
+        
+        # In a real implementation, this would:
+        # 1. Deploy both versions simultaneously
+        # 2. Split traffic between versions based on defined rules
+        # 3. Collect metrics on both versions
+        # 4. Determine winner based on metrics
+        
+        deployment_info = {
+            "strategy": "a_b_testing",
+            "model_a_endpoint": f"http://model-a-{config.model_name}:{config.port}",
+            "model_b_endpoint": f"http://model-b-{config.model_name}:{config.port}",
+            "traffic_split": {"model_a": 50, "model_b": 50},  # 50-50 split
+            "status": "active"
+        }
+        
+        return deployment_info
+    
+    def undeploy_model(self, deployment_id: str):
+        """Undeploy a model."""
+        if deployment_id not in self.active_deployments:
+            raise ValueError(f"Deployment {deployment_id} not found")
+        
+        deployment = self.active_deployments[deployment_id]
+        logger.info(f"Undeploying model {deployment['config'].model_name}")
+        
+        # In a real implementation, this would:
+        # 1. Remove the deployed resources
+        # 2. Clean up any associated resources
+        
+        del self.active_deployments[deployment_id]
+        logger.info(f"Model undeployed: {deployment_id}")
+    
+    def get_deployment_status(self, deployment_id: str) -> Optional[Dict[str, Any]]:
+        """Get the status of a deployment."""
+        if deployment_id not in self.active_deployments:
             return None
         
-        return ModelSerializer.load(active.path)
-    
-    def list_versions(self) -> List[ModelVersion]:
-        """List all registered versions."""
-        return list(self.versions.values())
-
-
-# ============================================================
-# CANARY DEPLOYMENT
-# ============================================================
-
-class CanaryDeployment:
-    """
-    Canary deployment controller.
-    
-    Gradually shifts traffic from old to new model version.
-    
-    Example:
-        >>> canary = CanaryDeployment(old_model, new_model, traffic_percent=10)
-        >>> result = canary.predict(features)  # Routes to old or new
-        >>> canary.increase_traffic(20)  # Increase to 20%
-        >>> canary.promote()  # Full switch to new
-    """
-    
-    def __init__(
-        self,
-        stable_model: Any,
-        canary_model: Any,
-        traffic_percent: float = 10.0,
-        metrics_collector: Optional[Callable[[str, Any], None]] = None
-    ):
-        """
-        Args:
-            stable_model: Current production model
-            canary_model: New model to test
-            traffic_percent: Percentage of traffic to canary (0-100)
-            metrics_collector: Optional callback to collect metrics
-        """
-        self.stable = stable_model
-        self.canary = canary_model
-        self.traffic_percent = traffic_percent
-        self.metrics_collector = metrics_collector
-        self._stable_calls = 0
-        self._canary_calls = 0
-        import random
-        self._random = random
-    
-    def predict(self, *args, **kwargs) -> tuple[Any, str]:
-        """
-        Route prediction to stable or canary model.
-        
-        Returns:
-            Tuple of (prediction, model_name)
-        """
-        if self._random.random() * 100 < self.traffic_percent:
-            self._canary_calls += 1
-            result = self.canary.predict(*args, **kwargs)
-            model_name = "canary"
-        else:
-            self._stable_calls += 1
-            result = self.stable.predict(*args, **kwargs)
-            model_name = "stable"
-        
-        if self.metrics_collector:
-            self.metrics_collector(model_name, result)
-        
-        return result, model_name
-    
-    def increase_traffic(self, percent: float):
-        """Increase canary traffic percentage."""
-        self.traffic_percent = min(100.0, max(0.0, percent))
-        logger.info(f"Canary traffic set to {self.traffic_percent}%")
-    
-    def promote(self):
-        """Promote canary to stable (100% traffic)."""
-        self.stable = self.canary
-        self.traffic_percent = 0.0
-        logger.info("Canary promoted to stable")
-    
-    def rollback(self):
-        """Rollback canary (0% traffic)."""
-        self.traffic_percent = 0.0
-        logger.info("Canary rolled back")
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get deployment statistics."""
-        total = self._stable_calls + self._canary_calls
+        deployment = self.active_deployments[deployment_id]
         return {
-            "traffic_percent": self.traffic_percent,
-            "stable_calls": self._stable_calls,
-            "canary_calls": self._canary_calls,
-            "actual_canary_percent": (self._canary_calls / total * 100) if total > 0 else 0
+            "deployment_id": deployment_id,
+            "model_name": deployment["config"].model_name,
+            "model_version": deployment["config"].model_version,
+            "status": deployment["status"],
+            "deployed_at": deployment["deployed_at"],
+            "deployment_info": deployment["deployment_info"]
         }
+    
+    def scale_deployment(self, deployment_id: str, replicas: int):
+        """Scale a deployment to the specified number of replicas."""
+        if deployment_id not in self.active_deployments:
+            raise ValueError(f"Deployment {deployment_id} not found")
+        
+        deployment = self.active_deployments[deployment_id]
+        logger.info(f"Scaling deployment {deployment_id} to {replicas} replicas")
+        
+        # In a real implementation, this would:
+        # 1. Update the deployment configuration
+        # 2. Scale the underlying resources
+        deployment["config"].replicas = replicas
 
 
-# ============================================================
-# EXPORTS
-# ============================================================
+class DockerDeployer(ModelDeployer):
+    """Docker-based model deployment."""
+    
+    def __init__(self, registry: ModelRegistry, docker_client=None):
+        super().__init__(registry)
+        self.docker_client = docker_client or docker.from_env()
+    
+    def _create_docker_deployment(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Create a Docker-based deployment."""
+        # Create a simple Docker image for the model
+        dockerfile_content = f"""
+FROM python:3.9-slim
 
-__all__ = [
-    # Configuration
-    'Environment', 'DeploymentConfig',
-    # Serialization
-    'ModelFormat', 'ModelMetadata', 'ModelSerializer',
-    # Health checks
-    'HealthStatus', 'HealthCheckResult', 'HealthChecker',
-    # Shutdown
-    'GracefulShutdown',
-    # Version management
-    'ModelVersion', 'ModelVersionManager',
-    # Canary deployment
-    'CanaryDeployment',
-]
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+EXPOSE {config.port}
+
+CMD ["python", "-m", "uvicorn", "src.production.api:app", "--host", "0.0.0.0", "--port", "{config.port}"]
+"""
+        
+        # Write Dockerfile
+        dockerfile_path = f"./temp_dockerfile_{config.model_name}"
+        with open(dockerfile_path, 'w') as f:
+            f.write(dockerfile_content)
+        
+        # Build image
+        image_tag = f"{config.model_name}:{config.model_version}"
+        logger.info(f"Building Docker image: {image_tag}")
+        
+        # In a real implementation, we would build the actual image
+        # For this example, we'll just return a placeholder
+        image_id = hashlib.md5(f"{image_tag}{time.time()}".encode()).hexdigest()
+        
+        # Remove temporary Dockerfile
+        os.remove(dockerfile_path)
+        
+        # Run container
+        container_name = f"{config.model_name}-{config.model_version}"
+        
+        try:
+            # Stop and remove any existing container with the same name
+            try:
+                existing_container = self.docker_client.containers.get(container_name)
+                existing_container.stop()
+                existing_container.remove()
+            except docker.errors.NotFound:
+                pass  # Container doesn't exist, which is fine
+            
+            # Run new container
+            container = self.docker_client.containers.run(
+                image=image_tag,
+                name=container_name,
+                ports={f"{config.port}/tcp": config.port},
+                environment=config.environment,
+                detach=True,
+                remove=False  # Don't auto-remove when stopped
+            )
+            
+            return {
+                "image_id": image_id,
+                "container_id": container.id,
+                "container_name": container_name,
+                "endpoint": f"http://localhost:{config.port}",
+                "status": "running"
+            }
+        except Exception as e:
+            logger.error(f"Docker deployment failed: {str(e)}")
+            raise
+
+
+class KubernetesDeployer(ModelDeployer):
+    """Kubernetes-based model deployment."""
+    
+    def __init__(self, registry: ModelRegistry, kube_config_path: Optional[str] = None):
+        super().__init__(registry)
+        
+        # Load Kubernetes configuration
+        if kube_config_path:
+            config.load_kube_config(config_file=kube_config_path)
+        else:
+            try:
+                config.load_incluster_config()  # For in-cluster config
+            except:
+                config.load_kube_config()  # For local development
+        
+        self.apps_v1 = client.AppsV1Api()
+        self.core_v1 = client.CoreV1Api()
+    
+    def _create_k8s_deployment(self, config: DeploymentConfig, model_version: ModelVersion) -> Dict[str, Any]:
+        """Create a Kubernetes deployment."""
+        # Define the deployment manifest
+        deployment_manifest = {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": f"{config.model_name}-{config.model_version}",
+                "labels": {
+                    "app": config.model_name,
+                    "version": config.model_version
+                }
+            },
+            "spec": {
+                "replicas": config.replicas,
+                "selector": {
+                    "matchLabels": {
+                        "app": config.model_name,
+                        "version": config.model_version
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": config.model_name,
+                            "version": config.model_version
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": config.model_name,
+                                "image": f"{config.model_name}:{config.model_version}",
+                                "ports": [
+                                    {
+                                        "containerPort": config.port
+                                    }
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "cpu": config.resources["cpu"],
+                                        "memory": config.resources["memory"]
+                                    },
+                                    "limits": {
+                                        "cpu": config.resources["cpu"],
+                                        "memory": config.resources["memory"]
+                                    }
+                                },
+                                "env": [{"name": k, "value": v} for k, v in config.environment.items()]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        
+        # Create the deployment
+        try:
+            deployment = self.apps_v1.create_namespaced_deployment(
+                body=deployment_manifest,
+                namespace="default"
+            )
+            
+            # Create a service for the deployment
+            service_manifest = {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {
+                    "name": f"{config.model_name}-service",
+                    "labels": {
+                        "app": config.model_name
+                    }
+                },
+                "spec": {
+                    "selector": {
+                        "app": config.model_name,
+                        "version": config.model_version
+                    },
+                    "ports": [
+                        {
+                            "protocol": "TCP",
+                            "port": config.port,
+                            "targetPort": config.port
+                        }
+                    ],
+                    "type": "LoadBalancer"
+                }
+            }
+            
+            service = self.core_v1.create_namespaced_service(
+                body=service_manifest,
+                namespace="default"
+            )
+            
+            return {
+                "deployment_name": deployment.metadata.name,
+                "service_name": service.metadata.name,
+                "namespace": "default",
+                "endpoint": f"http://{service.metadata.name}:{config.port}",
+                "status": "created"
+            }
+        except Exception as e:
+            logger.error(f"Kubernetes deployment failed: {str(e)}")
+            raise
+
+
+class ModelDeploymentManager:
+    """High-level manager for model deployments."""
+    
+    def __init__(self, registry_path: str = "./model_registry"):
+        self.registry = ModelRegistry(registry_path)
+        self.deployer: Optional[ModelDeployer] = None
+        self.deployment_history: List[Dict[str, Any]] = []
+    
+    def set_deployer(self, deployer: ModelDeployer):
+        """Set the deployment backend."""
+        self.deployer = deployer
+    
+    def register_and_deploy(
+        self, 
+        model_name: str, 
+        model_path: str, 
+        config: DeploymentConfig,
+        metadata: Dict[str, Any] = None,
+        accuracy: Optional[float] = None,
+        performance_metrics: Optional[Dict[str, float]] = None
+    ) -> str:
+        """Register a model and deploy it in one step."""
+        if metadata is None:
+            metadata = {}
+        
+        # Register the model
+        version_id = self.registry.register_model(
+            model_name, 
+            model_path, 
+            metadata, 
+            accuracy, 
+            performance_metrics
+        )
+        
+        # Update config with the new version
+        config.model_version = version_id
+        
+        # Deploy the model
+        deployment_id = self.deployer.deploy_model(config)
+        
+        # Record in deployment history
+        self.deployment_history.append({
+            "deployment_id": deployment_id,
+            "model_name": model_name,
+            "version_id": version_id,
+            "deployed_at": time.time(),
+            "config": config
+        })
+        
+        return deployment_id
+    
+    def update_deployment(
+        self, 
+        deployment_id: str, 
+        new_model_path: str, 
+        strategy: DeploymentStrategy,
+        metadata: Dict[str, Any] = None
+    ) -> str:
+        """Update an existing deployment with a new model version."""
+        if metadata is None:
+            metadata = {}
+        
+        # Get the current deployment
+        current_deployment = self.deployer.get_deployment_status(deployment_id)
+        if not current_deployment:
+            raise ValueError(f"Deployment {deployment_id} not found")
+        
+        model_name = current_deployment["model_name"]
+        
+        # Register the new model version
+        version_id = self.registry.register_model(model_name, new_model_path, metadata)
+        
+        # Undeploy the old version
+        self.deployer.undeploy_model(deployment_id)
+        
+        # Deploy the new version with the same configuration but updated version
+        new_config = DeploymentConfig(
+            model_name=model_name,
+            model_version=version_id,
+            strategy=strategy,
+            replicas=current_deployment["deployment_info"].get("replicas", 1),
+            resources=current_deployment["config"].resources,
+            environment=current_deployment["config"].environment,
+            health_check_path=current_deployment["config"].health_check_path,
+            readiness_check_path=current_deployment["config"].readiness_check_path,
+            port=current_deployment["config"].port
+        )
+        
+        new_deployment_id = self.deployer.deploy_model(new_config)
+        
+        return new_deployment_id
+    
+    def get_model_performance(self, model_name: str, version_id: str) -> Optional[Dict[str, Any]]:
+        """Get performance metrics for a specific model version."""
+        model_version = self.registry.get_model_version(model_name, version_id)
+        if not model_version:
+            return None
+        
+        return {
+            "model_name": model_name,
+            "version_id": version_id,
+            "accuracy": model_version.accuracy,
+            "performance_metrics": model_version.performance_metrics,
+            "created_at": model_version.created_at
+        }
+    
+    def rollback_deployment(self, deployment_id: str, to_version: str) -> str:
+        """Rollback a deployment to a previous version."""
+        # Get the current deployment
+        current_deployment = self.deployer.get_deployment_status(deployment_id)
+        if not current_deployment:
+            raise ValueError(f"Deployment {deployment_id} not found")
+        
+        model_name = current_deployment["model_name"]
+        
+        # Check if the target version exists
+        target_version = self.registry.get_model_version(model_name, to_version)
+        if not target_version:
+            raise ValueError(f"Model {model_name} version {to_version} not found in registry")
+        
+        # Undeploy the current version
+        self.deployer.undeploy_model(deployment_id)
+        
+        # Deploy the target version
+        config = current_deployment["config"]
+        config.model_version = to_version
+        
+        new_deployment_id = self.deployer.deploy_model(config)
+        
+        return new_deployment_id
+
+
+# Global deployment manager instance
+deployment_manager = ModelDeploymentManager()
+
+
+def get_deployment_manager() -> ModelDeploymentManager:
+    """Get the global deployment manager instance."""
+    return deployment_manager
+
+
+def deploy_model_simple(model_name: str, model_path: str, port: int = 8000) -> str:
+    """
+    Simple function to deploy a model with default settings.
+    
+    Args:
+        model_name: Name of the model
+        model_path: Path to the model file
+        port: Port to deploy on
+        
+    Returns:
+        Deployment ID
+    """
+    config = DeploymentConfig(
+        model_name=model_name,
+        model_version="temp",  # Will be replaced by register_and_deploy
+        strategy=DeploymentStrategy.ROLLING,
+        port=port
+    )
+    
+    deployment_id = deployment_manager.register_and_deploy(
+        model_name=model_name,
+        model_path=model_path,
+        config=config
+    )
+    
+    return deployment_id
+
+
+# Initialize the deployment manager when module is loaded
+logger.info("Deployment module initialized")
