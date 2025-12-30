@@ -1,0 +1,54 @@
+{
+  "classification_model": {
+    "model_type": "RandomForestClassifier",
+    "n_features": 10,
+    "n_classes": 2,
+    "train_accuracy": 0.9925,
+    "test_accuracy": 0.86,
+    "feature_names": [
+      "feature_0",
+      "feature_1",
+      "feature_2",
+      "feature_3",
+      "feature_4",
+      "feature_5",
+      "feature_6",
+      "feature_7",
+      "feature_8",
+      "feature_9"
+    ]
+  },
+  "regression_model": {
+    "model_type": "GradientBoostingRegressor",
+    "n_features": 10,
+    "train_r2": 0.9979433572127238,
+    "test_r2": 0.9375999459035839,
+    "feature_names": [
+      "feature_0",
+      "feature_1",
+      "feature_2",
+      "feature_3",
+      "feature_4",
+      "feature_5",
+      "feature_6",
+      "feature_7",
+      "feature_8",
+      "feature_9"
+    ]
+  },
+  "logistic_model": {
+    "model_type": "LogisticRegression",
+    "n_features": 5,
+    "n_classes": 2,
+    "train_accuracy": 0.695,
+    "test_accuracy": 0.68,
+    "feature_names": [
+      "feature_0",
+      "feature_1",
+      "feature_2",
+      "feature_3",
+      "feature_4"
+    ]
+  },
+  "default_model": "classification_model"
+}
