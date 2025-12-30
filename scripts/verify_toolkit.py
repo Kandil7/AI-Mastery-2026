@@ -36,9 +36,11 @@ def verify_core():
         
         # Test Math
         v1, v2 = [1, 2], [3, 4]
-        if hasattr(math_ops, 'dot'):
-            res = math_ops.dot(v1, v2)
-            print(f"  Math Check: dot([1,2], [3,4]) = {res}")
+        if hasattr(math_ops, 'dot_product'):
+            res = math_ops.dot_product(v1, v2)
+            print(f"  Math Check: dot_product([1,2], [3,4]) = {res}")
+        else:
+            print(f"  Math Check: dot_product NOT FOUND")
         
         # Test Prob
         g = Gaussian(mu=0, sigma=1)
@@ -55,15 +57,12 @@ def verify_core():
 def verify_ml():
     print("\n--- Verifying ML Modules ---")
     try:
-        from src.ml.classical import LinearRegressionScratch  # Updated class name
+        from src.ml.classical import LinearRegressionScratch
+        from src.ml.deep_learning import Dense
         
-        # Check Torch
-        if check_dependency('torch'):
-            from src.ml.deep_learning import Dense
-            dense = Dense(10, 1)
-            print(f"  DL Check: Dense layer initialized")
-        else:
-            print("  Skipping Deep Learning verify (torch missing)")
+        # DL Check (Numpy based)
+        dense = Dense(10, 1)
+        print(f"  DL Check: Dense layer initialized")
 
         # Test LR
         model = LinearRegressionScratch()
