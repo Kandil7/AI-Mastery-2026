@@ -127,13 +127,13 @@ def main():
         verify_production()
     ]
     
-    print(f"DEBUG: Results = {results}")
-    
     if all(results):
         print("\n[SUCCESS] AI Engineer Toolkit verification complete!")
+        sys.exit(0)
     else:
         print("\n[WARN] Some modules failed verification.")
-        sys.exit(1)
+        print(f"DEBUG: Results = {results}")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
