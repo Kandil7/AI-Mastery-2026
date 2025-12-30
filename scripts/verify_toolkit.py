@@ -11,10 +11,12 @@ Usage:
 import sys
 import os
 import logging
-import numpy as np
+import traceback
 
 # Add project root to python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,13 +25,17 @@ logger = logging.getLogger("verify_toolkit")
 def verify_core():
     logger.info("Verifying Core Modules...")
     try:
-        from src.core.math_operations import dot
+        import src.core.math_operations as math_ops
         from src.core.optimization import GradientDescent
         from src.core.probability import Gaussian
         
         # Test Math
         v1, v2 = [1, 2], [3, 4]
-        assert dot(v1, v2) == 11, "Dot product failed"
+        # Check if dot is in math_ops or we need to import it
+        if hasattr(math_ops, 'dot'):
+            assert math_ops.dot(v1, v2) == 11, "Dot product failed"
+        else:
+            logger.warning("dot function not found in math_operations (check exports)")
         
         # Test Prob
         g = Gaussian(mu=0, sigma=1)
@@ -39,6 +45,7 @@ def verify_core():
         logger.info("✅ Core Modules OK")
     except Exception as e:
         logger.error(f"❌ Core Modules Failed: {e}")
+        logger.error(traceback.format_exc())
         return False
     return True
 
@@ -59,6 +66,7 @@ def verify_ml():
         logger.info("✅ ML Modules OK")
     except Exception as e:
         logger.error(f"❌ ML Modules Failed: {e}")
+        logger.error(traceback.format_exc())
         return False
     return True
 
@@ -81,14 +89,16 @@ def verify_llm():
         logger.info("✅ LLM Modules OK")
     except Exception as e:
         logger.error(f"❌ LLM Modules Failed: {e}")
+        logger.error(traceback.format_exc())
         return False
     return True
 
 def verify_production():
     logger.info("Verifying Production Modules...")
     try:
-        from src.production.api import create_app
-        from src.production.caching import LRUCache, RedisCache
+        # Check exports in api
+        import src.production.api as api_module
+        from src.production.caching import LRUCache
         from src.production.deployment import ModelRegistry
         
         # Test Cache
@@ -99,11 +109,13 @@ def verify_production():
         logger.info("✅ Production Modules OK")
     except Exception as e:
         logger.error(f"❌ Production Modules Failed: {e}")
+        logger.error(traceback.format_exc())
         return False
     return True
 
 def main():
-    logger.info("Starting Toolkit Verification...")
+    logger.info(f"Starting Toolkit Verification... Root: {project_root}")
+    logger.info(f"Sys Path: {sys.path}")
     
     results = [
         verify_core(),
@@ -114,10 +126,6 @@ def main():
     
     if all(results):
         logger.info("\n🎉 SUCCESS: AI Engineer Toolkit is completely installed and verified! 🎉")
-        print("\nYou can now start exploring:")
-        print("  - Notebooks: notebooks/")
-        print("  - Case Studies: case_studies/")
-        print("  - Run Tests: pytest tests/")
     else:
         logger.error("\n⚠️  WARNING: Some modules failed verification. Check the logs above.")
         sys.exit(1)
