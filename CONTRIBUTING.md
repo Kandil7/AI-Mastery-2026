@@ -1,99 +1,47 @@
-# Contributing to AI Engineer Toolkit 2025
+# Contributing to AI-Mastery-2026
 
-Thank you for your interest in contributing! This project follows the **White-Box Approach** to AI/ML engineering.
+Thank you for your interest in contributing to the AI-Mastery-2026 project! This toolkit is designed to help engineers understand AI from mathematical foundations to production systems using the "white-box" approach.
 
-## Philosophy
+## Getting Started
 
-Our core principles:
-1. **Math First** - Understand the mathematical foundations before implementation
-2. **Code Second** - Implement from scratch using pure NumPy before using libraries
-3. **Production Always** - Consider deployment, monitoring, and scaling from day one
+1. Fork the repository
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## How to Contribute
+## Project Philosophy
 
-### 1. Fork & Clone
-
-```bash
-git clone https://github.com/Kandil7/AI-Mastery-2026.git
-cd AI-Mastery-2026
-```
-
-### 2. Set Up Development Environment
-
-```bash
-# Create conda environment
-conda create -n ai-mastery python=3.10
-conda activate ai-mastery
-
-# Install dependencies
-make install-dev
-```
-
-### 3. Create a Branch
-
-```bash
-git checkout -b feature/your-feature-name
-```
-
-### 4. Make Changes
-
-Follow these guidelines:
-- Add mathematical derivations in docstrings
-- Include unit tests for new functions
-- Follow the existing code style
-
-### 5. Test Your Changes
-
-```bash
-make test
-make lint
-```
-
-### 6. Submit Pull Request
-
-- Write clear PR description
-- Reference any related issues
-- Ensure CI passes
+This project follows the "white-box" approach:
+- Understand the mathematical foundations before using abstractions
+- Implement algorithms from scratch with NumPy
+- Use libraries like sklearn/PyTorch knowing what happens underneath
+- Consider production aspects throughout the development process
 
 ## Code Style
 
-- **Python 3.10+** compatible
-- **Type hints** for all functions
-- **Docstrings** with mathematical notation
-- **100 character** line limit
+- Python 3.10+ compatible
+- Type hints for all functions
+- 100 character line limit
+- Black formatting with 100 character line length
+- MyPy type checking
 
 ## Documentation Standards
 
 Each function should include:
 1. Brief description
-2. Mathematical definition (using Unicode symbols)
+2. Mathematical definition (using Unicode symbols where applicable)
 3. Args and Returns sections
 4. Example usage
 
-```python
-def example_function(x: np.ndarray) -> np.ndarray:
-    """
-    Brief description of what this does.
-    
-    Mathematical Definition:
-        f(x) = σ(Wx + b)
-    
-    Args:
-        x: Input array of shape (n, m)
-    
-    Returns:
-        Transformed array
-    
-    Example:
-        >>> result = example_function(np.array([1, 2, 3]))
-    """
-    pass
-```
+## Pull Request Process
 
-## Questions?
-
-Open an issue or reach out to the maintainers.
-
----
-
-Thank you for contributing! 🚀
+1. Ensure any install or build dependencies are removed before the end of the layer when doing a build
+2. Update the README.md with details of changes to the interface
+3. Increase the version numbers in any examples files and the README.md to the new version that this Pull Request would represent
+4. You may merge the Pull Request in once you have the sign-off of two other developers, or if you do not have permission to do that, you may request the second reviewer to merge it for you

@@ -1,44 +1,24 @@
-# AI-Mastery-2026 Dockerfile
-# ===========================
+# Dockerfile for AI-Mastery-2026
 
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-
-# Set work directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    curl \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for caching
+# Copy requirements first to leverage Docker cache
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy project files
+# Copy the rest of the application
 COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
-# Expose port for API
+# Expose port for the API
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Default command: run FastAPI server
+# Run the application
 CMD ["uvicorn", "src.production.api:app", "--host", "0.0.0.0", "--port", "8000"]
