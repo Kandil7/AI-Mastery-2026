@@ -662,12 +662,489 @@ def max_pool2d(input_image: np.ndarray, pool_size: int = 2, stride: int = 2) -> 
 
 
 # ============================================================
+# LSTM (Long Short-Term Memory)
+# ============================================================
+
+class LSTM(Layer):
+    """
+    Long Short-Term Memory (LSTM) layer from scratch.
+    
+    LSTM equations:
+        fₜ = σ(Wf·[hₜ₋₁, xₜ] + bf)    # Forget gate
+        iₜ = σ(Wi·[hₜ₋₁, xₜ] + bi)    # Input gate  
+        c̃ₜ = tanh(Wc·[hₜ₋₁, xₜ] + bc) # Candidate cell
+        cₜ = fₜ * cₜ₋₁ + iₜ * c̃ₜ      # Cell state
+        oₜ = σ(Wo·[hₜ₋₁, xₜ] + bo)    # Output gate
+        hₜ = oₜ * tanh(cₜ)             # Hidden state
+    
+    Args:
+        input_size: Size of input features
+        hidden_size: Size of hidden state
+        return_sequences: Return output for all timesteps or just the last
+    
+    Example:
+        >>> lstm = LSTM(input_size=10, hidden_size=32)
+        >>> output = lstm.forward(input_sequence)  # Shape: (batch, time, 10)
+    """
+    
+    def __init__(self, input_size: int, hidden_size: int, return_sequences: bool = False):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.return_sequences = return_sequences
+        
+        # Combined weight matrices for efficiency
+        # Shape: (input_size + hidden_size, 4 * hidden_size)
+        concat_size = input_size + hidden_size
+        scale = np.sqrt(1.0 / concat_size)
+        
+        # Weights for [forget, input, candidate, output] gates combined
+        self.W = np.random.randn(concat_size, 4 * hidden_size) * scale
+        self.b = np.zeros((1, 4 * hidden_size))
+        
+        # Cache for backward pass
+        self.cache = {}
+        self.dW = None
+        self.db = None
+    
+    def forward(self, input_data: np.ndarray, training: bool = True) -> np.ndarray:
+        """
+        Forward pass through LSTM.
+        
+        Args:
+            input_data: Shape (batch_size, timesteps, input_size)
+            
+        Returns:
+            If return_sequences: (batch_size, timesteps, hidden_size)
+            Else: (batch_size, hidden_size)
+        """
+        self.input = input_data
+        batch_size, timesteps, _ = input_data.shape
+        
+        # Initialize hidden and cell states
+        h = np.zeros((batch_size, self.hidden_size))
+        c = np.zeros((batch_size, self.hidden_size))
+        
+        # Store all states for backprop
+        self.cache = {
+            'h_states': [h],
+            'c_states': [c],
+            'gates': [],
+            'x': input_data
+        }
+        
+        outputs = []
+        
+        for t in range(timesteps):
+            x_t = input_data[:, t, :]  # (batch_size, input_size)
+            
+            # Concatenate input and previous hidden state
+            concat = np.concatenate([x_t, h], axis=1)  # (batch_size, input_size + hidden_size)
+            
+            # Compute all gates at once
+            gates = concat @ self.W + self.b  # (batch_size, 4 * hidden_size)
+            
+            # Split into individual gates
+            f_gate = sigmoid(gates[:, :self.hidden_size])                                    # Forget
+            i_gate = sigmoid(gates[:, self.hidden_size:2*self.hidden_size])                  # Input
+            c_candidate = tanh(gates[:, 2*self.hidden_size:3*self.hidden_size])              # Candidate
+            o_gate = sigmoid(gates[:, 3*self.hidden_size:])                                  # Output
+            
+            # Update cell state
+            c = f_gate * c + i_gate * c_candidate
+            
+            # Update hidden state
+            h = o_gate * tanh(c)
+            
+            # Store for backprop
+            self.cache['h_states'].append(h)
+            self.cache['c_states'].append(c)
+            self.cache['gates'].append({
+                'f': f_gate, 'i': i_gate, 
+                'c_candidate': c_candidate, 'o': o_gate,
+                'concat': concat
+            })
+            
+            outputs.append(h)
+        
+        if self.return_sequences:
+            self.output = np.stack(outputs, axis=1)  # (batch, time, hidden)
+        else:
+            self.output = h  # (batch, hidden) - last timestep
+        
+        return self.output
+    
+    def backward(self, output_gradient: np.ndarray, learning_rate: float) -> np.ndarray:
+        """
+        Backward pass through LSTM (Backpropagation Through Time).
+        
+        Args:
+            output_gradient: Gradient from next layer
+            learning_rate: Learning rate
+            
+        Returns:
+            Gradient w.r.t. input
+        """
+        batch_size, timesteps, _ = self.input.shape
+        
+        # Initialize gradients
+        self.dW = np.zeros_like(self.W)
+        self.db = np.zeros_like(self.b)
+        
+        # Gradient flowing back through hidden and cell states
+        dh_next = np.zeros((batch_size, self.hidden_size))
+        dc_next = np.zeros((batch_size, self.hidden_size))
+        
+        # Gradient w.r.t input
+        dx = np.zeros_like(self.input)
+        
+        # Handle gradient shape
+        if self.return_sequences:
+            dout = output_gradient  # (batch, time, hidden)
+        else:
+            # Only gradient at last timestep
+            dout = np.zeros((batch_size, timesteps, self.hidden_size))
+            dout[:, -1, :] = output_gradient
+        
+        # Backprop through time (reverse)
+        for t in reversed(range(timesteps)):
+            # Add gradient from output and from next timestep
+            dh = dout[:, t, :] + dh_next
+            
+            # Get cached values
+            gate_cache = self.cache['gates'][t]
+            f, i, c_candidate, o = gate_cache['f'], gate_cache['i'], gate_cache['c_candidate'], gate_cache['o']
+            concat = gate_cache['concat']
+            c_prev = self.cache['c_states'][t]
+            c_curr = self.cache['c_states'][t + 1]
+            
+            # Gradient of output gate
+            tanh_c = tanh(c_curr)
+            do = dh * tanh_c
+            do_gate = do * o * (1 - o)  # sigmoid derivative
+            
+            # Gradient of cell state
+            dc = dh * o * (1 - tanh_c ** 2) + dc_next
+            
+            # Gradient of candidate
+            dc_candidate = dc * i
+            dc_candidate_gate = dc_candidate * (1 - c_candidate ** 2)  # tanh derivative
+            
+            # Gradient of input gate
+            di = dc * c_candidate
+            di_gate = di * i * (1 - i)
+            
+            # Gradient of forget gate
+            df = dc * c_prev
+            df_gate = df * f * (1 - f)
+            
+            # Gradient for cell state to previous timestep
+            dc_next = dc * f
+            
+            # Combine gate gradients
+            dgates = np.concatenate([df_gate, di_gate, dc_candidate_gate, do_gate], axis=1)
+            
+            # Weight gradients
+            self.dW += concat.T @ dgates
+            self.db += np.sum(dgates, axis=0, keepdims=True)
+            
+            # Gradient w.r.t concatenated input
+            dconcat = dgates @ self.W.T
+            
+            # Split gradient
+            dx[:, t, :] = dconcat[:, :self.input_size]
+            dh_next = dconcat[:, self.input_size:]
+        
+        # Update weights
+        self.W -= learning_rate * self.dW
+        self.b -= learning_rate * self.db
+        
+        return dx
+    
+    def get_params(self) -> dict:
+        return {'W': self.W.copy(), 'b': self.b.copy()}
+    
+    def set_params(self, params: dict):
+        self.W = params['W']
+        self.b = params['b']
+
+
+# ============================================================
+# Conv2D (2D Convolution Layer)
+# ============================================================
+
+class Conv2D(Layer):
+    """
+    2D Convolutional Layer from scratch.
+    
+    Performs 2D convolution with multiple input/output channels.
+    
+    Forward:
+        out[b, k, i, j] = Σ_c Σ_m Σ_n input[b, c, i*s+m, j*s+n] * kernel[k, c, m, n] + bias[k]
+    
+    Args:
+        in_channels: Number of input channels
+        out_channels: Number of output channels (number of filters)
+        kernel_size: Size of convolutional kernel (int or tuple)
+        stride: Stride of convolution
+        padding: Zero-padding around input
+    
+    Example:
+        >>> conv = Conv2D(in_channels=3, out_channels=32, kernel_size=3, padding=1)
+        >>> output = conv.forward(input_batch)  # Shape: (batch, 3, H, W)
+    """
+    
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Union[int, Tuple[int, int]] = 3,
+        stride: int = 1,
+        padding: int = 0
+    ):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
+        self.stride = stride
+        self.padding = padding
+        
+        # Initialize weights using He initialization
+        kh, kw = self.kernel_size
+        scale = np.sqrt(2.0 / (in_channels * kh * kw))
+        
+        # Shape: (out_channels, in_channels, kernel_height, kernel_width)
+        self.weights = np.random.randn(out_channels, in_channels, kh, kw) * scale
+        self.bias = np.zeros((out_channels,))
+        
+        # Gradients
+        self.dW = None
+        self.db = None
+    
+    def _pad_input(self, X: np.ndarray) -> np.ndarray:
+        """Apply zero padding to input."""
+        if self.padding == 0:
+            return X
+        return np.pad(
+            X,
+            ((0, 0), (0, 0), (self.padding, self.padding), (self.padding, self.padding)),
+            mode='constant'
+        )
+    
+    def _im2col(self, X: np.ndarray) -> np.ndarray:
+        """
+        Convert image patches to columns for efficient convolution.
+        
+        This transforms the convolution into a matrix multiplication.
+        """
+        batch_size, in_channels, H, W = X.shape
+        kh, kw = self.kernel_size
+        
+        out_h = (H - kh) // self.stride + 1
+        out_w = (W - kw) // self.stride + 1
+        
+        # Create column matrix
+        col = np.zeros((batch_size, in_channels, kh, kw, out_h, out_w))
+        
+        for i in range(kh):
+            i_max = i + self.stride * out_h
+            for j in range(kw):
+                j_max = j + self.stride * out_w
+                col[:, :, i, j, :, :] = X[:, :, i:i_max:self.stride, j:j_max:self.stride]
+        
+        # Reshape: (batch, in_channels * kh * kw, out_h * out_w)
+        col = col.transpose(0, 4, 5, 1, 2, 3).reshape(batch_size * out_h * out_w, -1)
+        
+        return col, (batch_size, out_h, out_w)
+    
+    def forward(self, input_data: np.ndarray, training: bool = True) -> np.ndarray:
+        """
+        Forward pass of convolution.
+        
+        Args:
+            input_data: Shape (batch_size, in_channels, height, width)
+            
+        Returns:
+            Shape (batch_size, out_channels, out_height, out_width)
+        """
+        self.input = input_data
+        batch_size, _, H, W = input_data.shape
+        
+        # Apply padding
+        X_padded = self._pad_input(input_data)
+        self.X_padded = X_padded
+        
+        # Use im2col for efficient computation
+        col, (batch_size, out_h, out_w) = self._im2col(X_padded)
+        self.col = col
+        self.out_shape = (out_h, out_w)
+        
+        # Reshape weights for matrix multiply
+        W_col = self.weights.reshape(self.out_channels, -1)  # (out_channels, in_channels * kh * kw)
+        
+        # Convolution as matrix multiplication
+        output = col @ W_col.T + self.bias  # (batch * out_h * out_w, out_channels)
+        
+        # Reshape to proper output format
+        self.output = output.reshape(batch_size, out_h, out_w, self.out_channels).transpose(0, 3, 1, 2)
+        
+        return self.output
+    
+    def backward(self, output_gradient: np.ndarray, learning_rate: float) -> np.ndarray:
+        """
+        Backward pass of convolution.
+        
+        Args:
+            output_gradient: Shape (batch_size, out_channels, out_h, out_w)
+            learning_rate: Learning rate
+            
+        Returns:
+            Gradient w.r.t. input
+        """
+        batch_size, _, out_h, out_w = output_gradient.shape
+        kh, kw = self.kernel_size
+        
+        # Reshape gradient
+        dout = output_gradient.transpose(0, 2, 3, 1).reshape(-1, self.out_channels)
+        
+        # Gradient w.r.t. bias
+        self.db = np.sum(dout, axis=0)
+        
+        # Gradient w.r.t. weights
+        W_col = self.weights.reshape(self.out_channels, -1)
+        self.dW = (dout.T @ self.col).reshape(self.weights.shape)
+        
+        # Gradient w.r.t. input (using col2im)
+        dcol = dout @ W_col
+        
+        # col2im (inverse of im2col)
+        _, _, H_padded, W_padded = self.X_padded.shape
+        dx_padded = np.zeros((batch_size, self.in_channels, H_padded, W_padded))
+        
+        dcol = dcol.reshape(batch_size, out_h, out_w, self.in_channels, kh, kw).transpose(0, 3, 4, 5, 1, 2)
+        
+        for i in range(kh):
+            i_max = i + self.stride * out_h
+            for j in range(kw):
+                j_max = j + self.stride * out_w
+                dx_padded[:, :, i:i_max:self.stride, j:j_max:self.stride] += dcol[:, :, i, j, :, :]
+        
+        # Remove padding
+        if self.padding > 0:
+            dx = dx_padded[:, :, self.padding:-self.padding, self.padding:-self.padding]
+        else:
+            dx = dx_padded
+        
+        # Update weights
+        self.weights -= learning_rate * self.dW
+        self.bias -= learning_rate * self.db
+        
+        return dx
+    
+    def get_params(self) -> dict:
+        return {'weights': self.weights.copy(), 'bias': self.bias.copy()}
+    
+    def set_params(self, params: dict):
+        self.weights = params['weights']
+        self.bias = params['bias']
+
+
+class MaxPool2D(Layer):
+    """
+    Max Pooling layer.
+    
+    Reduces spatial dimensions by taking the maximum value in each pooling window.
+    
+    Args:
+        pool_size: Size of pooling window
+        stride: Stride of pooling (defaults to pool_size)
+    """
+    
+    def __init__(self, pool_size: int = 2, stride: int = None):
+        super().__init__()
+        self.pool_size = pool_size
+        self.stride = stride if stride else pool_size
+        self.trainable = False
+        self.max_indices = None
+    
+    def forward(self, input_data: np.ndarray, training: bool = True) -> np.ndarray:
+        """
+        Forward pass.
+        
+        Args:
+            input_data: Shape (batch_size, channels, height, width)
+        """
+        self.input = input_data
+        batch_size, channels, H, W = input_data.shape
+        
+        out_h = (H - self.pool_size) // self.stride + 1
+        out_w = (W - self.pool_size) // self.stride + 1
+        
+        output = np.zeros((batch_size, channels, out_h, out_w))
+        self.max_indices = np.zeros((batch_size, channels, out_h, out_w, 2), dtype=int)
+        
+        for i in range(out_h):
+            for j in range(out_w):
+                h_start = i * self.stride
+                w_start = j * self.stride
+                region = input_data[:, :, h_start:h_start+self.pool_size, w_start:w_start+self.pool_size]
+                
+                # Reshape to find max
+                region_flat = region.reshape(batch_size, channels, -1)
+                max_idx = np.argmax(region_flat, axis=2)
+                
+                output[:, :, i, j] = np.max(region_flat, axis=2)
+                
+                # Store indices for backward pass
+                self.max_indices[:, :, i, j, 0] = max_idx // self.pool_size + h_start
+                self.max_indices[:, :, i, j, 1] = max_idx % self.pool_size + w_start
+        
+        self.output = output
+        return self.output
+    
+    def backward(self, output_gradient: np.ndarray, learning_rate: float) -> np.ndarray:
+        """Backward pass - gradient flows only to max elements."""
+        batch_size, channels, out_h, out_w = output_gradient.shape
+        dx = np.zeros_like(self.input)
+        
+        for i in range(out_h):
+            for j in range(out_w):
+                for b in range(batch_size):
+                    for c in range(channels):
+                        h_idx = self.max_indices[b, c, i, j, 0]
+                        w_idx = self.max_indices[b, c, i, j, 1]
+                        dx[b, c, h_idx, w_idx] += output_gradient[b, c, i, j]
+        
+        return dx
+
+
+class Flatten(Layer):
+    """Flatten layer to convert 4D tensor to 2D for Dense layers."""
+    
+    def __init__(self):
+        super().__init__()
+        self.trainable = False
+        self.input_shape = None
+    
+    def forward(self, input_data: np.ndarray, training: bool = True) -> np.ndarray:
+        self.input = input_data
+        self.input_shape = input_data.shape
+        batch_size = input_data.shape[0]
+        self.output = input_data.reshape(batch_size, -1)
+        return self.output
+    
+    def backward(self, output_gradient: np.ndarray, learning_rate: float) -> np.ndarray:
+        return output_gradient.reshape(self.input_shape)
+
+
+# ============================================================
 # EXPORTS
 # ============================================================
 
 __all__ = [
     # Layers
     'Layer', 'Dense', 'Activation', 'Dropout', 'BatchNormalization',
+    'LSTM', 'Conv2D', 'MaxPool2D', 'Flatten',
     # Loss
     'Loss', 'MSELoss', 'CrossEntropyLoss', 'BinaryCrossEntropyLoss',
     # Model
@@ -675,3 +1152,4 @@ __all__ = [
     # Convolution
     'conv2d_single', 'max_pool2d',
 ]
+

@@ -845,6 +845,199 @@ class GaussianNBScratch(BaseClassifier):
 
 
 # ============================================================
+# SUPPORT VECTOR MACHINE
+# ============================================================
+
+class SVMScratch(BaseClassifier):
+    """
+    Support Vector Machine (SVM) from scratch.
+    
+    Linear SVM with Hinge Loss:
+        L(w) = (1/n) Σ max(0, 1 - yᵢ(w·xᵢ + b)) + λ||w||²
+    
+    Gradient:
+        If yᵢ(w·xᵢ + b) < 1:
+            ∂L/∂w = -yᵢxᵢ + 2λw
+            ∂L/∂b = -yᵢ
+        Else:
+            ∂L/∂w = 2λw
+            ∂L/∂b = 0
+    
+    Args:
+        C: Regularization parameter (higher = less regularization)
+        learning_rate: Learning rate for gradient descent
+        n_iterations: Number of training iterations
+        kernel: Kernel type ('linear' or 'rbf')
+        gamma: RBF kernel coefficient
+    
+    Example:
+        >>> svm = SVMScratch(C=1.0, learning_rate=0.001, n_iterations=1000)
+        >>> svm.fit(X_train, y_train)
+        >>> predictions = svm.predict(X_test)
+    """
+    
+    def __init__(
+        self,
+        C: float = 1.0,
+        learning_rate: float = 0.001,
+        n_iterations: int = 1000,
+        kernel: str = 'linear',
+        gamma: float = 1.0
+    ):
+        self.C = C
+        self.learning_rate = learning_rate
+        self.n_iterations = n_iterations
+        self.kernel = kernel
+        self.gamma = gamma
+        
+        # Parameters learned during training
+        self.weights = None
+        self.bias = None
+        self.classes_ = None
+        self.support_vectors_ = None
+        self.loss_history = []
+    
+    def _linear_kernel(self, X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
+        """Linear kernel: K(x, y) = x · y"""
+        return np.dot(X1, X2.T)
+    
+    def _rbf_kernel(self, X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
+        """RBF kernel: K(x, y) = exp(-γ||x - y||²)"""
+        if X1.ndim == 1:
+            X1 = X1.reshape(1, -1)
+        if X2.ndim == 1:
+            X2 = X2.reshape(1, -1)
+        
+        # Compute squared Euclidean distances
+        X1_sq = np.sum(X1 ** 2, axis=1).reshape(-1, 1)
+        X2_sq = np.sum(X2 ** 2, axis=1).reshape(1, -1)
+        distances = X1_sq + X2_sq - 2 * np.dot(X1, X2.T)
+        
+        return np.exp(-self.gamma * distances)
+    
+    def _compute_kernel(self, X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
+        """Compute kernel matrix."""
+        if self.kernel == 'linear':
+            return self._linear_kernel(X1, X2)
+        elif self.kernel == 'rbf':
+            return self._rbf_kernel(X1, X2)
+        else:
+            raise ValueError(f"Unknown kernel: {self.kernel}")
+    
+    def fit(self, X: np.ndarray, y: np.ndarray) -> 'SVMScratch':
+        """
+        Fit SVM model using sub-gradient descent.
+        
+        For binary classification, labels should be -1 and 1.
+        For other labels, they are converted internally.
+        
+        Args:
+            X: Features (n_samples, n_features)
+            y: Labels (n_samples,)
+        
+        Returns:
+            Self for chaining
+        """
+        X = np.asarray(X)
+        y = np.asarray(y)
+        
+        n_samples, n_features = X.shape
+        
+        # Store classes and convert to -1, 1
+        self.classes_ = np.unique(y)
+        if len(self.classes_) != 2:
+            raise ValueError("SVM currently only supports binary classification")
+        
+        # Map labels to -1 and 1
+        y_svm = np.where(y == self.classes_[0], -1, 1)
+        
+        # Initialize weights and bias
+        self.weights = np.zeros(n_features)
+        self.bias = 0.0
+        self.loss_history = []
+        
+        # Regularization parameter (lambda = 1 / C)
+        reg_lambda = 1 / self.C
+        
+        # Sub-gradient descent
+        for iteration in range(self.n_iterations):
+            total_loss = 0
+            
+            for i in range(n_samples):
+                # Compute margin
+                margin = y_svm[i] * (np.dot(X[i], self.weights) + self.bias)
+                
+                if margin < 1:
+                    # Misclassified or within margin
+                    # Update weights and bias
+                    self.weights -= self.learning_rate * (
+                        2 * reg_lambda * self.weights - y_svm[i] * X[i]
+                    )
+                    self.bias -= self.learning_rate * (-y_svm[i])
+                    total_loss += 1 - margin
+                else:
+                    # Correctly classified outside margin
+                    self.weights -= self.learning_rate * (2 * reg_lambda * self.weights)
+            
+            # Compute total loss
+            hinge_loss = total_loss / n_samples
+            reg_loss = reg_lambda * np.dot(self.weights, self.weights)
+            total_loss = hinge_loss + reg_loss
+            self.loss_history.append(total_loss)
+        
+        # Find support vectors (points within margin)
+        margins = y_svm * (np.dot(X, self.weights) + self.bias)
+        self.support_vectors_ = X[margins <= 1]
+        
+        return self
+    
+    def decision_function(self, X: np.ndarray) -> np.ndarray:
+        """
+        Compute decision function value for samples.
+        
+        Args:
+            X: Features (n_samples, n_features)
+        
+        Returns:
+            Decision function values (positive = class 1, negative = class 0)
+        """
+        X = np.asarray(X)
+        return np.dot(X, self.weights) + self.bias
+    
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels.
+        
+        Args:
+            X: Features (n_samples, n_features)
+        
+        Returns:
+            Predicted class labels
+        """
+        decision = self.decision_function(X)
+        indices = (decision > 0).astype(int)
+        return self.classes_[indices]
+    
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Estimate probabilities using Platt scaling approximation.
+        
+        Note: This is an approximation; true probabilities require calibration.
+        
+        Args:
+            X: Features (n_samples, n_features)
+        
+        Returns:
+            Probability estimates (n_samples, 2)
+        """
+        decision = self.decision_function(X)
+        # Sigmoid approximation
+        prob_positive = 1 / (1 + np.exp(-decision))
+        prob_negative = 1 - prob_positive
+        return np.column_stack([prob_negative, prob_positive])
+
+
+# ============================================================
 # EXPORTS
 # ============================================================
 
@@ -855,5 +1048,6 @@ __all__ = [
     'LinearRegressionScratch',
     # Classification
     'LogisticRegressionScratch', 'KNNScratch', 'DecisionTreeScratch',
-    'RandomForestScratch', 'GaussianNBScratch',
+    'RandomForestScratch', 'GaussianNBScratch', 'SVMScratch',
 ]
+
