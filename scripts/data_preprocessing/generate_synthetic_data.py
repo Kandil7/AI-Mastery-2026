@@ -1,395 +1,454 @@
 """
-Synthetic Data Generator
-========================
-Generate synthetic datasets for ML training and testing.
-
-Supports:
-- Classification data
-- Regression data
-- Time series data
-- Text/NLP data
-- Recommendation system data
-
-Author: AI-Mastery-2026
+Synthetic Data Generation for Testing and Development.
+This script generates various types of synthetic data to support model development and testing.
 """
 
 import numpy as np
+import pandas as pd
+import random
+from datetime import datetime, timedelta
 import json
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from pathlib import Path
+import os
+from typing import List, Dict, Any, Tuple
+import argparse
 import logging
 
-logger = logging.getLogger(__name__)
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("synthetic_data_generator")
 
-
-# ============================================================
-# DATA GENERATION FUNCTIONS
-# ============================================================
-
-def generate_classification_data(
-    n_samples: int = 1000,
-    n_features: int = 20,
-    n_classes: int = 2,
-    n_informative: int = 10,
-    n_redundant: int = 5,
-    class_sep: float = 1.0,
-    random_state: int = 42
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate synthetic classification dataset.
+class SyntheticDataGenerator:
+    """Generator for synthetic datasets."""
     
-    Args:
-        n_samples: Number of samples
-        n_features: Total number of features
-        n_classes: Number of classes
-        n_informative: Number of informative features
-        n_redundant: Number of redundant features
-        class_sep: Class separation factor
-        random_state: Random seed
+    def __init__(self, seed: int = 42):
+        self.seed = seed
+        np.random.seed(seed)
+        random.seed(seed)
     
-    Returns:
-        Tuple of (X, y) arrays
-    """
-    np.random.seed(random_state)
-    
-    # Generate informative features from class centroids
-    centroids = np.random.randn(n_classes, n_informative) * class_sep
-    
-    # Assign samples to classes
-    y = np.random.randint(0, n_classes, n_samples)
-    
-    # Generate features
-    X_informative = centroids[y] + np.random.randn(n_samples, n_informative) * 0.5
-    
-    # Generate redundant features as linear combinations
-    if n_redundant > 0:
-        weights = np.random.randn(n_informative, n_redundant)
-        X_redundant = X_informative @ weights + np.random.randn(n_samples, n_redundant) * 0.1
-    else:
-        X_redundant = np.zeros((n_samples, 0))
-    
-    # Generate noise features
-    n_noise = n_features - n_informative - n_redundant
-    X_noise = np.random.randn(n_samples, max(0, n_noise))
-    
-    # Combine
-    X = np.hstack([X_informative, X_redundant, X_noise])[:, :n_features]
-    
-    return X, y
-
-
-def generate_regression_data(
-    n_samples: int = 1000,
-    n_features: int = 10,
-    n_informative: int = 5,
-    noise: float = 0.1,
-    bias: float = 0.0,
-    random_state: int = 42
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate synthetic regression dataset.
-    
-    Args:
-        n_samples: Number of samples
-        n_features: Total number of features
-        n_informative: Number of features used in target
-        noise: Standard deviation of noise
-        bias: Bias term
-        random_state: Random seed
-    
-    Returns:
-        Tuple of (X, y) arrays
-    """
-    np.random.seed(random_state)
-    
-    X = np.random.randn(n_samples, n_features)
-    
-    # True coefficients
-    coef = np.zeros(n_features)
-    coef[:n_informative] = np.random.randn(n_informative)
-    
-    # Generate target
-    y = X @ coef + bias + np.random.randn(n_samples) * noise
-    
-    return X, y
-
-
-def generate_time_series(
-    n_samples: int = 1000,
-    n_features: int = 1,
-    trend: str = "linear",  # linear, quadratic, none
-    seasonality: int = 0,  # Period of seasonality (0 = none)
-    noise: float = 0.1,
-    random_state: int = 42
-) -> np.ndarray:
-    """
-    Generate synthetic time series data.
-    
-    Args:
-        n_samples: Length of time series
-        n_features: Number of parallel series
-        trend: Type of trend
-        seasonality: Seasonal period (0 for none)
-        noise: Noise level
-        random_state: Random seed
-    
-    Returns:
-        Time series array of shape (n_samples, n_features)
-    """
-    np.random.seed(random_state)
-    
-    t = np.arange(n_samples)
-    series = np.zeros((n_samples, n_features))
-    
-    for i in range(n_features):
-        # Trend component
-        if trend == "linear":
-            trend_component = 0.01 * t
-        elif trend == "quadratic":
-            trend_component = 0.0001 * t ** 2
-        else:
-            trend_component = np.zeros(n_samples)
+    def generate_customer_data(self, n_samples: int = 1000) -> pd.DataFrame:
+        """
+        Generate synthetic customer data.
         
-        # Seasonality component
-        if seasonality > 0:
-            season_component = np.sin(2 * np.pi * t / seasonality)
-        else:
-            season_component = np.zeros(n_samples)
+        Args:
+            n_samples: Number of samples to generate.
         
-        # Noise
-        noise_component = np.random.randn(n_samples) * noise
+        Returns:
+            DataFrame containing customer data.
+        """
+        logger.info(f"Generating customer data for {n_samples} samples...")
         
-        series[:, i] = trend_component + season_component + noise_component
-    
-    return series
-
-
-def generate_text_data(
-    n_samples: int = 100,
-    n_classes: int = 3,
-    vocab_size: int = 1000,
-    seq_length: Tuple[int, int] = (10, 50),
-    random_state: int = 42
-) -> Tuple[List[str], List[int]]:
-    """
-    Generate synthetic text classification data.
-    
-    Creates pseudo-text with class-specific vocabulary distributions.
-    
-    Args:
-        n_samples: Number of samples
-        n_classes: Number of classes
-        vocab_size: Size of vocabulary
-        seq_length: (min, max) sequence length
-        random_state: Random seed
-    
-    Returns:
-        Tuple of (texts, labels)
-    """
-    np.random.seed(random_state)
-    
-    # Create vocabulary
-    vocab = [f"word_{i}" for i in range(vocab_size)]
-    
-    # Class-specific word distributions
-    class_distributions = []
-    for _ in range(n_classes):
-        probs = np.random.dirichlet(np.ones(vocab_size) * 0.5)
-        class_distributions.append(probs)
-    
-    texts = []
-    labels = []
-    
-    for _ in range(n_samples):
-        label = np.random.randint(0, n_classes)
-        length = np.random.randint(seq_length[0], seq_length[1])
+        # Generate IDs
+        customer_ids = [f"CUST_{i:06d}" for i in range(n_samples)]
         
-        # Sample words from class distribution
-        word_indices = np.random.choice(
-            vocab_size, size=length, p=class_distributions[label]
+        # Generate Names
+        first_names = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth"]
+        last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"]
+        names = [f"{random.choice(first_names)} {random.choice(last_names)}" for _ in range(n_samples)]
+        
+        # Generate Age
+        ages = np.clip(np.random.normal(35, 12, n_samples).astype(int), 18, 85)
+        
+        # Generate Gender
+        genders = np.random.choice(["Male", "Female"], n_samples, p=[0.49, 0.51])
+        
+        # Generate Income
+        income_levels = ["Low", "Medium", "High"]
+        income = np.random.choice(income_levels, n_samples, p=[0.3, 0.5, 0.2])
+        annual_income = np.where(
+            income == "Low", np.random.uniform(25000, 50000, n_samples),
+            np.where(
+                income == "Medium", np.random.uniform(50000, 120000, n_samples),
+                np.random.uniform(120000, 350000, n_samples)
+            )
+        ).astype(int)
+        
+        # Generate Location (US Cities for English context)
+        cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"]
+        cities_col = np.random.choice(cities, n_samples)
+        regions = np.where(np.isin(cities_col, ["New York", "Philadelphia"]), "East", 
+                  np.where(np.isin(cities_col, ["Los Angeles", "San Diego", "Phoenix"]), "West", "Central"))
+        
+        # Generate Customer Status
+        customer_status = np.random.choice(["Active", "Inactive", "Churned"], n_samples, p=[0.7, 0.2, 0.1])
+        
+        # Generate Registration Date
+        base_date = datetime(2020, 1, 1)
+        registration_dates = [
+            base_date + timedelta(days=int(np.random.exponential(365)))
+            for _ in range(n_samples)
+        ]
+        
+        # Generate Loyalty Score
+        loyalty_scores = np.clip(np.random.normal(0.65, 0.2, n_samples), 0, 1)
+        
+        # Create DataFrame
+        df = pd.DataFrame({
+            'customer_id': customer_ids,
+            'name': names,
+            'age': ages,
+            'gender': genders,
+            'income_level': income,
+            'annual_income': annual_income,
+            'city': cities_col,
+            'region': regions,
+            'customer_status': customer_status,
+            'registration_date': registration_dates,
+            'loyalty_score': np.round(loyalty_scores, 2)
+        })
+        
+        logger.info("Customer data generated successfully")
+        return df
+    
+    def generate_transaction_data(self, customer_ids: List[str], n_transactions: int = 5000) -> pd.DataFrame:
+        """
+        Generate synthetic transaction data.
+        
+        Args:
+            customer_ids: List of available customer IDs.
+            n_transactions: Number of transactions to generate.
+        
+        Returns:
+            DataFrame containing transaction data.
+        """
+        logger.info(f"Generating transaction data for {n_transactions} transactions...")
+        
+        # Generate Transaction IDs
+        transaction_ids = [f"TRX_{i:08d}" for i in range(n_transactions)]
+        
+        # Randomly select customers
+        selected_customers = np.random.choice(customer_ids, n_transactions)
+        
+        # Generate Dates
+        start_date = datetime(2023, 1, 1)
+        end_date = datetime(2025, 1, 1)
+        date_range = (end_date - start_date).days
+        transaction_dates = [
+            start_date + timedelta(days=int(np.random.uniform(0, date_range)))
+            for _ in range(n_transactions)
+        ]
+        
+        # Generate Types
+        transaction_types = ["Purchase", "Refund", "Subscription", "Payment", "Withdrawal"]
+        types = np.random.choice(transaction_types, n_transactions, p=[0.65, 0.05, 0.2, 0.05, 0.05])
+        
+        # Generate Amounts based on type
+        amounts = np.zeros(n_transactions)
+        for i, t_type in enumerate(types):
+            if t_type == "Purchase":
+                amounts[i] = np.random.uniform(10, 1000)
+            elif t_type == "Refund":
+                amounts[i] = -np.random.uniform(10, 500)
+            elif t_type == "Subscription":
+                amounts[i] = np.random.uniform(10, 100)
+            elif t_type == "Payment":
+                amounts[i] = np.random.uniform(50, 2000)
+            elif t_type == "Withdrawal":
+                amounts[i] = -np.random.uniform(20, 1000)
+        
+        # Generate Categories
+        categories = ["Electronics", "Clothing", "Grocery", "Entertainment", "Home & Garden", "Travel"]
+        product_categories = np.random.choice(categories, n_transactions)
+        
+        # Generate Status
+        status = np.random.choice(["Completed", "Pending", "Failed"], n_transactions, p=[0.94, 0.04, 0.02])
+        
+        # Generate Loyalty Points earned
+        loyalty_points = np.where(
+            status == "Completed",
+            np.maximum(0, (amounts * 0.05).astype(int)),
+            0
         )
-        text = " ".join([vocab[i] for i in word_indices])
         
-        texts.append(text)
-        labels.append(label)
+        # Create DataFrame
+        df = pd.DataFrame({
+            'transaction_id': transaction_ids,
+            'customer_id': selected_customers,
+            'transaction_date': transaction_dates,
+            'transaction_type': types,
+            'amount': np.round(amounts, 2),
+            'product_category': product_categories,
+            'status': status,
+            'loyalty_points': loyalty_points
+        })
+        
+        # Sort by date
+        df = df.sort_values('transaction_date').reset_index(drop=True)
+        
+        logger.info("Transaction data generated successfully")
+        return df
     
-    return texts, labels
-
-
-def generate_recommendation_data(
-    n_users: int = 100,
-    n_items: int = 500,
-    n_interactions: int = 5000,
-    rating_range: Tuple[int, int] = (1, 5),
-    sparsity: float = 0.95,
-    random_state: int = 42
-) -> Dict[str, np.ndarray]:
-    """
-    Generate synthetic recommendation system data.
+    def generate_product_data(self, n_products: int = 500) -> pd.DataFrame:
+        """
+        Generate synthetic product data.
+        
+        Args:
+            n_products: Number of products to generate.
+        
+        Returns:
+            DataFrame containing product data.
+        """
+        logger.info(f"Generating product data for {n_products} products...")
+        
+        # Generate Product IDs
+        product_ids = [f"PROD_{i:05d}" for i in range(n_products)]
+        
+        # Generate Product Names
+        adjectives = ["Premium", "Luxury", "Essential", "Smart", "Wireless", "Portable", "Durable", "Eco-friendly"]
+        nouns = ["Headphones", "Watch", "Smartphone", "Laptop", "Sneakers", "Backpack", "Camera", "Speaker", "Monitor", "Chair"]
+        product_names = [f"{random.choice(adjectives)} {random.choice(nouns)}" for _ in range(n_products)]
+        
+        # Generate Categories
+        categories = ["Electronics", "Clothing", "Grocery", "Entertainment", "Home", "Travel"]
+        product_categories = np.random.choice(categories, n_products, p=[0.35, 0.2, 0.1, 0.1, 0.15, 0.1])
+        
+        # Generate Prices
+        base_prices = {
+            "Electronics": (100, 2500),
+            "Clothing": (20, 300),
+            "Grocery": (2, 50),
+            "Entertainment": (10, 150),
+            "Home": (30, 800),
+            "Travel": (50, 1000)
+        }
+        
+        prices = []
+        for cat in product_categories:
+            min_price, max_price = base_prices[cat]
+            price = np.random.uniform(min_price, max_price)
+            prices.append(round(price, 2))
+        
+        # Generate Costs (Margin simulation)
+        costs = [price * np.random.uniform(0.4, 0.8) for price in prices]
+        
+        # Generate Stock Quantities
+        quantities = np.random.poisson(100, n_products)
+        quantities = np.maximum(quantities, 0) 
+        
+        # Generate Ratings
+        ratings = np.clip(np.random.normal(4.2, 0.6, n_products), 1.0, 5.0)
+        ratings = np.round(ratings, 1)
+        
+        # Generate Review Counts
+        review_counts = np.random.poisson(80, n_products)
+        review_counts = np.maximum(review_counts, 0)
+        
+        # Create DataFrame
+        df = pd.DataFrame({
+            'product_id': product_ids,
+            'product_name': product_names,
+            'category': product_categories,
+            'price': prices,
+            'cost': np.round(costs, 2),
+            'quantity_in_stock': quantities,
+            'rating': ratings,
+            'review_count': review_counts
+        })
+        
+        logger.info("Product data generated successfully")
+        return df
     
-    Args:
-        n_users: Number of users
-        n_items: Number of items
-        n_interactions: Number of user-item interactions
-        rating_range: (min, max) rating values
-        sparsity: Matrix sparsity (fraction of missing entries)
-        random_state: Random seed
+    def generate_medical_records(self, n_records: int = 1000) -> pd.DataFrame:
+        """
+        Generate synthetic medical records.
+        
+        Args:
+            n_records: Number of records to generate.
+        
+        Returns:
+            DataFrame containing medical records.
+        """
+        logger.info(f"Generating medical records for {n_records} patients...")
+        
+        # Generate Patient IDs
+        patient_ids = [f"PAT_{i:06d}" for i in range(n_records)]
+        
+        # Generate Names
+        first_names = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth"]
+        last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"]
+        names = [f"{random.choice(first_names)} {random.choice(last_names)}" for _ in range(n_records)]
+        
+        # Generate Age
+        ages = np.clip(np.random.normal(48, 18, n_records).astype(int), 18, 95)
+        
+        # Generate Gender
+        genders = np.random.choice(["Male", "Female"], n_records, p=[0.48, 0.52])
+        
+        # Generate Conditions
+        medical_conditions_pool = [
+            "Hypertension", "Type 2 Diabetes", "Asthma", "Coronary Heart Disease", 
+            "Osteoarthritis", "Migraine", "Major Depression", "Generalized Anxiety",
+            "Obesity", "Hyperlipidemia", "GERD", "Hypothyroidism"
+        ]
+        conditions = []
+        for _ in range(n_records):
+            num_conditions = np.random.poisson(1.5)
+            num_conditions = max(0, min(num_conditions, 5))
+            patient_conditions = random.sample(medical_conditions_pool, num_conditions)
+            conditions.append(", ".join(patient_conditions))
+        
+        # Generate Medications
+        medications_pool = [
+            "Lisinopril", "Metformin", "Albuterol", "Aspirin",
+            "Ibuprofen", "Sertraline", "Atorvastatin", "Levothyroxine",
+            "Omeprazole", "Amlodipine", "Losartan", "Gabapentin"
+        ]
+        medications_list = []
+        for _ in range(n_records):
+            num_medications = np.random.poisson(1.8)
+            num_medications = max(0, min(num_medications, 6))
+            patient_meds = random.sample(medications_pool, num_medications)
+            medications_list.append(", ".join(patient_meds))
+        
+        # Generate Vitals
+        systolic_bp = np.clip(np.random.normal(120 + 0.5 * ages, 15), 90, 210).astype(int)
+        diastolic_bp = np.clip(np.random.normal(70 + 0.3 * ages, 10), 50, 130).astype(int)
+        blood_sugar = np.clip(np.random.normal(95 + 1.0 * (ages > 50).astype(int) * 25, 20), 65, 350)
+        
+        # Generate Visit Dates
+        visit_dates = [
+            datetime(2023, 1, 1) + timedelta(days=int(np.random.uniform(0, 730)))
+            for _ in range(n_records)
+        ]
+        
+        # Generate Risk Score
+        risk_scores = np.clip(
+            0.2 * (ages > 60).astype(int) +
+            0.5 * (np.array([len(c.split(',')) if c else 0 for c in conditions]) > 2).astype(int) +
+            0.3 * (blood_sugar > 140).astype(int),
+            0, 1
+        )
+        
+        # Create DataFrame
+        df = pd.DataFrame({
+            'patient_id': patient_ids,
+            'name': names,
+            'age': ages,
+            'gender': genders,
+            'medical_conditions': conditions,
+            'medications': medications_list,
+            'systolic_bp': systolic_bp,
+            'diastolic_bp': diastolic_bp,
+            'blood_sugar': np.round(blood_sugar, 1),
+            'visit_date': visit_dates,
+            'risk_score': np.round(risk_scores, 2)
+        })
+        
+        logger.info("Medical records generated successfully")
+        return df
     
-    Returns:
-        Dict with user_ids, item_ids, ratings arrays
-    """
-    np.random.seed(random_state)
+    def generate_legal_documents(self, n_documents: int = 100) -> List[Dict[str, Any]]:
+        """
+        Generate synthetic legal documents.
+        
+        Args:
+            n_documents: Number of documents to generate.
+        
+        Returns:
+            List of dictionaries containing legal documents.
+        """
+        logger.info(f"Generating legal documents for {n_documents} documents...")
+        
+        document_types = ["Service Agreement", "Employment Contract", "Non-Disclosure Agreement (NDA)", "Last Will and Testament", "Lease Agreement", "Merger Plan"]
+        parties = ["TechCorp Inc.", "Global Solutions Ltd.", "John Doe", "Jane Smith", "State Department", "Innovate LLC"]
+        jurisdictions = ["California", "New York", "Texas", "Delaware", "United Kingdom", "European Union"]
+        
+        documents = []
+        for i in range(n_documents):
+            doc_type = random.choice(document_types)
+            title = f"{doc_type} between {random.choice(parties)} and {random.choice(parties)}"
+            jurisdiction = random.choice(jurisdictions)
+            date = datetime(2021, 1, 1) + timedelta(days=int(np.random.uniform(0, 1500)))
+            
+            # Generate Document Content
+            clauses = []
+            num_clauses = random.randint(5, 12)
+            for j in range(num_clauses):
+                clause_text = [
+                    f"Clause {j+1}.1: The parties hereby agree to the terms and conditions set forth in this section.",
+                    f"Clause {j+1}.2: This agreement shall be governed by and construed in accordance with the laws of {jurisdiction}.",
+                    f"Clause {j+1}.3: Any dispute arising out of or in connection with this agreement shall be referred to arbitration.",
+                    f"Clause {j+1}.4: The duration of this agreement shall be {random.randint(1, 10)} years from the Effective Date.",
+                    f"Clause {j+1}.5: Receiving Party shall hold the Confidential Information in strict confidence."
+                ]
+                clauses.append(random.choice(clause_text))
+            
+            content = "\\n\\n".join(clauses)
+            
+            documents.append({
+                'document_id': f"DOC_{i:06d}",
+                'title': title,
+                'type': doc_type,
+                'jurisdiction': jurisdiction,
+                'date': date.strftime("%Y-%m-%d"),
+                'content': content,
+                'metadata': {
+                    'word_count': len(content.split()),
+                    'clause_count': num_clauses,
+                    'created_at': datetime.now().isoformat()
+                }
+            })
+        
+        logger.info("Legal documents generated successfully")
+        return documents
     
-    # Generate user and item latent factors
-    n_factors = 10
-    user_factors = np.random.randn(n_users, n_factors)
-    item_factors = np.random.randn(n_items, n_factors)
-    
-    # Generate interactions
-    user_ids = np.random.randint(0, n_users, n_interactions)
-    item_ids = np.random.randint(0, n_items, n_interactions)
-    
-    # Calculate ratings based on latent factors
-    true_ratings = np.sum(
-        user_factors[user_ids] * item_factors[item_ids], axis=1
-    )
-    
-    # Scale to rating range
-    min_r, max_r = rating_range
-    ratings = (true_ratings - true_ratings.min()) / (true_ratings.max() - true_ratings.min())
-    ratings = ratings * (max_r - min_r) + min_r
-    ratings = np.round(ratings).astype(int)
-    ratings = np.clip(ratings, min_r, max_r)
-    
-    return {
-        "user_ids": user_ids,
-        "item_ids": item_ids,
-        "ratings": ratings
-    }
-
-
-def generate_embedding_data(
-    n_samples: int = 1000,
-    n_clusters: int = 5,
-    embedding_dim: int = 768,
-    cluster_std: float = 0.3,
-    random_state: int = 42
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate synthetic embedding vectors with cluster structure.
-    
-    Useful for testing vector search and clustering algorithms.
-    
-    Args:
-        n_samples: Number of embeddings
-        n_clusters: Number of clusters
-        embedding_dim: Embedding dimension
-        cluster_std: Within-cluster standard deviation
-        random_state: Random seed
-    
-    Returns:
-        Tuple of (embeddings, cluster_labels)
-    """
-    np.random.seed(random_state)
-    
-    # Generate cluster centers on unit sphere
-    centers = np.random.randn(n_clusters, embedding_dim)
-    centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
-    
-    # Assign samples to clusters
-    labels = np.random.randint(0, n_clusters, n_samples)
-    
-    # Generate embeddings around centers
-    embeddings = centers[labels] + np.random.randn(n_samples, embedding_dim) * cluster_std
-    
-    # Normalize to unit sphere
-    embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-    
-    return embeddings, labels
-
-
-# ============================================================
-# DATA SAVING UTILITIES
-# ============================================================
-
-def save_dataset(
-    data: Dict[str, Any],
-    output_path: str,
-    format: str = "npz"
-):
-    """
-    Save generated dataset to file.
-    
-    Args:
-        data: Dictionary of arrays/lists
-        output_path: Output file path
-        format: Output format (npz, json, csv)
-    """
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    
-    if format == "npz":
-        np.savez(path, **{k: np.array(v) for k, v in data.items()})
-    elif format == "json":
-        with open(path, 'w') as f:
-            json.dump({k: v.tolist() if hasattr(v, 'tolist') else v for k, v in data.items()}, f)
-    else:
-        raise ValueError(f"Unsupported format: {format}")
-    
-    logger.info(f"Saved dataset to {path}")
-
-
-# ============================================================
-# MAIN SCRIPT
-# ============================================================
+    def save_data(self, output_dir: str = "data/synthetic"):
+        """
+        Save all generated synthetic data to the output directory.
+        
+        Args:
+            output_dir: Directory to save the data.
+        """
+        logger.info(f"Saving synthetic data to {output_dir}...")
+        
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Customer Data
+        customer_df = self.generate_customer_data(1000)
+        customer_df.to_csv(os.path.join(output_dir, "customers.csv"), index=False)
+        
+        # Transaction Data
+        transaction_df = self.generate_transaction_data(customer_df['customer_id'].tolist(), 5000)
+        transaction_df.to_csv(os.path.join(output_dir, "transactions.csv"), index=False)
+        
+        # Product Data
+        product_df = self.generate_product_data(500)
+        product_df.to_csv(os.path.join(output_dir, "products.csv"), index=False)
+        
+        # Medical Data
+        medical_df = self.generate_medical_records(1000)
+        medical_df.to_csv(os.path.join(output_dir, "medical_records.csv"), index=False)
+        
+        # Legal Data
+        legal_docs = self.generate_legal_documents(100)
+        with open(os.path.join(output_dir, "legal_documents.json"), 'w', encoding='utf-8') as f:
+            json.dump(legal_docs, f, ensure_ascii=False, indent=2)
+        
+        logger.info("All synthetic data saved successfully")
 
 def main():
-    """Generate all synthetic datasets."""
-    import argparse
+    """Main function execution."""
+    parser = argparse.ArgumentParser(description='Generate synthetic data for AI Engineer Toolkit')
+    parser.add_argument('--output_dir', type=str, default='data/synthetic', 
+                        help='Output directory for synthetic data')
+    parser.add_argument('--seed', type=int, default=42, 
+                        help='Random seed for reproducibility')
+    parser.add_argument('--sample_size', type=int, default=1000,
+                        help='Base sample size for datasets')
     
-    parser = argparse.ArgumentParser(description="Generate synthetic ML datasets")
-    parser.add_argument("--output-dir", default="data/synthetic", help="Output directory")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
     
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Starting synthetic data generation...")
+    logger.info(f"Output directory: {args.output_dir}")
+    logger.info(f"Random seed: {args.seed}")
     
-    print("Generating synthetic datasets...")
+    generator = SyntheticDataGenerator(seed=args.seed)
+    generator.save_data(args.output_dir)
     
-    # Classification
-    X, y = generate_classification_data(n_samples=5000, random_state=args.seed)
-    save_dataset({"X": X, "y": y}, output_dir / "classification.npz")
-    print(f"✓ Classification: {X.shape}")
-    
-    # Regression
-    X, y = generate_regression_data(n_samples=5000, random_state=args.seed)
-    save_dataset({"X": X, "y": y}, output_dir / "regression.npz")
-    print(f"✓ Regression: {X.shape}")
-    
-    # Time series
-    ts = generate_time_series(n_samples=1000, seasonality=50, random_state=args.seed)
-    save_dataset({"series": ts}, output_dir / "time_series.npz")
-    print(f"✓ Time series: {ts.shape}")
-    
-    # Text
-    texts, labels = generate_text_data(n_samples=1000, random_state=args.seed)
-    save_dataset({"texts": texts, "labels": labels}, output_dir / "text_classification.json", format="json")
-    print(f"✓ Text: {len(texts)} samples")
-    
-    # Recommendations
-    rec_data = generate_recommendation_data(random_state=args.seed)
-    save_dataset(rec_data, output_dir / "recommendations.npz")
-    print(f"✓ Recommendations: {len(rec_data['ratings'])} interactions")
-    
-    # Embeddings
-    embeddings, clusters = generate_embedding_data(random_state=args.seed)
-    save_dataset({"embeddings": embeddings, "clusters": clusters}, output_dir / "embeddings.npz")
-    print(f"✓ Embeddings: {embeddings.shape}")
-    
-    print(f"\nAll datasets saved to {output_dir}")
-
+    logger.info("Synthetic data generation completed successfully!")
 
 if __name__ == "__main__":
     main()

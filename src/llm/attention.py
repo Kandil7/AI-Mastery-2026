@@ -1,606 +1,611 @@
 """
-Attention Mechanisms
-====================
-Self-attention and Transformer components from scratch.
-
-The Transformer architecture (Vaswani et al., 2017) revolutionized NLP
-with its self-attention mechanism, enabling parallel processing and
-capturing long-range dependencies.
-
-Key Equation:
-    Attention(Q, K, V) = softmax(QKᵀ / √d_k) × V
-
-Components:
-- Scaled Dot-Product Attention
-- Multi-Head Attention
-- Positional Encodings (Sinusoidal, RoPE)
-- TransformerBlock
-
-Author: AI-Mastery-2026
+Advanced Attention Mechanisms Implementation for Large Language Models.
+Focuses on efficiency, customization, and deep mathematical understanding.
 """
 
 import numpy as np
-from typing import Optional, Tuple
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Optional, Tuple, List, Dict, Any
+import math
+import logging
+from dataclasses import dataclass
 
-# Try relative import
-try:
-    from ..core.math_operations import softmax
-except ImportError:
-    def softmax(x, axis=-1):
-        exp_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
-        return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
+logger = logging.getLogger(__name__)
 
+@dataclass
+class AttentionConfig:
+    """Configuration for Attention parameters"""
+    hidden_size: int
+    num_attention_heads: int
+    head_dim: int
+    max_position_embeddings: int = 4096
+    attention_dropout: float = 0.1
+    hidden_dropout: float = 0.1
+    use_flash_attention: bool = False
+    rotary_embedding_base: int = 10000
+    rotary_embedding_fraction: float = 1.0  # Fraction of dimension to apply rotary embedding
+    attention_type: str = "scaled_dot_product"  # "scaled_dot_product", "linear", "performer"
+    kv_cache_enabled: bool = True
 
-# ============================================================
-# POSITIONAL ENCODINGS
-# ============================================================
+class RotaryPositionEmbedding(nn.Module):
+    """Rotary Position Embedding (RoPE)"""
+    
+    def __init__(self, config: AttentionConfig):
+        super().__init__()
+        self.dim = int(config.head_dim * config.rotary_embedding_fraction)
+        self.base = config.rotary_embedding_base
+        self.max_seq_len = config.max_position_embeddings
+        
+        # Determine inverse frequencies
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float() / self.dim))
+        self.register_buffer("inv_freq", inv_freq)
+        
+        # Pre-compute cosine and sine cache
+        self._set_cos_sin_cache(seq_len=self.max_seq_len)
 
-def sinusoidal_positional_encoding(seq_len: int, d_model: int) -> np.ndarray:
-    """
-    Sinusoidal Positional Encoding (original Transformer).
-    
-    PE(pos, 2i) = sin(pos / 10000^(2i/d_model))
-    PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))
-    
-    Properties:
-    - Deterministic (no learned parameters)
-    - Generalizes to longer sequences than seen in training
-    - Relative positions can be expressed as linear functions
-    
-    Args:
-        seq_len: Maximum sequence length
-        d_model: Model dimension
-    
-    Returns:
-        Positional encoding matrix (seq_len, d_model)
-    """
-    position = np.arange(seq_len)[:, np.newaxis]
-    div_term = np.exp(np.arange(0, d_model, 2) * -(np.log(10000.0) / d_model))
-    
-    pe = np.zeros((seq_len, d_model))
-    pe[:, 0::2] = np.sin(position * div_term)
-    pe[:, 1::2] = np.cos(position * div_term)
-    
-    return pe
-
-
-def rotary_positional_embedding(x: np.ndarray, seq_len: int, 
-                                 d_model: int, base: int = 10000) -> np.ndarray:
-    """
-    Rotary Position Embedding (RoPE).
-    
-    Used in Llama, GPT-Neo-X, and modern LLMs.
-    
-    Advantages over sinusoidal:
-    - Relative position is encoded in dot product
-    - Better generalization to longer sequences
-    - Can be applied at each layer
-    
-    Formula:
-        RoPE(x, pos) = x * cos(mθ) + rotate(x) * sin(mθ)
-    
-    Where rotate(x) swaps pairs and negates alternates.
-    
-    Args:
-        x: Input tensor (batch, seq_len, d_model)
-        seq_len: Sequence length
-        d_model: Model dimension
-        base: Base for frequency calculation
-    
-    Returns:
-        Position-encoded tensor
-    """
-    # Generate rotation angles
-    inv_freq = 1.0 / (base ** (np.arange(0, d_model, 2) / d_model))
-    positions = np.arange(seq_len)
-    angles = np.outer(positions, inv_freq)
-    
-    # Create rotation matrix components
-    cos = np.cos(angles)
-    sin = np.sin(angles)
-    
-    # Apply rotation
-    x1, x2 = x[..., 0::2], x[..., 1::2]
-    x_rotated = np.stack([-x2, x1], axis=-1).reshape(x.shape)
-    
-    cos_expanded = np.repeat(cos, 2, axis=-1)
-    sin_expanded = np.repeat(sin, 2, axis=-1)
-    
-    return x * cos_expanded + x_rotated * sin_expanded
-
-
-# ============================================================
-# ATTENTION MECHANISMS
-# ============================================================
-
-def scaled_dot_product_attention(
-    Q: np.ndarray,
-    K: np.ndarray, 
-    V: np.ndarray,
-    mask: Optional[np.ndarray] = None,
-    dropout_rate: float = 0.0,
-    training: bool = True
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Scaled Dot-Product Attention.
-    
-    The core attention mechanism from "Attention Is All You Need".
-    
-    Formula:
-        Attention(Q, K, V) = softmax(QKᵀ / √d_k) × V
-    
-    Intuition:
-        - Q (Query): "What am I looking for?"
-        - K (Key): "What do I contain?"
-        - V (Value): "What can I provide?"
-        - Attention scores = compatibility between Q and K
-        - Output = weighted sum of V based on scores
-    
-    Args:
-        Q: Queries (batch, seq_q, d_k)
-        K: Keys (batch, seq_k, d_k)
-        V: Values (batch, seq_k, d_v)
-        mask: Optional attention mask (broadcastable)
-        dropout_rate: Dropout probability on attention weights
-        training: Whether in training mode
-    
-    Returns:
-        Tuple of (output, attention_weights)
-    
-    Example:
-        >>> Q = np.random.randn(2, 10, 64)  # batch=2, seq=10, d_k=64
-        >>> K = np.random.randn(2, 20, 64)
-        >>> V = np.random.randn(2, 20, 64)
-        >>> output, weights = scaled_dot_product_attention(Q, K, V)
-        >>> print(output.shape)  # (2, 10, 64)
-    """
-    d_k = K.shape[-1]
-    
-    # Compute attention scores: Q @ K^T
-    # (batch, seq_q, d_k) @ (batch, d_k, seq_k) -> (batch, seq_q, seq_k)
-    scores = np.matmul(Q, K.transpose(0, 2, 1)) / np.sqrt(d_k)
-    
-    # Apply mask (for causal attention or padding)
-    if mask is not None:
-        scores = np.where(mask, scores, -1e9)
-    
-    # Softmax over keys
-    attention_weights = softmax(scores, axis=-1)
-    
-    # Apply dropout during training
-    if training and dropout_rate > 0:
-        dropout_mask = np.random.binomial(1, 1 - dropout_rate, attention_weights.shape)
-        attention_weights = attention_weights * dropout_mask / (1 - dropout_rate)
-    
-    # Weighted sum of values
-    output = np.matmul(attention_weights, V)
-    
-    return output, attention_weights
-
-
-class MultiHeadAttention:
-    """
-    Multi-Head Attention.
-    
-    Allows the model to attend to information from different
-    representation subspaces at different positions.
-    
-    Formula:
-        MultiHead(Q, K, V) = Concat(head_1, ..., head_h) @ W_O
-        where head_i = Attention(Q @ W_Q^i, K @ W_K^i, V @ W_V^i)
-    
-    Parameters:
-        - d_model: 512 (typical)
-        - num_heads: 8
-        - d_k = d_v = d_model / num_heads = 64
-    
-    Why multiple heads?
-        - Different heads can focus on different aspects
-        - Head 1: syntax (subject-verb)
-        - Head 2: coreference (pronouns)
-        - Head 3: semantic similarity
-    
-    Example:
-        >>> mha = MultiHeadAttention(d_model=512, num_heads=8)
-        >>> output = mha.forward(x, x, x)  # Self-attention
-    """
-    
-    def __init__(self, d_model: int, num_heads: int, dropout_rate: float = 0.0):
-        """
-        Args:
-            d_model: Model dimension
-            num_heads: Number of attention heads
-            dropout_rate: Dropout probability
-        """
-        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+    def _set_cos_sin_cache(self, seq_len: int):
+        """Pre-compute cosine and sine values"""
+        t = torch.arange(seq_len, device=self.inv_freq.device).type_as(self.inv_freq)
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        emb = torch.cat((freqs, freqs), dim=-1)
         
-        self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_k = d_model // num_heads
-        self.dropout_rate = dropout_rate
+        # Reshape for broadcasting: [1, 1, seq_len, head_dim]
+        cos = emb.cos()[None, None, :, :]
+        sin = emb.sin()[None, None, :, :]
         
-        # Initialize projection weights
-        scale = np.sqrt(2.0 / d_model)
-        self.W_Q = np.random.randn(d_model, d_model) * scale
-        self.W_K = np.random.randn(d_model, d_model) * scale
-        self.W_V = np.random.randn(d_model, d_model) * scale
-        self.W_O = np.random.randn(d_model, d_model) * scale
-        
-        # For backward pass
-        self.Q = None
-        self.K = None
-        self.V = None
-        self.attention_weights = None
-    
-    def split_heads(self, x: np.ndarray) -> np.ndarray:
-        """
-        Split last dimension into (num_heads, d_k).
-        
-        (batch, seq, d_model) -> (batch, num_heads, seq, d_k)
-        """
-        batch_size, seq_len, _ = x.shape
-        x = x.reshape(batch_size, seq_len, self.num_heads, self.d_k)
-        return x.transpose(0, 2, 1, 3)
-    
-    def combine_heads(self, x: np.ndarray) -> np.ndarray:
-        """
-        Combine heads back to original shape.
-        
-        (batch, num_heads, seq, d_k) -> (batch, seq, d_model)
-        """
-        batch_size, _, seq_len, _ = x.shape
-        x = x.transpose(0, 2, 1, 3)
-        return x.reshape(batch_size, seq_len, self.d_model)
-    
-    def forward(self, Q: np.ndarray, K: np.ndarray, V: np.ndarray,
-                mask: Optional[np.ndarray] = None,
-                training: bool = True) -> np.ndarray:
-        """
-        Multi-head attention forward pass.
-        
-        Args:
-            Q: Queries (batch, seq_q, d_model)
-            K: Keys (batch, seq_k, d_model)
-            V: Values (batch, seq_k, d_model)
-            mask: Optional attention mask
-            training: Training mode
-        
-        Returns:
-            Output tensor (batch, seq_q, d_model)
-        """
-        # Linear projections
-        Q_proj = Q @ self.W_Q
-        K_proj = K @ self.W_K
-        V_proj = V @ self.W_V
-        
-        # Split into heads
-        Q_heads = self.split_heads(Q_proj)
-        K_heads = self.split_heads(K_proj)
-        V_heads = self.split_heads(V_proj)
-        
-        # Apply attention for each head
-        # Reshape for batch processing
-        batch_size = Q.shape[0]
-        Q_flat = Q_heads.reshape(-1, Q_heads.shape[2], self.d_k)
-        K_flat = K_heads.reshape(-1, K_heads.shape[2], self.d_k)
-        V_flat = V_heads.reshape(-1, V_heads.shape[2], self.d_k)
-        
-        attention_output, self.attention_weights = scaled_dot_product_attention(
-            Q_flat, K_flat, V_flat,
-            mask=mask, dropout_rate=self.dropout_rate, training=training
-        )
-        
-        # Reshape back
-        attention_output = attention_output.reshape(
-            batch_size, self.num_heads, -1, self.d_k
-        )
-        
-        # Combine heads
-        concat_output = self.combine_heads(attention_output)
-        
-        # Final linear projection
-        output = concat_output @ self.W_O
-        
-        return output
-    
-    def __call__(self, Q: np.ndarray, K: np.ndarray, V: np.ndarray,
-                 mask: Optional[np.ndarray] = None,
-                 training: bool = True) -> np.ndarray:
-        return self.forward(Q, K, V, mask, training)
-
-
-# ============================================================
-# FEED-FORWARD NETWORK
-# ============================================================
-
-class FeedForwardNetwork:
-    """
-    Position-wise Feed-Forward Network.
-    
-    Applied to each position independently and identically.
-    
-    Formula:
-        FFN(x) = max(0, xW_1 + b_1)W_2 + b_2
-    
-    Or with GELU (GPT, BERT):
-        FFN(x) = GELU(xW_1 + b_1)W_2 + b_2
-    
-    Typical dimensions:
-        - d_model: 512
-        - d_ff: 2048 (4× expansion)
-    
-    Why 4×?
-        - Larger capacity for non-linear transformations
-        - Empirically found to work well
-    """
-    
-    def __init__(self, d_model: int, d_ff: int, activation: str = 'relu',
-                 dropout_rate: float = 0.0):
-        """
-        Args:
-            d_model: Model dimension
-            d_ff: Feed-forward dimension (usually 4 * d_model)
-            activation: 'relu' or 'gelu'
-            dropout_rate: Dropout probability
-        """
-        self.d_model = d_model
-        self.d_ff = d_ff
-        self.activation = activation
-        self.dropout_rate = dropout_rate
-        
-        # Initialize weights
-        scale = np.sqrt(2.0 / d_model)
-        self.W1 = np.random.randn(d_model, d_ff) * scale
-        self.b1 = np.zeros(d_ff)
-        self.W2 = np.random.randn(d_ff, d_model) * scale
-        self.b2 = np.zeros(d_model)
-    
-    def _activate(self, x: np.ndarray) -> np.ndarray:
-        """Apply activation function."""
-        if self.activation == 'relu':
-            return np.maximum(0, x)
-        elif self.activation == 'gelu':
-            # GELU approximation
-            return 0.5 * x * (1 + np.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * x ** 3)))
+        if hasattr(self, "cos_cached"):
+             self.cos_cached = cos
+             self.sin_cached = sin
         else:
-            return x
+             self.register_buffer("cos_cached", cos, persistent=False)
+             self.register_buffer("sin_cached", sin, persistent=False)
     
-    def forward(self, x: np.ndarray, training: bool = True) -> np.ndarray:
+    def rotate_half(self, x: torch.Tensor) -> torch.Tensor:
+        """Rotate half the hidden dimension"""
+        x1, x2 = x[..., :self.dim // 2], x[..., self.dim // 2:]
+        return torch.cat((-x2, x1), dim=-1)
+    
+    def apply_rotary_pos_emb(self, q: torch.Tensor, k: torch.Tensor, 
+                           position_ids: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass.
+        Apply Rotary Position Embeddings to Q and K vectors.
         
         Args:
-            x: Input (batch, seq, d_model)
-            training: Training mode
+            q: Query vectors [batch_size, num_heads, seq_len, head_dim]
+            k: Key vectors [batch_size, num_heads, seq_len, head_dim]
+            position_ids: Position indices (optional)
         
         Returns:
-            Output (batch, seq, d_model)
+            Tuple of rotated Q and K
         """
-        # First linear + activation
-        hidden = self._activate(x @ self.W1 + self.b1)
+        seq_len = q.shape[2]
+        
+        # Ensure cache is on correct device
+        if self.cos_cached.device != q.device:
+             self.cos_cached = self.cos_cached.to(q.device)
+             self.sin_cached = self.sin_cached.to(q.device)
+
+        if position_ids is not None:
+            # Select specific positions
+            # Assuming position_ids shape is [batch, seq_len] -> unsqueeze for broadcasting
+            # We need to slice strictly or use gather.
+            # Simplified approach:
+            cos = self.cos_cached[:, :, position_ids, :]
+            sin = self.sin_cached[:, :, position_ids, :]
+            # Warning: this simple indexing might need adjustment based on exact position_ids shape
+        else:
+            if seq_len > self.cos_cached.shape[2]:
+                self._set_cos_sin_cache(seq_len)
+                self.cos_cached = self.cos_cached.to(q.device)
+                self.sin_cached = self.sin_cached.to(q.device)
+            
+            cos = self.cos_cached[:, :, :seq_len, :]
+            sin = self.sin_cached[:, :, :seq_len, :]
+        
+        # Apply One-sided RoPE or Full? Generally applied to part of dim.
+        # Here assuming full dim is rotated if fraction=1.0
+        
+        # Apply embeddings
+        q_embed = (q * cos) + (self.rotate_half(q) * sin)
+        k_embed = (k * cos) + (self.rotate_half(k) * sin)
+        
+        return q_embed, k_embed
+
+class AttentionMechanism(nn.Module):
+    """Base Attention Mechanism"""
+    
+    def __init__(self, config: AttentionConfig):
+        super().__init__()
+        self.config = config
+        
+        # Validation
+        assert config.hidden_size % config.num_attention_heads == 0, \
+            "Hidden size must be divisible by number of attention heads"
+        
+        self.head_dim = config.head_dim
+        self.num_heads = config.num_attention_heads
+        self.hidden_size = config.hidden_size
+        
+        # Projection Layers
+        self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
+        self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
+        self.v_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
+        self.o_proj = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
+        
+        # Initialize RoPE
+        self.rotary_emb = RotaryPositionEmbedding(config)
+        
+        # Weight Initialization
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights with Xavier Uniform"""
+        nn.init.xavier_uniform_(self.q_proj.weight)
+        nn.init.xavier_uniform_(self.k_proj.weight)
+        nn.init.xavier_uniform_(self.v_proj.weight)
+        nn.init.xavier_uniform_(self.o_proj.weight)
+    
+    def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int) -> torch.Tensor:
+        """Reshape tensor for multi-head attention"""
+        return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+    
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        output_attentions: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        """
+        Forward pass for attention mechanism.
+        
+        Args:
+            hidden_states: Input hidden states [batch_size, seq_len, hidden_size]
+            attention_mask: Attention mask (optional)
+            position_ids: Position indices (optional)
+            past_key_value: Cached Key/Value states from previous step (optional)
+            output_attentions: Whether to return attention weights
+        
+        Returns:
+            Tuple of (output, attention_weights, past_key_value)
+        """
+        bsz, q_len, _ = hidden_states.size()
+        
+        # Project Q, K, V
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+        
+        # Reshape to [batch_size, num_heads, seq_len, head_dim]
+        query_states = self._shape(query_states, q_len, bsz)
+        key_states = self._shape(key_states, q_len, bsz)
+        value_states = self._shape(value_states, q_len, bsz)
+        
+        # Apply Rotary Position Embeddings
+        if position_ids is not None:
+            query_states, key_states = self.rotary_emb.apply_rotary_pos_emb(
+                query_states, key_states, position_ids
+            )
+        else:
+             # If no position_ids but we are generating seq, assume 0..n
+             # For simpler usage let's pass None and let RoPE handle generic seq_len logic
+             # (See RoPE implementation detail above)
+             query_states, key_states = self.rotary_emb.apply_rotary_pos_emb(
+                 query_states, key_states, None
+             )
+        
+        # Handle KV Cache (Append new keys/values to past ones)
+        if past_key_value is not None and self.config.kv_cache_enabled:
+            key_states = torch.cat([past_key_value[0], key_states], dim=2)
+            value_states = torch.cat([past_key_value[1], value_states], dim=2)
+        
+        # Compute Attention
+        attn_output, attn_weights = self._compute_attention(
+            query_states, key_states, value_states, attention_mask
+        )
+        
+        # Reshape Output
+        attn_output = attn_output.transpose(1, 2).contiguous().view(bsz, q_len, self.hidden_size)
+        attn_output = self.o_proj(attn_output)
+        
+        # Update Cache
+        past_key_value = (key_states, value_states) if self.config.kv_cache_enabled else None
+        
+        return attn_output, attn_weights, past_key_value
+    
+    def _compute_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Dispatch to appropriate attention computation method"""
+        
+        if self.config.attention_type == "scaled_dot_product":
+            return self._scaled_dot_product_attention(q, k, v, attention_mask)
+        elif self.config.attention_type == "linear":
+            return self._linear_attention(q, k, v, attention_mask)
+        elif self.config.attention_type == "performer":
+            return self._performer_attention(q, k, v, attention_mask)
+        else:
+            raise ValueError(f"Unsupported attention type: {self.config.attention_type}")
+    
+    def _scaled_dot_product_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Compute Scaled Dot-Product Attention"""
+        
+        # Scores: [batch_size, num_heads, q_len, k_len]
+        attn_weights = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(self.head_dim)
+        
+        # Apply Mask
+        if attention_mask is not None:
+            attn_weights = attn_weights + attention_mask
+        
+        # Softmax
+        attn_weights = F.softmax(attn_weights, dim=-1, dtype=torch.float32).to(q.dtype)
         
         # Dropout
-        if training and self.dropout_rate > 0:
-            mask = np.random.binomial(1, 1 - self.dropout_rate, hidden.shape)
-            hidden = hidden * mask / (1 - self.dropout_rate)
+        attn_weights = F.dropout(attn_weights, p=self.config.attention_dropout, training=self.training)
         
-        # Second linear
-        output = hidden @ self.W2 + self.b2
+        # Weighted Sum
+        attn_output = torch.matmul(attn_weights, v)
         
-        return output
+        return attn_output, attn_weights
     
-    def __call__(self, x: np.ndarray, training: bool = True) -> np.ndarray:
-        return self.forward(x, training)
+    def _linear_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """
+        Compute Linear Attention.
+        Useful for very long sequences where O(n^2) is prohibitive.
+        Based on kernel trick (feature map).
+        """
+        # Feature Map (ELU + 1)
+        q = F.elu(q) + 1
+        k = F.elu(k) + 1
+        
+        # Denominator
+        kv = torch.einsum("bhld,bhle->bhde", k, v)
+        
+        # Numerator
+        z = 1.0 / (torch.einsum("bhld,bhl->bhd", q, k.sum(dim=2)) + 1e-6)
+        
+        # Output
+        attn_output = torch.einsum("bhld,bhde,bhd->bhle", q, kv, z)
+        
+        return attn_output, None
+    
+    def _performer_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """
+        Performer Attention (FAVOR+).
+        Approximates Softmax attention with O(n) complexity using random Fourier features.
+        """
+        # Random Fourier Features
+        m = 64  # Number of random features
+        projection = torch.randn(self.head_dim, m).to(q.device) * math.sqrt(2 / m)
+        
+        # Project Q and K
+        q_proj = torch.einsum("bhld, dm -> bhlm", q, projection)
+        k_proj = torch.einsum("bhld, dm -> bhlm", k, projection)
+        
+        # Approximate Softmax components
+        q_feat = F.softmax(q_proj, dim=-1)
+        k_feat = F.softmax(k_proj, dim=-1)
+        
+        # Compute Output
+        kv = torch.einsum("bhld,bhle->bhde", k_feat, v)
+        z = torch.einsum("bhld,bhl->bhd", q_feat, k_feat.sum(dim=2))
+        
+        attn_output = torch.einsum("bhld,bhde,bhd->bhle", q_feat, kv, 1.0 / (z + 1e-6))
+        
+        return attn_output, None
 
-
-# ============================================================
-# LAYER NORMALIZATION
-# ============================================================
-
-class LayerNorm:
+class MultiQueryAttention(AttentionMechanism):
     """
-    Layer Normalization.
-    
-    Normalizes across the feature dimension (d_model).
-    
-    Formula:
-        y = γ × (x - μ) / σ + β
-    
-    Where μ, σ are computed over the last dimension.
-    
-    Key difference from BatchNorm:
-        - LayerNorm: normalize per sample, across features
-        - BatchNorm: normalize per feature, across batch
-    
-    Why LayerNorm for Transformers?
-        - Batch-independent (works with variable sequence length)
-        - More stable for RNNs and attention
-    """
-    
-    def __init__(self, d_model: int, epsilon: float = 1e-6):
-        """
-        Args:
-            d_model: Model dimension
-            epsilon: Numerical stability
-        """
-        self.d_model = d_model
-        self.epsilon = epsilon
-        
-        # Learnable parameters
-        self.gamma = np.ones(d_model)
-        self.beta = np.zeros(d_model)
-    
-    def forward(self, x: np.ndarray) -> np.ndarray:
-        """
-        Apply layer normalization.
-        
-        Args:
-            x: Input (batch, seq, d_model)
-        
-        Returns:
-            Normalized output
-        """
-        mean = np.mean(x, axis=-1, keepdims=True)
-        var = np.var(x, axis=-1, keepdims=True)
-        
-        x_normalized = (x - mean) / np.sqrt(var + self.epsilon)
-        
-        return self.gamma * x_normalized + self.beta
-    
-    def __call__(self, x: np.ndarray) -> np.ndarray:
-        return self.forward(x)
-
-
-# ============================================================
-# TRANSFORMER BLOCK
-# ============================================================
-
-class TransformerBlock:
-    """
-    Single Transformer Encoder Block.
-    
-    Architecture:
-        x → LayerNorm → MultiHeadAttention → Add → LayerNorm → FFN → Add → output
-    
-    Uses Pre-LayerNorm (like GPT-2, modern models) for stability.
-    
-    Components:
-        1. Multi-Head Self-Attention
-        2. Add & Norm (residual connection)
-        3. Feed-Forward Network
-        4. Add & Norm (residual connection)
-    
-    Example:
-        >>> block = TransformerBlock(d_model=512, num_heads=8)
-        >>> output = block.forward(x, mask=causal_mask)
+    Multi-Query Attention (MQA).
+    Uses multiple heads for Query, but shares a single Key and Value head across all queries.
+    Significantly reduces memory bandwidth and cache usage.
     """
     
-    def __init__(self, d_model: int, num_heads: int, d_ff: int,
-                 dropout_rate: float = 0.1, activation: str = 'gelu',
-                 pre_norm: bool = True):
-        """
-        Args:
-            d_model: Model dimension
-            num_heads: Number of attention heads
-            d_ff: Feed-forward dimension
-            dropout_rate: Dropout probability
-            activation: FFN activation ('relu', 'gelu')
-            pre_norm: Use pre-layer normalization
-        """
-        self.d_model = d_model
-        self.pre_norm = pre_norm
-        self.dropout_rate = dropout_rate
+    def __init__(self, config: AttentionConfig):
+        super().__init__(config)
         
-        # Layers
-        self.attention = MultiHeadAttention(d_model, num_heads, dropout_rate)
-        self.ffn = FeedForwardNetwork(d_model, d_ff, activation, dropout_rate)
-        self.norm1 = LayerNorm(d_model)
-        self.norm2 = LayerNorm(d_model)
+        # In MQA, k_proj and v_proj output only 1 head dim
+        self.k_proj = nn.Linear(config.hidden_size, config.head_dim, bias=False)
+        self.v_proj = nn.Linear(config.hidden_size, config.head_dim, bias=False)
+        
+        self._init_weights()
     
-    def forward(self, x: np.ndarray, 
-                mask: Optional[np.ndarray] = None,
-                training: bool = True) -> np.ndarray:
-        """
-        Forward pass through transformer block.
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        output_attentions: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        """Forward pass for MQA"""
         
-        Args:
-            x: Input (batch, seq, d_model)
-            mask: Attention mask
-            training: Training mode
+        bsz, q_len, _ = hidden_states.size()
         
-        Returns:
-            Output (batch, seq, d_model)
-        """
-        if self.pre_norm:
-            # Pre-LayerNorm architecture
-            # 1. Self-attention with residual
-            norm_x = self.norm1(x)
-            attn_output = self.attention(norm_x, norm_x, norm_x, mask, training)
-            x = x + self._dropout(attn_output, training)
-            
-            # 2. FFN with residual
-            norm_x = self.norm2(x)
-            ffn_output = self.ffn(norm_x, training)
-            x = x + self._dropout(ffn_output, training)
+        # Project Q (Multiple Heads), K (1 Head), V (1 Head)
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+        
+        # Reshape Q: [batch, num_heads, seq_len, head_dim]
+        query_states = self._shape(query_states, q_len, bsz)
+        
+        # Reshape K, V: [batch, 1, seq_len, head_dim]
+        key_states = key_states.view(bsz, q_len, 1, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, 1, self.head_dim).transpose(1, 2)
+        
+        # Expand K, V to match Num Heads (Broadcasting)
+        key_states_expanded = key_states.expand(-1, self.num_heads, -1, -1)
+        value_states_expanded = value_states.expand(-1, self.num_heads, -1, -1)
+        
+        # Apply RoPE
+        if position_ids is not None:
+             # Apply RoPE to Query (all heads) and Key (expanded heads)
+            query_states, key_states_expanded = self.rotary_emb.apply_rotary_pos_emb(
+                query_states, key_states_expanded, position_ids
+            )
         else:
-            # Post-LayerNorm architecture (original Transformer)
-            attn_output = self.attention(x, x, x, mask, training)
-            x = self.norm1(x + self._dropout(attn_output, training))
-            
-            ffn_output = self.ffn(x, training)
-            x = self.norm2(x + self._dropout(ffn_output, training))
+            query_states, key_states_expanded = self.rotary_emb.apply_rotary_pos_emb(
+                query_states, key_states_expanded, None
+            )
         
-        return x
-    
-    def _dropout(self, x: np.ndarray, training: bool) -> np.ndarray:
-        """Apply dropout during training."""
-        if training and self.dropout_rate > 0:
-            mask = np.random.binomial(1, 1 - self.dropout_rate, x.shape)
-            return x * mask / (1 - self.dropout_rate)
-        return x
-    
-    def __call__(self, x: np.ndarray, 
-                 mask: Optional[np.ndarray] = None,
-                 training: bool = True) -> np.ndarray:
-        return self.forward(x, mask, training)
+        # Handle Cache
+        # Note: We should cache the COMPRESSED (1-head) K/V for efficiency, 
+        # but for simplicity here we cache what we use. Real MQA implementations optimize this.
+        if past_key_value is not None and self.config.kv_cache_enabled:
+             # Assumes past_key_value is also expanded. 
+            key_states_expanded = torch.cat([past_key_value[0], key_states_expanded], dim=2)
+            value_states_expanded = torch.cat([past_key_value[1], value_states_expanded], dim=2)
+        
+        # Compute Attention
+        attn_output, attn_weights = self._compute_attention(
+            query_states, key_states_expanded, value_states_expanded, attention_mask
+        )
+        
+        # Reshape Output
+        attn_output = attn_output.transpose(1, 2).contiguous().view(bsz, q_len, self.hidden_size)
+        attn_output = self.o_proj(attn_output)
+        
+        # Update Cache
+        past_key_value = (key_states_expanded, value_states_expanded) if self.config.kv_cache_enabled else None
+        
+        return attn_output, attn_weights, past_key_value
 
-
-# ============================================================
-# UTILITY FUNCTIONS
-# ============================================================
-
-def create_causal_mask(seq_len: int) -> np.ndarray:
+class GroupedQueryAttention(AttentionMechanism):
     """
-    Create causal (autoregressive) attention mask.
+    Grouped-Query Attention (GQA).
+    Groups attention heads into 'g' groups. Each group shares a single K/V head.
+    Interpolates between MHA (g=num_heads) and MQA (g=1).
+    """
     
-    Prevents attending to future positions.
+    def __init__(self, config: AttentionConfig, num_key_value_heads: int):
+        """
+        Args:
+            config: Attention config
+            num_key_value_heads: Number of KV heads. Must divide num_attention_heads.
+        """
+        super().__init__(config)
+        self.num_key_value_heads = num_key_value_heads
+        self.num_key_value_groups = config.num_attention_heads // num_key_value_heads
+        
+        # Output dim for K/V proj matches num_kv_heads * head_dim
+        self.k_proj = nn.Linear(config.hidden_size, self.head_dim * num_key_value_heads, bias=False)
+        self.v_proj = nn.Linear(config.hidden_size, self.head_dim * num_key_value_heads, bias=False)
+        
+        self._init_weights()
     
-    Mask:
-        [[1, 0, 0, 0],
-         [1, 1, 0, 0],
-         [1, 1, 1, 0],
-         [1, 1, 1, 1]]
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        output_attentions: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        """Forward pass for GQA"""
+        
+        bsz, q_len, _ = hidden_states.size()
+        
+        # Project
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+        
+        # Reshape Q: [batch, num_heads, seq_len, head_dim]
+        query_states = self._shape(query_states, q_len, bsz)
+        
+        # Reshape K, V: [batch, num_kv_heads, seq_len, head_dim]
+        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        
+        # Apply RoPE (Before repeating for correct rotational semantics if needed)
+        # Note: RoPE is element-wise rotation on head_dim. Safe to apply before repeat.
+        if position_ids is not None:
+             # We need to temporarily treat Q as having matching heads or just rotate independently?
+             # RoPE method expects [batch, heads, seq, dim]. It works for any 'heads' dim.
+            query_states, _ = self.rotary_emb.apply_rotary_pos_emb(query_states, query_states, position_ids)
+            key_states, _ = self.rotary_emb.apply_rotary_pos_emb(key_states, key_states, position_ids)
+        else:
+             query_states, _ = self.rotary_emb.apply_rotary_pos_emb(query_states, query_states, None)
+             key_states, _ = self.rotary_emb.apply_rotary_pos_emb(key_states, key_states, None)
+        
+        # Repeat K/V for each group to match Q heads
+        # [batch, kv_heads, seq, dim] -> [batch, kv_heads, groups, seq, dim] -> [batch, num_heads, seq, dim]
+        key_states_expanded = key_states.repeat_interleave(self.num_key_value_groups, dim=1)
+        value_states_expanded = value_states.repeat_interleave(self.num_key_value_groups, dim=1)
+        
+        # Handle Cache
+        if past_key_value is not None and self.config.kv_cache_enabled:
+            key_states_expanded = torch.cat([past_key_value[0], key_states_expanded], dim=2)
+            value_states_expanded = torch.cat([past_key_value[1], value_states_expanded], dim=2)
+        
+        # Compute Attention
+        attn_output, attn_weights = self._compute_attention(
+            query_states, key_states_expanded, value_states_expanded, attention_mask
+        )
+        
+        # Reshape Output
+        attn_output = attn_output.transpose(1, 2).contiguous().view(bsz, q_len, self.hidden_size)
+        attn_output = self.o_proj(attn_output)
+        
+        # Update Cache
+        past_key_value = (key_states_expanded, value_states_expanded) if self.config.kv_cache_enabled else None
+        
+        return attn_output, attn_weights, past_key_value
+
+class FlashAttentionWrapper(nn.Module):
+    """
+    Wrapper for FlashAttention to maximize GPU efficiency.
+    Requires CUDA 11.4+ and `flash_attn` library.
+    """
+    
+    def __init__(self, attention_mechanism: AttentionMechanism):
+        super().__init__()
+        self.attention = attention_mechanism
+    
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        output_attentions: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+        """Forward pass using FlashAttention"""
+        
+        try:
+            from flash_attn.flash_attn_interface import flash_attn_func
+            
+            # Note: This is an illustrative wrapper. 
+            # In a real scenario, we need to extract Q, K, V properly from the underlying attention mechanism
+            # or refactor the attention mechanism to support a 'get_qkv' method.
+            # Using standard implementation fallback if complex setup needed, but attempting basic flow:
+            
+            bsz, q_len, _ = hidden_states.size()
+            
+            q = self.attention.q_proj(hidden_states)
+            k = self.attention.k_proj(hidden_states)
+            v = self.attention.v_proj(hidden_states)
+            
+            q = self.attention._shape(q, q_len, bsz)
+            k = self.attention._shape(k, q_len, bsz)
+            v = self.attention._shape(v, q_len, bsz)
+            
+            # Apply RoPE
+            if position_ids is not None:
+                q, k = self.attention.rotary_emb.apply_rotary_pos_emb(q, k, position_ids)
+            else:
+                 q, k = self.attention.rotary_emb.apply_rotary_pos_emb(q, k, None)
+
+            # Flash Attention expects [batch, seq_len, num_heads, head_dim]
+            q = q.transpose(1, 2)
+            k = k.transpose(1, 2)
+            v = v.transpose(1, 2)
+            
+            # Run FlashAttention
+            attn_output = flash_attn_func(
+                q, k, v,
+                dropout_p=self.attention.config.attention_dropout if self.training else 0.0,
+                softmax_scale=1.0 / math.sqrt(self.attention.head_dim),
+                causal=True if attention_mask is not None else False
+            )
+            
+            # Reshape Output
+            attn_output = attn_output.reshape(bsz, q_len, self.attention.hidden_size)
+            attn_output = self.attention.o_proj(attn_output)
+            
+            return attn_output, None, past_key_value
+            
+        except ImportError:
+            logger.warning("FlashAttention not available/installed, falling back to standard implementation")
+            return self.attention(
+                hidden_states, attention_mask, position_ids, past_key_value, output_attentions
+            )
+        except Exception as e:
+            logger.warning(f"FlashAttention failed ({e}), falling back to standard implementation")
+            return self.attention(
+                hidden_states, attention_mask, position_ids, past_key_value, output_attentions
+            )
+
+def create_attention_layer(config: AttentionConfig, attention_type: str = "standard") -> nn.Module:
+    """
+    Factory to create the appropriate attention layer.
     
     Args:
-        seq_len: Sequence length
+        config: Attention configuration.
+        attention_type: Type of attention ("standard", "multi_query", "grouped_query", "flash").
     
     Returns:
-        Causal mask (seq_len, seq_len)
+        Configured attention module.
     """
-    return np.tril(np.ones((seq_len, seq_len), dtype=bool))
-
-
-def create_padding_mask(lengths: np.ndarray, max_len: int) -> np.ndarray:
-    """
-    Create padding mask from sequence lengths.
+    if attention_type == "standard":
+        attention = AttentionMechanism(config)
+    elif attention_type == "multi_query":
+        attention = MultiQueryAttention(config)
+    elif attention_type == "grouped_query":
+        # Default: Split heads into 4 groups if possible, else 1
+        num_key_value_heads = max(1, config.num_attention_heads // 4)
+        attention = GroupedQueryAttention(config, num_key_value_heads)
+    else:
+        # Fallback due to invalid type, user might mean standard
+        logger.warning(f"Unknown attention type '{attention_type}', defaulting to standard.")
+        attention = AttentionMechanism(config)
     
-    Args:
-        lengths: Array of actual sequence lengths
-        max_len: Maximum sequence length
+    # Wrap with FlashAttention if requested and not explicitly 'flash' type (which isn't a separate class here)
+    if config.use_flash_attention:
+        try:
+             # Just verify import possible
+            import flash_attn
+            return FlashAttentionWrapper(attention)
+        except ImportError:
+            logger.warning("FlashAttention requested but not installed. Using standard implementation.")
     
-    Returns:
-        Padding mask (batch, max_len)
-    """
-    batch_size = len(lengths)
-    mask = np.zeros((batch_size, max_len), dtype=bool)
+    return attention
+
+if __name__ == "__main__":
+    # Test Driver
+    logging.basicConfig(level=logging.INFO)
     
-    for i, length in enumerate(lengths):
-        mask[i, :length] = True
+    config = AttentionConfig(
+        hidden_size=256,
+        num_attention_heads=8,
+        head_dim=32,
+        attention_dropout=0.1,
+        use_flash_attention=False
+    )
     
-    return mask
-
-
-# ============================================================
-# EXPORTS
-# ============================================================
-
-__all__ = [
-    # Positional Encodings
-    'sinusoidal_positional_encoding', 'rotary_positional_embedding',
-    # Attention
-    'scaled_dot_product_attention', 'MultiHeadAttention',
-    # Components
-    'FeedForwardNetwork', 'LayerNorm', 'TransformerBlock',
-    # Utilities
-    'create_causal_mask', 'create_padding_mask',
-]
+    print("Testing Standard Attention...")
+    attn = create_attention_layer(config, "standard")
+    x = torch.randn(2, 10, 256)
+    out, _, _ = attn(x)
+    print(f"Output: {out.shape}")
+    
+    print("\nTesting Grouped Query Attention...")
+    attn_gqa = create_attention_layer(config, "grouped_query")
+    out_gqa, _, _ = attn_gqa(x)
+    print(f"Output: {out_gqa.shape}")
