@@ -20,11 +20,10 @@ import numpy as np
 from typing import List, Tuple, Optional, Union, Callable
 from abc import ABC, abstractmethod
 
-# Try relative import, fall back to direct
 try:
-    from ..core.math_operations import sigmoid, relu, relu_derivative, softmax, tanh
+    from src.core.math_operations import sigmoid, relu, relu_derivative, softmax, tanh
 except ImportError:
-    from core.math_operations import sigmoid, relu, relu_derivative, softmax, tanh
+    from ..core.math_operations import sigmoid, relu, relu_derivative, softmax, tanh
 
 
 # ============================================================

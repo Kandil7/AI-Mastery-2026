@@ -18,10 +18,13 @@ import numpy as np
 from typing import List, Optional, Tuple, Union, Callable
 from collections import Counter
 from abc import ABC, abstractmethod
-import sys
-sys.path.append('..')
-from core.math_operations import sigmoid, softmax
-from core.optimization import SGD, Adam, l2_regularization
+try:
+    from src.core.math_operations import sigmoid, softmax
+    from src.core.optimization import SGD, Adam, l2_regularization
+except ImportError:
+    # Try relative import if src is not in path but running as package
+    from ..core.math_operations import sigmoid, softmax
+    from ..core.optimization import SGD, Adam, l2_regularization
 
 
 # ============================================================
