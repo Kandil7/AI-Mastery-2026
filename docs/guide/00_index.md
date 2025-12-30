@@ -46,8 +46,26 @@ make docker-run
 6.  **[Deployment Guide](./09_deployment_guide.md)**
     *   Instructions for deploying the application using Docker and `docker-compose`.
 
-7.  **[Capstone Project: GitHub Issue Classifier](./10_capstone_project.md)** ⭐ NEW
+7.  **[Capstone Project: GitHub Issue Classifier](./10_capstone_project.md)** ⭐
     *   Complete end-to-end project building a production ML application.
+
+8.  **Production & Operations**
+    *   **[Cost Optimization](./11_cost_optimization.md)** 💰
+        *   GPU spot instances, model quantization, auto-scaling, pricing examples
+    *   **[Security Guide](./12_security_guide.md)** 🔒
+        *   API authentication, model security, data privacy, infrastructure hardening
+    *   **[Advanced MLOps](./13_advanced_mlops.md)** 🔧
+        *   Drift detection, A/B testing, shadow deployment, feature stores
+    *   **[Case Studies](./14_case_studies.md)** 📊
+        *   Real-world applications: fraud detection, RAG chatbot, predictive maintenance
+
+9.  **Specialized Guides** 🆕
+    *   **[Domain Applications](./15_domain_applications.md)** 🏥
+        *   Healthcare (HIPAA), Financial Services (PCI-DSS), E-Commerce (GDPR)
+    *   **[Cloud Deployment](./16_cloud_deployment.md)** ☁️
+        *   AWS, GCP, Azure with Terraform, Helm, and Kubernetes
+    *   **[Interview Preparation](./17_interview_prep.md)** 💼
+        *   ML fundamentals, system design, coding challenges, behavioral questions
 
 ---
 
