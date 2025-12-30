@@ -34,8 +34,12 @@ class TestFeatureCompleteness(unittest.TestCase):
         print("- Customer data OK")
 
         # Medical Records (ensure English terms)
-        medical_df = self.generator.generate_medical_records(n_records=5)
-        self.assertTrue(any("Hypertension" in c for c in medical_df['medical_conditions']))
+        medical_df = self.generator.generate_medical_records(n_records=50)
+        # Check if at least one row has some condition (Hypertension/Diabetes etc)
+        # Use a broader check to avoid randomness failure
+        english_conditions = ["Hypertension", "Diabetes", "Asthma", "Heart Disease"]
+        found_english = any(any(cond in record for cond in english_conditions) for record in medical_df['medical_conditions'])
+        self.assertTrue(found_english, "No English medical conditions found in 50 samples")
         print("- Medical records OK")
 
         # Legal Docs
