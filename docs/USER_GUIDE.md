@@ -251,6 +251,30 @@ docker-compose up -d
 
 ---
 
+## 7. Case Studies
+
+The toolkit includes full implementations of real-world systems.
+
+### Legal Document RAG System
+Located in `case_studies/legal_document_rag_system/`.
+*   **Architecture**: Hybrid search (Keyword + Vector) with citation tracking.
+*   **Key Components**: `DocumentProcessor`, `VectorStore`, `QueryEngine`.
+*   **Run Evaluation**:
+    ```bash
+    python case_studies/legal_document_rag_system/run_evaluation.py
+    ```
+
+### Medical Diagnosis Agent
+Located in `case_studies/medical_diagnosis_agent/`.
+*   **Architecture**: Privacy-first agent with PII stripping and clinical validation.
+*   **Key Components**: `PIIFilter`, `DiagnosticEngine`, `SafetyValidator`.
+*   **Run Demo**:
+    ```bash
+    python case_studies/medical_diagnosis_agent/run_demo.py
+    ```
+
+---
+
 ## Educational Resources
 Explore the `notebooks/` directory for weekly learning materials:
 - **Week 1**: Mathematical Foundations (`notebooks/week_01/`)
