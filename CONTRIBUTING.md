@@ -14,7 +14,7 @@ Our core principles:
 ### 1. Fork & Clone
 
 ```bash
-git clone https://github.com/yourusername/AI-Mastery-2026.git
+git clone https://github.com/Kandil7/AI-Mastery-2026.git
 cd AI-Mastery-2026
 ```
 

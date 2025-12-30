@@ -46,11 +46,19 @@ AI-Mastery-2026/
 
 ---
 
+## 📚 Documentation
+
+- **[User Guide](docs/USER_GUIDE.md)**: Comprehensive tutorials and workflows.
+- **[API Reference](docs/API_REFERENCE.md)**: Detailed module and class reference.
+- **[Completion Report](COMPLETION_REPORT.md)**: Implementation status and verification.
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/AI-Mastery-2026.git
+git clone https://github.com/Kandil7/AI-Mastery-2026.git
 cd AI-Mastery-2026
 
 # Create virtual environment
