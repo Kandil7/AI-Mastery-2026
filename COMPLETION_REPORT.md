@@ -15,9 +15,8 @@ All planned modules, case studies, and notebooks have been implemented following
 - **Medical Diagnosis Agent**: Safety-first architecture with PII filtering and validation.
 
 ### 3. Notebooks (`notebooks/`)
-- Week 1: Mathematical Foundations
-- Week 2: Neural Networks from Scratch
-- Week 3: Classical ML
+- Weeks 1-15: Fully populated with foundational content and demonstration notebooks leveraging the `src` modules.
+- Practical demonstrations for Production, LLMs, and System Design included.
 
 ### 4. Verification
 A verification script is provided at `scripts/verify_toolkit.py`.

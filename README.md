@@ -48,9 +48,7 @@ AI-Mastery-2026/
 
 ## 📚 Documentation
 
-- **[User Guide](docs/USER_GUIDE.md)**: Comprehensive tutorials and workflows.
-- **[API Reference](docs/API_REFERENCE.md)**: Detailed module and class reference.
-- **[Completion Report](COMPLETION_REPORT.md)**: Implementation status and verification.
+For a complete breakdown of the architecture, modules, development workflows, and deployment, please see the **[Complete User Guide](./docs/guide/00_index.md)**.
 
 ---
 
