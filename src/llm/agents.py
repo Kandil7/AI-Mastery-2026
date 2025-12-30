@@ -1,900 +1,683 @@
 """
-LLM Agent Design Patterns Module
-================================
-Agent architectures, tool integration, and orchestration patterns
-following the White-Box Approach.
+AI Agents Module
 
-Mathematical Foundations:
-- ReAct (Reason + Act) framework
-- Chain-of-Thought prompting
-- Function calling and tool use
-- Multi-agent coordination
-
-Author: AI-Mastery-2026
+This module implements various AI agent architectures and patterns,
+including reactive agents, deliberative agents, and multi-agent systems.
 """
 
+import asyncio
 import json
-import re
 import logging
-from typing import List, Dict, Any, Optional, Callable, Union, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional, Callable, Union, Tuple
+from dataclasses import dataclass
 from enum import Enum
 from abc import ABC, abstractmethod
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import openai
+from langchain.tools import BaseTool
+from langchain.agents import AgentType, initialize_agent, Tool
+from langchain_openai import OpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ============================================================
-# CORE DATA STRUCTURES
-# ============================================================
-
-class AgentRole(Enum):
-    """Predefined agent roles for multi-agent systems."""
-    COORDINATOR = "coordinator"
-    EXECUTOR = "executor"
-    REVIEWER = "reviewer"
-    RESEARCHER = "researcher"
-    PLANNER = "planner"
-
-
-@dataclass
-class Message:
-    """
-    Message structure for agent communication.
-    
-    Follows OpenAI chat format for compatibility.
-    """
-    role: str  # "system", "user", "assistant", "tool"
-    content: str
-    name: Optional[str] = None
-    tool_call_id: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        d = {"role": self.role, "content": self.content}
-        if self.name:
-            d["name"] = self.name
-        if self.tool_call_id:
-            d["tool_call_id"] = self.tool_call_id
-        if self.tool_calls:
-            d["tool_calls"] = self.tool_calls
-        return d
-
-
-@dataclass
-class Tool:
-    """
-    Tool definition for agent function calling.
-    
-    Based on OpenAI function calling schema.
-    """
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-    function: Callable
-    
-    def to_schema(self) -> Dict[str, Any]:
-        """Convert to OpenAI tool schema format."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters
-            }
-        }
-    
-    def execute(self, **kwargs) -> str:
-        """Execute the tool with given arguments."""
-        try:
-            result = self.function(**kwargs)
-            return json.dumps(result) if not isinstance(result, str) else result
-        except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            return json.dumps({"error": str(e)})
+class AgentType(Enum):
+    """Enumeration of agent types."""
+    REACTIVE = "reactive"
+    DELIBERATIVE = "deliberative"
+    HIERARCHICAL = "hierarchical"
+    MULTI_AGENT = "multi_agent"
+    FUNCTION_CALLING = "function_calling"
 
 
 @dataclass
 class AgentState:
-    """
-    Tracks agent's internal state.
-    
-    Used for persistence, debugging, and resumption.
-    """
-    messages: List[Message] = field(default_factory=list)
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    step_count: int = 0
-    
-    def add_message(self, message: Message):
-        """Add message to history."""
-        self.messages.append(message)
-    
-    def get_history(self) -> List[Dict[str, Any]]:
-        """Get message history as list of dicts."""
-        return [m.to_dict() for m in self.messages]
+    """Represents the state of an agent."""
+    beliefs: Dict[str, Any]
+    goals: List[str]
+    actions: List[str]
+    context: Dict[str, Any]
+    timestamp: float
 
 
-# ============================================================
-# MEMORY SYSTEMS
-# ============================================================
+@dataclass
+class AgentMessage:
+    """Represents a message between agents."""
+    sender: str
+    receiver: str
+    content: str
+    message_type: str  # "request", "response", "notification", "action"
+    timestamp: float
+    metadata: Optional[Dict[str, Any]] = None
 
-class Memory(ABC):
-    """Abstract base class for agent memory."""
-    
-    @abstractmethod
-    def add(self, content: str, metadata: Optional[Dict[str, Any]] = None):
-        """Add content to memory."""
-        pass
-    
-    @abstractmethod
-    def retrieve(self, query: str, k: int = 5) -> List[str]:
-        """Retrieve relevant memories."""
-        pass
-    
-    @abstractmethod
-    def clear(self):
-        """Clear all memories."""
-        pass
-
-
-class ConversationMemory(Memory):
-    """
-    Simple conversation buffer memory.
-    
-    Stores recent conversation turns.
-    """
-    
-    def __init__(self, max_turns: int = 10):
-        self.max_turns = max_turns
-        self.history: List[Dict[str, Any]] = []
-    
-    def add(self, content: str, metadata: Optional[Dict[str, Any]] = None):
-        """Add a turn to conversation history."""
-        self.history.append({
-            "content": content,
-            "metadata": metadata or {},
-            "timestamp": time.time()
-        })
-        
-        # Trim to max turns
-        if len(self.history) > self.max_turns:
-            self.history = self.history[-self.max_turns:]
-    
-    def retrieve(self, query: str, k: int = 5) -> List[str]:
-        """Retrieve last k turns (ignores query for simple buffer)."""
-        return [h["content"] for h in self.history[-k:]]
-    
-    def clear(self):
-        """Clear conversation history."""
-        self.history = []
-    
-    def get_formatted_history(self) -> str:
-        """Get history as formatted string."""
-        return "\n".join([
-            f"Turn {i+1}: {h['content']}" 
-            for i, h in enumerate(self.history)
-        ])
-
-
-class SummaryMemory(Memory):
-    """
-    Summary-based memory for long conversations.
-    
-    Periodically summarizes old conversations to save context.
-    """
-    
-    def __init__(self, summarize_fn: Callable[[str], str], 
-                 buffer_size: int = 5, summary_size: int = 500):
-        """
-        Args:
-            summarize_fn: Function to summarize text
-            buffer_size: Number of turns before summarizing
-            summary_size: Max characters for summary
-        """
-        self.summarize_fn = summarize_fn
-        self.buffer_size = buffer_size
-        self.summary_size = summary_size
-        self.buffer: List[str] = []
-        self.summaries: List[str] = []
-    
-    def add(self, content: str, metadata: Optional[Dict[str, Any]] = None):
-        """Add content, summarizing when buffer is full."""
-        self.buffer.append(content)
-        
-        if len(self.buffer) >= self.buffer_size:
-            # Summarize buffer
-            buffer_text = "\n".join(self.buffer)
-            summary = self.summarize_fn(buffer_text)
-            self.summaries.append(summary[:self.summary_size])
-            self.buffer = []
-    
-    def retrieve(self, query: str, k: int = 5) -> List[str]:
-        """Retrieve summaries and recent buffer content."""
-        results = self.summaries[-k:] + self.buffer
-        return results[-k:]
-    
-    def clear(self):
-        """Clear all memory."""
-        self.buffer = []
-        self.summaries = []
-
-
-class VectorMemory(Memory):
-    """
-    Vector-based semantic memory using embeddings.
-    
-    Uses cosine similarity for retrieval.
-    """
-    
-    def __init__(self, embed_fn: Callable[[str], List[float]]):
-        """
-        Args:
-            embed_fn: Function to embed text to vector
-        """
-        self.embed_fn = embed_fn
-        self.memories: List[Dict[str, Any]] = []
-    
-    def add(self, content: str, metadata: Optional[Dict[str, Any]] = None):
-        """Add content with its embedding."""
-        embedding = self.embed_fn(content)
-        self.memories.append({
-            "content": content,
-            "embedding": embedding,
-            "metadata": metadata or {}
-        })
-    
-    def retrieve(self, query: str, k: int = 5) -> List[str]:
-        """Retrieve most similar memories."""
-        if not self.memories:
-            return []
-        
-        import numpy as np
-        
-        query_embedding = np.array(self.embed_fn(query))
-        
-        # Compute similarities
-        similarities = []
-        for mem in self.memories:
-            mem_embedding = np.array(mem["embedding"])
-            sim = np.dot(query_embedding, mem_embedding) / (
-                np.linalg.norm(query_embedding) * np.linalg.norm(mem_embedding) + 1e-10
-            )
-            similarities.append((sim, mem["content"]))
-        
-        # Sort by similarity and return top k
-        similarities.sort(key=lambda x: x[0], reverse=True)
-        return [s[1] for s in similarities[:k]]
-    
-    def clear(self):
-        """Clear all memories."""
-        self.memories = []
-
-
-# ============================================================
-# BASE AGENT CLASS
-# ============================================================
 
 class BaseAgent(ABC):
-    """
-    Abstract base class for all agents.
+    """Abstract base class for all agents."""
     
-    Provides common interface for different agent patterns.
-    """
-    
-    def __init__(
-        self,
-        name: str,
-        system_prompt: str,
-        llm_fn: Callable[[List[Dict[str, Any]]], str],
-        tools: Optional[List[Tool]] = None,
-        memory: Optional[Memory] = None,
-        max_iterations: int = 10
-    ):
-        """
-        Args:
-            name: Agent name for identification
-            system_prompt: System instructions
-            llm_fn: Function to call LLM (takes messages, returns response)
-            tools: List of available tools
-            memory: Agent memory system
-            max_iterations: Maximum reasoning iterations
-        """
+    def __init__(self, agent_id: str, name: str):
+        self.agent_id = agent_id
         self.name = name
-        self.system_prompt = system_prompt
-        self.llm_fn = llm_fn
-        self.tools = {t.name: t for t in (tools or [])}
-        self.memory = memory
-        self.max_iterations = max_iterations
-        self.state = AgentState()
-    
-    def _get_system_message(self) -> Message:
-        """Get system message with agent instructions."""
-        return Message(role="system", content=self.system_prompt)
-    
-    def _call_llm(self, messages: List[Message]) -> str:
-        """Call LLM with messages."""
-        msg_dicts = [m.to_dict() for m in messages]
-        return self.llm_fn(msg_dicts)
-    
-    def _parse_tool_calls(self, response: str) -> List[Dict[str, Any]]:
-        """
-        Parse tool calls from LLM response.
-        
-        Supports both JSON format and custom markup.
-        """
-        tool_calls = []
-        
-        # Try to find JSON tool calls
-        try:
-            # Look for ```json blocks
-            json_pattern = r'```json\s*(.*?)\s*```'
-            matches = re.findall(json_pattern, response, re.DOTALL)
-            
-            for match in matches:
-                parsed = json.loads(match)
-                if "tool" in parsed or "function" in parsed:
-                    tool_calls.append(parsed)
-        except json.JSONDecodeError:
-            pass
-        
-        # Look for action/input pattern (ReAct style)
-        action_pattern = r'Action:\s*(\w+)\nAction Input:\s*(.+?)(?=\n(?:Action:|Observation:|$))'
-        matches = re.findall(action_pattern, response, re.DOTALL)
-        
-        for action, action_input in matches:
-            try:
-                args = json.loads(action_input.strip())
-            except json.JSONDecodeError:
-                args = {"input": action_input.strip()}
-            
-            tool_calls.append({
-                "tool": action,
-                "args": args
-            })
-        
-        return tool_calls
-    
-    def _execute_tool(self, tool_name: str, args: Dict[str, Any]) -> str:
-        """Execute a tool and return result."""
-        if tool_name not in self.tools:
-            return f"Error: Tool '{tool_name}' not found"
-        
-        tool = self.tools[tool_name]
-        return tool.execute(**args)
+        self.state = AgentState(
+            beliefs={},
+            goals=[],
+            actions=[],
+            context={},
+            timestamp=time.time()
+        )
+        self.message_queue = asyncio.Queue()
+        self.is_running = False
     
     @abstractmethod
-    def run(self, user_input: str) -> str:
-        """
-        Run the agent on user input.
-        
-        Must be implemented by subclasses.
-        """
+    async def perceive(self, environment_state: Dict[str, Any]) -> None:
+        """Perceive the environment and update internal state."""
         pass
+    
+    @abstractmethod
+    async def decide(self) -> str:
+        """Decide on the next action based on current state."""
+        pass
+    
+    @abstractmethod
+    async def act(self, action: str) -> Dict[str, Any]:
+        """Execute an action and return the result."""
+        pass
+    
+    async def process_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+        """Process an incoming message."""
+        # Default implementation - can be overridden
+        logger.info(f"Agent {self.name} received message: {message.content}")
+        return None
+    
+    async def run(self, environment_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Main execution loop for the agent."""
+        self.is_running = True
+        
+        while self.is_running:
+            # Perceive environment
+            await self.perceive(environment_state)
+            
+            # Decide on action
+            action = await self.decide()
+            
+            # Execute action
+            result = await self.act(action)
+            
+            # Update state
+            self.state.timestamp = time.time()
+            
+            # Process any messages
+            while not self.message_queue.empty():
+                message = await self.message_queue.get()
+                response = await self.process_message(message)
+                if response:
+                    # Handle response if needed
+                    pass
+            
+            # Small delay to prevent busy waiting
+            await asyncio.sleep(0.1)
+            
+            return result
+    
+    def stop(self):
+        """Stop the agent."""
+        self.is_running = False
 
 
-# ============================================================
-# REACT AGENT
-# ============================================================
-
-class ReActAgent(BaseAgent):
+class ReactiveAgent(BaseAgent):
     """
-    ReAct (Reason + Act) Agent.
-    
-    Implementation of the ReAct framework that interleaves reasoning
-    traces with actions for improved decision making.
-    
-    Pattern:
-        Thought -> Action -> Observation -> ... -> Final Answer
-    
-    Reference:
-        Yao et al., "ReAct: Synergizing Reasoning and Acting in Language Models"
-    
-    Example:
-        >>> agent = ReActAgent(
-        ...     name="assistant",
-        ...     system_prompt="You are a helpful assistant.",
-        ...     llm_fn=call_llm,
-        ...     tools=[search_tool, calculator_tool]
-        ... )
-        >>> result = agent.run("What is the population of France?")
+    Reactive agent that responds directly to environmental stimuli
+    without maintaining complex internal state.
     """
     
-    REACT_PROMPT_TEMPLATE = """You are an AI assistant that follows the ReAct pattern.
-
-Available Tools:
-{tool_descriptions}
-
-To use a tool, respond in this format:
-Thought: [your reasoning about what to do next]
-Action: [tool name]
-Action Input: [JSON arguments for the tool]
-
-After receiving an Observation, continue reasoning until you have a final answer.
-
-When you have the final answer, respond:
-Thought: [final reasoning]
-Final Answer: [your answer to the user]
-
-Remember:
-- Always think before acting
-- Use tools when you need external information
-- Provide clear, helpful final answers
-"""
+    def __init__(self, agent_id: str, name: str, rules: Dict[str, str]):
+        super().__init__(agent_id, name)
+        self.rules = rules  # Mapping of conditions to actions
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._enhance_system_prompt()
+    async def perceive(self, environment_state: Dict[str, Any]) -> None:
+        """Perceive the environment and update beliefs."""
+        # Update context with environment state
+        self.state.context.update(environment_state)
+        
+        # Update beliefs based on environment
+        for key, value in environment_state.items():
+            self.state.beliefs[f"env_{key}"] = value
     
-    def _enhance_system_prompt(self):
-        """Add ReAct instructions to system prompt."""
-        tool_descriptions = "\n".join([
-            f"- {name}: {tool.description}"
-            for name, tool in self.tools.items()
-        ])
+    async def decide(self) -> str:
+        """Decide on action based on rules and current state."""
+        # Apply rules to determine action
+        for condition, action in self.rules.items():
+            if self._evaluate_condition(condition):
+                return action
         
-        react_prompt = self.REACT_PROMPT_TEMPLATE.format(
-            tool_descriptions=tool_descriptions or "No tools available."
-        )
-        
-        self.system_prompt = f"{self.system_prompt}\n\n{react_prompt}"
+        # Default action if no rules match
+        return "idle"
     
-    def run(self, user_input: str) -> str:
-        """
-        Run ReAct loop on user input.
+    async def act(self, action: str) -> Dict[str, Any]:
+        """Execute the action."""
+        logger.info(f"Reactive agent {self.name} performing action: {action}")
         
-        Returns:
-            Final answer from the agent
-        """
-        # Initialize conversation
-        messages = [
-            self._get_system_message(),
-            Message(role="user", content=user_input)
-        ]
+        # Record action
+        self.state.actions.append(action)
         
-        if self.memory:
-            # Add relevant memories
-            memories = self.memory.retrieve(user_input)
-            if memories:
-                memory_content = "Relevant context:\n" + "\n".join(memories)
-                messages.insert(1, Message(role="system", content=memory_content))
+        # Simulate action execution
+        if action == "move_forward":
+            result = {"status": "success", "position_change": (0, 1)}
+        elif action == "turn_left":
+            result = {"status": "success", "direction_change": -90}
+        elif action == "turn_right":
+            result = {"status": "success", "direction_change": 90}
+        elif action == "sense":
+            result = {"status": "success", "environment_data": self.state.context}
+        else:
+            result = {"status": "idle", "message": "No action performed"}
         
-        for iteration in range(self.max_iterations):
-            self.state.step_count = iteration + 1
-            
-            # Get LLM response
-            response = self._call_llm(messages)
-            messages.append(Message(role="assistant", content=response))
-            
-            logger.debug(f"Iteration {iteration + 1}: {response[:200]}...")
-            
-            # Check for final answer
-            if "Final Answer:" in response:
-                final_answer = response.split("Final Answer:")[-1].strip()
-                
-                # Save to memory
-                if self.memory:
-                    self.memory.add(f"Q: {user_input}\nA: {final_answer}")
-                
-                return final_answer
-            
-            # Parse and execute tool calls
-            tool_calls = self._parse_tool_calls(response)
-            
-            if not tool_calls:
-                # No tool calls and no final answer - prompt for continuation
-                messages.append(Message(
-                    role="user",
-                    content="Please continue your reasoning or provide a final answer."
-                ))
-                continue
-            
-            # Execute tools and add observations
-            for tc in tool_calls:
-                tool_name = tc.get("tool") or tc.get("function", {}).get("name")
-                args = tc.get("args") or tc.get("function", {}).get("arguments", {})
-                
-                if isinstance(args, str):
-                    try:
-                        args = json.loads(args)
-                    except:
-                        args = {"input": args}
-                
-                result = self._execute_tool(tool_name, args)
-                
-                observation = f"Observation: {result}"
-                messages.append(Message(role="user", content=observation))
-                
-                self.state.tool_results.append({
-                    "tool": tool_name,
-                    "args": args,
-                    "result": result
-                })
-        
-        return "I was unable to complete the task within the iteration limit."
+        return result
+    
+    def _evaluate_condition(self, condition: str) -> bool:
+        """Evaluate a condition against current state."""
+        # Simple condition evaluation
+        # In a real implementation, this would be more sophisticated
+        if condition == "object_detected":
+            return self.state.context.get("object_detected", False)
+        elif condition == "battery_low":
+            return self.state.context.get("battery_level", 100) < 20
+        elif condition == "goal_reached":
+            return self.state.context.get("goal_reached", False)
+        else:
+            return False
 
 
-# ============================================================
-# FUNCTION CALLING AGENT
-# ============================================================
+class DeliberativeAgent(BaseAgent):
+    """
+    Deliberative agent that maintains beliefs, goals, and plans
+    before taking actions.
+    """
+    
+    def __init__(self, agent_id: str, name: str, llm_model: str = "gpt-3.5-turbo"):
+        super().__init__(agent_id, name)
+        self.llm_model = llm_model
+        self.plans: List[List[str]] = []  # List of action sequences
+        self.current_plan_index = 0
+    
+    async def perceive(self, environment_state: Dict[str, Any]) -> None:
+        """Perceive the environment and update internal state."""
+        # Update context
+        self.state.context.update(environment_state)
+        
+        # Update beliefs based on environment
+        for key, value in environment_state.items():
+            self.state.beliefs[f"env_{key}"] = value
+        
+        # Check if goals are still valid
+        self._validate_goals()
+    
+    async def decide(self) -> str:
+        """Decide on the next action, potentially creating a plan."""
+        # If we have a current plan, continue executing it
+        if self.plans and self.current_plan_index < len(self.plans[-1]):
+            next_action = self.plans[-1][self.current_plan_index]
+            self.current_plan_index += 1
+            return next_action
+        
+        # Otherwise, create a new plan based on goals
+        if self.state.goals:
+            await self._create_plan()
+            if self.plans and len(self.plans[-1]) > 0:
+                next_action = self.plans[-1][0]
+                self.current_plan_index = 1
+                return next_action
+        
+        # If no goals or plan, return idle
+        return "idle"
+    
+    async def act(self, action: str) -> Dict[str, Any]:
+        """Execute the action."""
+        logger.info(f"Deliberative agent {self.name} performing action: {action}")
+        
+        # Record action
+        self.state.actions.append(action)
+        
+        # Simulate action execution
+        result = {
+            "action": action,
+            "status": "executed",
+            "timestamp": time.time()
+        }
+        
+        # Check if action achieved any goals
+        await self._check_goal_achievement(action)
+        
+        return result
+    
+    async def _create_plan(self):
+        """Create a plan to achieve the current goals."""
+        # In a real implementation, this would use more sophisticated planning
+        # For now, we'll use a simple approach
+        
+        goal = self.state.goals[0] if self.state.goals else "idle"
+        
+        # Simple planning based on common goals
+        if "navigate" in goal.lower() or "go to" in goal.lower():
+            plan = ["plan_route", "move_forward", "check_position", "adjust_direction"] * 3
+        elif "pick up" in goal.lower() or "collect" in goal.lower():
+            plan = ["approach_object", "verify_grasp", "pick_up", "verify_success"]
+        elif "analyze" in goal.lower() or "examine" in goal.lower():
+            plan = ["scan_area", "collect_data", "process_data", "generate_report"]
+        else:
+            plan = ["idle"]
+        
+        self.plans.append(plan)
+        self.current_plan_index = 0
+    
+    async def _check_goal_achievement(self, action: str):
+        """Check if the action achieved any goals."""
+        # Simple goal achievement checking
+        for goal in self.state.goals[:]:  # Use slice to avoid modification during iteration
+            if self._goal_achieved(goal, action):
+                self.state.goals.remove(goal)
+                logger.info(f"Goal achieved: {goal}")
+    
+    def _goal_achieved(self, goal: str, action: str) -> bool:
+        """Check if a specific goal has been achieved."""
+        # Simple implementation - in reality, this would be more complex
+        if "navigate" in goal.lower() and "move" in action.lower():
+            return self.state.context.get("at_destination", False)
+        elif "pick up" in goal.lower() and "pick" in action.lower():
+            return self.state.context.get("object_grasped", False)
+        return False
+    
+    def _validate_goals(self):
+        """Validate that current goals are still relevant."""
+        # Remove goals that are no longer relevant
+        valid_goals = []
+        for goal in self.state.goals:
+            if self._goal_is_valid(goal):
+                valid_goals.append(goal)
+            else:
+                logger.info(f"Removing invalid goal: {goal}")
+        
+        self.state.goals = valid_goals
+    
+    def _goal_is_valid(self, goal: str) -> bool:
+        """Check if a goal is still valid."""
+        # Simple validation - in reality, this would check environment conditions
+        return True
+
 
 class FunctionCallingAgent(BaseAgent):
     """
-    Agent using OpenAI-style function calling.
-    
-    Cleaner interface for structured tool use without
-    explicit ReAct prompting.
-    
-    Example:
-        >>> agent = FunctionCallingAgent(
-        ...     name="assistant",
-        ...     system_prompt="You are a helpful assistant.",
-        ...     llm_fn=call_llm_with_tools,
-        ...     tools=[search_tool]
-        ... )
+    Agent that uses function calling capabilities of LLMs.
     """
     
-    def __init__(self, *args, parse_fn: Optional[Callable] = None, **kwargs):
+    def __init__(self, agent_id: str, name: str, tools: List[BaseTool]):
+        super().__init__(agent_id, name)
+        self.tools = {tool.name: tool for tool in tools}
+        self.llm = OpenAI(temperature=0)
+        
+        # Initialize LangChain agent
+        self.langchain_agent = initialize_agent(
+            tools=list(self.tools.values()),
+            llm=self.llm,
+            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=True
+        )
+    
+    async def perceive(self, environment_state: Dict[str, Any]) -> None:
+        """Perceive the environment and update internal state."""
+        self.state.context.update(environment_state)
+        
+        # Update beliefs based on environment
+        for key, value in environment_state.items():
+            self.state.beliefs[f"env_{key}"] = value
+    
+    async def decide(self) -> str:
+        """Decide on the next action using LLM and tools."""
+        # Formulate a query based on current state and goals
+        query = self._formulate_query()
+        
+        try:
+            # Use the LangChain agent to decide on action
+            result = self.langchain_agent.run(query)
+            return result
+        except Exception as e:
+            logger.error(f"Error in agent decision: {e}")
+            return "error"
+    
+    async def act(self, action: str) -> Dict[str, Any]:
+        """Execute the action."""
+        logger.info(f"Function calling agent {self.name} performing action: {action}")
+        
+        # Record action
+        self.state.actions.append(action)
+        
+        return {
+            "action": action,
+            "status": "executed",
+            "timestamp": time.time()
+        }
+    
+    def _formulate_query(self) -> str:
+        """Formulate a query for the LLM based on current state."""
+        context_str = json.dumps(self.state.context, indent=2)
+        goals_str = json.dumps(self.state.goals, indent=2)
+        
+        query = f"""
+        Current context: {context_str}
+        
+        Current goals: {goals_str}
+        
+        Based on the current context and goals, what should be the next action?
+        Use the available tools to gather information or perform actions.
         """
-        Args:
-            parse_fn: Optional custom function to parse tool calls from response
-        """
-        super().__init__(*args, **kwargs)
-        self.parse_fn = parse_fn
-    
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        """Get tool schemas for API call."""
-        return [tool.to_schema() for tool in self.tools.values()]
-    
-    def run(self, user_input: str) -> str:
-        """Run the function calling agent."""
-        messages = [
-            self._get_system_message(),
-            Message(role="user", content=user_input)
-        ]
         
-        for iteration in range(self.max_iterations):
-            # Call LLM (should support tool use)
-            response = self._call_llm(messages)
-            
-            # Parse response for tool calls
-            if self.parse_fn:
-                tool_calls = self.parse_fn(response)
-            else:
-                tool_calls = self._parse_tool_calls(response)
-            
-            if not tool_calls:
-                # No tool calls - this is the final response
-                return response
-            
-            # Add assistant response
-            messages.append(Message(role="assistant", content=response))
-            
-            # Execute tools
-            for tc in tool_calls:
-                tool_name = tc.get("tool") or tc.get("name")
-                args = tc.get("args") or tc.get("arguments", {})
-                
-                result = self._execute_tool(tool_name, args)
-                
-                # Add tool result
-                messages.append(Message(
-                    role="tool",
-                    content=result,
-                    name=tool_name
-                ))
-        
-        return "Maximum iterations reached."
+        return query
 
 
-# ============================================================
-# CHAIN OF THOUGHT AGENT
-# ============================================================
-
-class ChainOfThoughtAgent(BaseAgent):
+class MultiAgentSystem:
     """
-    Chain-of-Thought (CoT) prompting agent.
-    
-    Encourages step-by-step reasoning for complex problems.
-    
-    Reference:
-        Wei et al., "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
-    """
-    
-    COT_PROMPT = """Let's approach this step-by-step:
-
-1. First, I'll analyze the problem
-2. Then, I'll break it down into sub-problems
-3. I'll solve each sub-problem
-4. Finally, I'll combine the results
-
-Let me think through this carefully..."""
-    
-    def run(self, user_input: str) -> str:
-        """Run with chain-of-thought prompting."""
-        # Enhance input with CoT prompt
-        enhanced_input = f"{user_input}\n\n{self.COT_PROMPT}"
-        
-        messages = [
-            self._get_system_message(),
-            Message(role="user", content=enhanced_input)
-        ]
-        
-        response = self._call_llm(messages)
-        
-        # Save to memory
-        if self.memory:
-            self.memory.add(f"Q: {user_input}\nA: {response}")
-        
-        return response
-
-
-# ============================================================
-# MULTI-AGENT ORCHESTRATOR
-# ============================================================
-
-class AgentOrchestrator:
-    """
-    Orchestrates multiple agents for complex tasks.
-    
-    Patterns supported:
-        - Sequential: Agents run in sequence, passing results
-        - Parallel: Agents run concurrently on same input
-        - Hierarchical: Coordinator agent delegates to specialists
-    
-    Example:
-        >>> orchestrator = AgentOrchestrator()
-        >>> orchestrator.add_agent(researcher, role=AgentRole.RESEARCHER)
-        >>> orchestrator.add_agent(writer, role=AgentRole.EXECUTOR)
-        >>> result = orchestrator.run_sequential("Research and summarize AI trends")
+    System that coordinates multiple agents.
     """
     
     def __init__(self):
-        self.agents: Dict[str, Tuple[BaseAgent, AgentRole]] = {}
+        self.agents: Dict[str, BaseAgent] = {}
+        self.message_router = MessageRouter()
+        self.is_running = False
     
-    def add_agent(self, agent: BaseAgent, role: AgentRole = AgentRole.EXECUTOR):
-        """Add an agent to the orchestrator."""
-        self.agents[agent.name] = (agent, role)
+    def add_agent(self, agent: BaseAgent):
+        """Add an agent to the system."""
+        self.agents[agent.agent_id] = agent
+        logger.info(f"Added agent {agent.name} to multi-agent system")
     
-    def run_sequential(self, task: str) -> str:
-        """
-        Run agents sequentially, passing output to next agent.
-        """
-        current_input = task
-        results = []
-        
-        for name, (agent, role) in self.agents.items():
-            logger.info(f"Running agent: {name} (role: {role.value})")
-            
-            # Format input based on role
-            if results:
-                agent_input = f"Previous output:\n{results[-1]}\n\nOriginal task: {task}"
-            else:
-                agent_input = current_input
-            
-            result = agent.run(agent_input)
-            results.append(result)
-        
-        return results[-1] if results else ""
+    def remove_agent(self, agent_id: str):
+        """Remove an agent from the system."""
+        if agent_id in self.agents:
+            agent = self.agents[agent_id]
+            agent.stop()
+            del self.agents[agent_id]
+            logger.info(f"Removed agent {agent_id} from multi-agent system")
     
-    def run_parallel(self, task: str) -> Dict[str, str]:
-        """
-        Run all agents in parallel on same input.
-        
-        Returns dict mapping agent name to result.
-        """
-        results = {}
-        
-        # In production, use asyncio or threading
-        for name, (agent, _) in self.agents.items():
-            logger.info(f"Running agent: {name}")
-            results[name] = agent.run(task)
-        
-        return results
+    async def send_message(self, message: AgentMessage):
+        """Send a message to an agent."""
+        await self.message_router.route_message(message)
     
-    def run_hierarchical(self, task: str, coordinator_name: str) -> str:
-        """
-        Run with coordinator delegating to specialists.
+    async def run(self):
+        """Run the multi-agent system."""
+        self.is_running = True
         
-        Coordinator decides which agents to use.
-        """
-        if coordinator_name not in self.agents:
-            raise ValueError(f"Coordinator '{coordinator_name}' not found")
+        # Run all agents concurrently
+        agent_tasks = []
+        for agent in self.agents.values():
+            # Each agent runs in its own task
+            task = asyncio.create_task(agent.run({}))
+            agent_tasks.append(task)
         
-        coordinator, _ = self.agents[coordinator_name]
-        specialists = {
-            name: agent for name, (agent, role) in self.agents.items()
-            if name != coordinator_name
-        }
-        
-        # Create delegation prompt
-        specialist_list = "\n".join([
-            f"- {name}: {agent.system_prompt[:100]}..."
-            for name, agent in specialists.items()
-        ])
-        
-        delegation_prompt = f"""Task: {task}
-
-Available specialists:
-{specialist_list}
-
-Decide which specialist(s) to delegate to and what subtasks to assign.
-Format your response as:
-DELEGATE: [agent_name]
-SUBTASK: [subtask description]
-"""
-        
-        # Get coordinator's plan
-        plan = coordinator.run(delegation_prompt)
-        
-        # Parse and execute delegations
-        results = []
-        delegation_pattern = r'DELEGATE:\s*(\w+)\nSUBTASK:\s*(.+?)(?=DELEGATE:|$)'
-        delegations = re.findall(delegation_pattern, plan, re.DOTALL)
-        
-        for agent_name, subtask in delegations:
-            if agent_name in specialists:
-                result = specialists[agent_name].run(subtask.strip())
-                results.append(f"{agent_name}: {result}")
-        
-        # Final synthesis by coordinator
-        synthesis_prompt = f"""Original task: {task}
-
-Specialist results:
-{chr(10).join(results)}
-
-Please synthesize these results into a final response."""
-        
-        return coordinator.run(synthesis_prompt)
-
-
-# ============================================================
-# UTILITY FUNCTIONS
-# ============================================================
-
-def create_tool(
-    name: str,
-    description: str,
-    function: Callable,
-    parameters: Optional[Dict[str, Any]] = None
-) -> Tool:
-    """
-    Helper to create a tool from a function.
+        # Wait for all agents to complete (they run indefinitely)
+        await asyncio.gather(*agent_tasks, return_exceptions=True)
     
-    Args:
-        name: Tool name
-        description: What the tool does
-        function: The function to execute
-        parameters: JSON schema for parameters (auto-generated if None)
-    
-    Returns:
-        Tool instance
-    """
-    if parameters is None:
-        # Auto-generate basic schema from function signature
-        import inspect
-        sig = inspect.signature(function)
-        
-        parameters = {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-        
-        for param_name, param in sig.parameters.items():
-            param_type = "string"  # Default type
-            if param.annotation != inspect.Parameter.empty:
-                if param.annotation == int:
-                    param_type = "integer"
-                elif param.annotation == float:
-                    param_type = "number"
-                elif param.annotation == bool:
-                    param_type = "boolean"
-            
-            parameters["properties"][param_name] = {"type": param_type}
-            
-            if param.default == inspect.Parameter.empty:
-                parameters["required"].append(param_name)
-    
-    return Tool(
-        name=name,
-        description=description,
-        parameters=parameters,
-        function=function
-    )
+    def stop(self):
+        """Stop the multi-agent system."""
+        self.is_running = False
+        for agent in self.agents.values():
+            agent.stop()
 
 
-# ============================================================
-# EXAMPLE TOOLS
-# ============================================================
-
-def calculator(expression: str) -> Dict[str, Any]:
-    """
-    Simple calculator tool.
+class MessageRouter:
+    """Routes messages between agents."""
     
-    Args:
-        expression: Mathematical expression to evaluate
+    def __init__(self):
+        self.agents: Dict[str, BaseAgent] = {}
     
-    Returns:
-        Result dictionary
-    """
-    try:
-        # Safe evaluation (production should use proper parser)
-        allowed = set('0123456789+-*/().^ ')
-        if all(c in allowed for c in expression):
-            result = eval(expression.replace('^', '**'))
-            return {"result": result, "expression": expression}
+    def register_agent(self, agent: BaseAgent):
+        """Register an agent with the router."""
+        self.agents[agent.agent_id] = agent
+    
+    def unregister_agent(self, agent_id: str):
+        """Unregister an agent from the router."""
+        if agent_id in self.agents:
+            del self.agents[agent_id]
+    
+    async def route_message(self, message: AgentMessage):
+        """Route a message to the appropriate agent."""
+        if message.receiver in self.agents:
+            receiver = self.agents[message.receiver]
+            await receiver.message_queue.put(message)
         else:
-            return {"error": "Invalid characters in expression"}
-    except Exception as e:
-        return {"error": str(e)}
+            logger.warning(f"Message receiver {message.receiver} not found")
 
 
-def web_search(query: str) -> Dict[str, Any]:
+class AgentOrchestrator:
     """
-    Simulated web search tool.
+    Orchestrates complex multi-agent workflows.
+    """
     
-    In production, integrate with real search API.
+    def __init__(self):
+        self.agents: Dict[str, BaseAgent] = {}
+        self.workflows = {}
+        self.current_workflow = None
+    
+    def register_agent(self, agent: BaseAgent):
+        """Register an agent with the orchestrator."""
+        self.agents[agent.agent_id] = agent
+    
+    def define_workflow(self, workflow_id: str, steps: List[Dict[str, Any]]):
+        """Define a workflow with steps."""
+        self.workflows[workflow_id] = steps
+    
+    async def execute_workflow(self, workflow_id: str, initial_context: Dict[str, Any] = None):
+        """Execute a defined workflow."""
+        if workflow_id not in self.workflows:
+            raise ValueError(f"Workflow {workflow_id} not found")
+        
+        if initial_context is None:
+            initial_context = {}
+        
+        self.current_workflow = workflow_id
+        steps = self.workflows[workflow_id]
+        
+        context = initial_context.copy()
+        
+        for step in steps:
+            agent_id = step["agent_id"]
+            action = step["action"]
+            params = step.get("params", {})
+            
+            if agent_id not in self.agents:
+                logger.error(f"Agent {agent_id} not found in orchestrator")
+                continue
+            
+            agent = self.agents[agent_id]
+            
+            # Update agent's context with current workflow context
+            agent.state.context.update(context)
+            
+            # Execute the action
+            result = await agent.act(action)
+            
+            # Update context with results
+            context.update(result)
+            
+            # Add any specific outputs to context
+            if "output_key" in step:
+                context[step["output_key"]] = result
+        
+        return context
+
+
+# Tool implementations for function calling agents
+class CalculatorTool(BaseTool):
+    """A simple calculator tool."""
+    
+    name = "calculator"
+    description = "Useful for performing mathematical calculations"
+    
+    def _run(self, query: str) -> str:
+        """Run the calculator tool."""
+        try:
+            # Simple evaluation - in production, use a safer method
+            result = eval(query)
+            return str(result)
+        except Exception as e:
+            return f"Error in calculation: {str(e)}"
+    
+    async def _arun(self, query: str) -> str:
+        """Asynchronous version of the calculator tool."""
+        return self._run(query)
+
+
+class SearchTool(BaseTool):
+    """A search tool (simulated)."""
+    
+    name = "search"
+    description = "Useful for searching information on the internet"
+    
+    def _run(self, query: str) -> str:
+        """Run the search tool."""
+        # Simulate search results
+        return f"Simulated search results for: {query}"
+    
+    async def _arun(self, query: str) -> str:
+        """Asynchronous version of the search tool."""
+        return self._run(query)
+
+
+class DatabaseTool(BaseTool):
+    """A database query tool (simulated)."""
+    
+    name = "database"
+    description = "Useful for querying a database"
+    
+    def _run(self, query: str) -> str:
+        """Run the database tool."""
+        # Simulate database query
+        return f"Simulated database results for query: {query}"
+    
+    async def _arun(self, query: str) -> str:
+        """Asynchronous version of the database tool."""
+        return self._run(query)
+
+
+def create_agent(agent_type: AgentType, agent_id: str, name: str, **kwargs) -> BaseAgent:
     """
-    # Placeholder - integrate with actual search API
-    return {
-        "query": query,
-        "results": [
-            {"title": f"Result for: {query}", "snippet": "Simulated search result..."}
-        ],
-        "note": "This is a placeholder. Integrate with real search API."
+    Factory function to create different types of agents.
+    
+    Args:
+        agent_type: Type of agent to create
+        agent_id: Unique identifier for the agent
+        name: Name of the agent
+        **kwargs: Additional arguments for agent initialization
+        
+    Returns:
+        Agent instance
+    """
+    if agent_type == AgentType.REACTIVE:
+        rules = kwargs.get("rules", {})
+        return ReactiveAgent(agent_id, name, rules)
+    elif agent_type == AgentType.DELIBERATIVE:
+        llm_model = kwargs.get("llm_model", "gpt-3.5-turbo")
+        return DeliberativeAgent(agent_id, name, llm_model)
+    elif agent_type == AgentType.FUNCTION_CALLING:
+        tools = kwargs.get("tools", [])
+        return FunctionCallingAgent(agent_id, name, tools)
+    else:
+        raise ValueError(f"Unsupported agent type: {agent_type}")
+
+
+def create_simple_reactive_agent(agent_id: str, name: str) -> ReactiveAgent:
+    """Create a simple reactive agent with basic rules."""
+    rules = {
+        "object_detected": "move_towards_object",
+        "battery_low": "return_to_charger",
+        "goal_reached": "report_success",
+        "default": "explore"
     }
+    return ReactiveAgent(agent_id, name, rules)
 
 
-# Pre-built tools
-CALCULATOR_TOOL = create_tool(
-    name="calculator",
-    description="Perform mathematical calculations. Use for any arithmetic.",
-    function=calculator,
-    parameters={
-        "type": "object",
-        "properties": {
-            "expression": {
-                "type": "string",
-                "description": "The mathematical expression to evaluate"
-            }
-        },
-        "required": ["expression"]
+def create_simple_deliberative_agent(agent_id: str, name: str) -> DeliberativeAgent:
+    """Create a simple deliberative agent."""
+    return DeliberativeAgent(agent_id, name)
+
+
+def create_function_calling_agent(agent_id: str, name: str) -> FunctionCallingAgent:
+    """Create a function calling agent with common tools."""
+    tools = [
+        CalculatorTool(),
+        SearchTool(),
+        DatabaseTool()
+    ]
+    return FunctionCallingAgent(agent_id, name, tools)
+
+
+# Example usage and testing
+async def main():
+    """Example usage of the agents module."""
+    logger.info("Starting agent examples...")
+    
+    # Create a reactive agent
+    reactive_agent = create_simple_reactive_agent("reactive_001", "ReactiveBot")
+    reactive_agent.state.goals = ["explore_environment"]
+    
+    # Create a deliberative agent
+    deliberative_agent = create_simple_deliberative_agent("delib_001", "DeliberativeBot")
+    deliberative_agent.state.goals = ["navigate_to_location", "pick_up_object"]
+    
+    # Create a function calling agent
+    func_agent = create_function_calling_agent("func_001", "FunctionBot")
+    func_agent.state.goals = ["calculate_complex_equation", "search_for_information"]
+    
+    # Example environment state
+    env_state = {
+        "object_detected": True,
+        "battery_level": 80,
+        "goal_reached": False,
+        "position": (10, 20)
     }
-)
+    
+    # Run agents
+    print("Reactive Agent:")
+    result = await reactive_agent.act("move_towards_object")
+    print(f"Result: {result}")
+    
+    print("\nDeliberative Agent:")
+    await deliberative_agent.perceive(env_state)
+    action = await deliberative_agent.decide()
+    result = await deliberative_agent.act(action)
+    print(f"Action: {action}, Result: {result}")
+    
+    print("\nFunction Calling Agent:")
+    await func_agent.perceive(env_state)
+    action = await func_agent.decide()
+    result = await func_agent.act(action)
+    print(f"Action: {action}, Result: {result}")
+    
+    # Create and run a multi-agent system
+    print("\nMulti-Agent System:")
+    mas = MultiAgentSystem()
+    mas.add_agent(reactive_agent)
+    mas.add_agent(deliberative_agent)
+    mas.add_agent(func_agent)
+    
+    # Send a message between agents
+    message = AgentMessage(
+        sender="reactive_001",
+        receiver="delib_001",
+        content="Object detected at coordinates (15, 25)",
+        message_type="notification",
+        timestamp=time.time()
+    )
+    
+    await mas.send_message(message)
+    
+    print("All examples completed!")
 
-SEARCH_TOOL = create_tool(
-    name="web_search",
-    description="Search the web for information. Use when you need current or external information.",
-    function=web_search,
-    parameters={
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "The search query"
-            }
-        },
-        "required": ["query"]
-    }
-)
 
-
-# ============================================================
-# EXPORTS
-# ============================================================
-
-__all__ = [
-    # Data structures
-    'Message', 'Tool', 'AgentState', 'AgentRole',
-    # Memory
-    'Memory', 'ConversationMemory', 'SummaryMemory', 'VectorMemory',
-    # Agents
-    'BaseAgent', 'ReActAgent', 'FunctionCallingAgent', 'ChainOfThoughtAgent',
-    # Orchestration
-    'AgentOrchestrator',
-    # Utilities
-    'create_tool', 'CALCULATOR_TOOL', 'SEARCH_TOOL',
-]
+if __name__ == "__main__":
+    asyncio.run(main())

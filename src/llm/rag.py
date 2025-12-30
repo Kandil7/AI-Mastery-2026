@@ -1,416 +1,666 @@
 """
-RAG (Retrieval-Augmented Generation) Pipeline
-==============================================
-Components for building production RAG systems.
+RAG (Retrieval-Augmented Generation) Module
 
-Pipeline:
-    Query → Embed → Retrieve → Rerank → Context → LLM → Response
-
-Author: AI-Mastery-2026
+This module implements RAG systems with various retrieval strategies,
+including dense retrieval, sparse retrieval, and hybrid approaches.
 """
 
+import torch
+import torch.nn as nn
 import numpy as np
-from typing import List, Dict, Any, Optional, Callable, Tuple
-from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Tuple, Union
+from dataclasses import dataclass
+from enum import Enum
+import faiss
+import pickle
+from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel, pipeline
+import json
+import logging
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import re
-import hashlib
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class RetrievalStrategy(Enum):
+    """Enumeration of retrieval strategies."""
+    DENSE = "dense"
+    SPARSE = "sparse"
+    HYBRID = "hybrid"
+    BM25 = "bm25"
+    HNSW = "hnsw"
 
 
 @dataclass
 class Document:
-    """Document with content and metadata."""
+    """Represents a document in the RAG system."""
+    id: str
     content: str
-    id: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any]
     embedding: Optional[np.ndarray] = None
-    
-    def __post_init__(self):
-        if not self.id:
-            self.id = hashlib.md5(self.content.encode()).hexdigest()[:12]
 
 
 @dataclass
 class RetrievalResult:
-    """Result from retrieval."""
+    """Represents a retrieval result."""
     document: Document
     score: float
     rank: int
 
 
-# ============================================================
-# CHUNKING STRATEGIES
-# ============================================================
-
-class TextChunker:
+class DenseRetriever:
     """
-    Text chunking for RAG pipelines.
-    
-    Strategies:
-    - Fixed size: Split by token/character count
-    - Semantic: Split at sentence/paragraph boundaries
-    - Recursive: Try larger delimiters first, then smaller
+    Dense retrieval using sentence transformers.
     """
     
-    def __init__(self, chunk_size: int = 512, overlap: int = 50,
-                 strategy: str = 'fixed'):
-        self.chunk_size = chunk_size
-        self.overlap = overlap
-        self.strategy = strategy
-    
-    def chunk(self, text: str, metadata: Dict = None) -> List[Document]:
-        """Split text into chunks."""
-        if self.strategy == 'fixed':
-            return self._fixed_chunk(text, metadata or {})
-        elif self.strategy == 'semantic':
-            return self._semantic_chunk(text, metadata or {})
-        elif self.strategy == 'recursive':
-            return self._recursive_chunk(text, metadata or {})
-        else:
-            return self._fixed_chunk(text, metadata or {})
-    
-    def _fixed_chunk(self, text: str, metadata: Dict) -> List[Document]:
-        """Fixed-size chunking with overlap."""
-        words = text.split()
-        chunks = []
-        
-        for i in range(0, len(words), self.chunk_size - self.overlap):
-            chunk_words = words[i:i + self.chunk_size]
-            chunk_text = ' '.join(chunk_words)
-            
-            chunks.append(Document(
-                content=chunk_text,
-                metadata={**metadata, 'chunk_idx': len(chunks)}
-            ))
-        
-        return chunks
-    
-    def _semantic_chunk(self, text: str, metadata: Dict) -> List[Document]:
-        """Chunk at sentence boundaries."""
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        chunks = []
-        current_chunk = []
-        current_size = 0
-        
-        for sentence in sentences:
-            words = len(sentence.split())
-            
-            if current_size + words > self.chunk_size and current_chunk:
-                chunks.append(Document(
-                    content=' '.join(current_chunk),
-                    metadata={**metadata, 'chunk_idx': len(chunks)}
-                ))
-                # Overlap: keep some sentences
-                overlap_sentences = current_chunk[-2:] if len(current_chunk) >= 2 else []
-                current_chunk = overlap_sentences
-                current_size = sum(len(s.split()) for s in overlap_sentences)
-            
-            current_chunk.append(sentence)
-            current_size += words
-        
-        if current_chunk:
-            chunks.append(Document(
-                content=' '.join(current_chunk),
-                metadata={**metadata, 'chunk_idx': len(chunks)}
-            ))
-        
-        return chunks
-    
-    def _recursive_chunk(self, text: str, metadata: Dict) -> List[Document]:
-        """Recursive splitting with multiple delimiters."""
-        delimiters = ['\n\n', '\n', '. ', ' ']
-        return self._recursive_split(text, delimiters, metadata)
-    
-    def _recursive_split(self, text: str, delimiters: List[str], 
-                         metadata: Dict) -> List[Document]:
-        """Helper for recursive chunking."""
-        if len(text.split()) <= self.chunk_size:
-            return [Document(content=text, metadata=metadata)]
-        
-        if not delimiters:
-            return self._fixed_chunk(text, metadata)
-        
-        delimiter = delimiters[0]
-        parts = text.split(delimiter)
-        
-        chunks = []
-        current = []
-        current_size = 0
-        
-        for part in parts:
-            part_size = len(part.split())
-            
-            if current_size + part_size > self.chunk_size:
-                if current:
-                    combined = delimiter.join(current)
-                    if len(combined.split()) > self.chunk_size:
-                        chunks.extend(self._recursive_split(combined, delimiters[1:], metadata))
-                    else:
-                        chunks.append(Document(content=combined, 
-                                              metadata={**metadata, 'chunk_idx': len(chunks)}))
-                current = [part]
-                current_size = part_size
-            else:
-                current.append(part)
-                current_size += part_size
-        
-        if current:
-            combined = delimiter.join(current)
-            chunks.append(Document(content=combined, 
-                                  metadata={**metadata, 'chunk_idx': len(chunks)}))
-        
-        return chunks
-
-
-# ============================================================
-# EMBEDDING
-# ============================================================
-
-class EmbeddingModel:
-    """
-    Embedding model interface.
-    
-    In production, use:
-    - OpenAI: text-embedding-3-small/large
-    - Cohere: embed-english-v3.0
-    - Local: sentence-transformers
-    """
-    
-    def __init__(self, model_fn: Optional[Callable] = None, dim: int = 384):
-        self.model_fn = model_fn
-        self.dim = dim
-    
-    def embed(self, texts: List[str]) -> np.ndarray:
-        """Embed list of texts."""
-        if self.model_fn:
-            return self.model_fn(texts)
-        else:
-            # Dummy embeddings for demo
-            return np.random.randn(len(texts), self.dim)
-    
-    def embed_query(self, query: str) -> np.ndarray:
-        """Embed a single query."""
-        return self.embed([query])[0]
-    
-    def embed_documents(self, documents: List[Document]) -> List[Document]:
-        """Embed documents and attach embeddings."""
-        texts = [doc.content for doc in documents]
-        embeddings = self.embed(texts)
-        
-        for doc, emb in zip(documents, embeddings):
-            doc.embedding = emb
-        
-        return documents
-
-
-# ============================================================
-# RETRIEVAL
-# ============================================================
-
-class Retriever:
-    """
-    Document retriever with multiple strategies.
-    
-    Strategies:
-    - Dense: Semantic search with embeddings
-    - Sparse: BM25/TF-IDF keyword matching
-    - Hybrid: Combine dense and sparse
-    """
-    
-    def __init__(self, embedding_model: EmbeddingModel, 
-                 strategy: str = 'dense'):
-        self.embedding_model = embedding_model
-        self.strategy = strategy
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self.encoder = SentenceTransformer(model_name)
         self.documents: List[Document] = []
-        self.index: Optional[np.ndarray] = None
+        self.embeddings: Optional[np.ndarray] = None
+        self.index: Optional[faiss.Index] = None
     
     def add_documents(self, documents: List[Document]):
         """Add documents to the retriever."""
-        documents = self.embedding_model.embed_documents(documents)
         self.documents.extend(documents)
         
-        # Build index
-        embeddings = [doc.embedding for doc in self.documents]
-        self.index = np.vstack(embeddings) if embeddings else None
+        # Encode all documents
+        contents = [doc.content for doc in documents]
+        new_embeddings = self.encoder.encode(contents, convert_to_numpy=True)
+        
+        if self.embeddings is None:
+            self.embeddings = new_embeddings
+        else:
+            self.embeddings = np.vstack([self.embeddings, new_embeddings])
+        
+        # Rebuild index
+        self._build_index()
+    
+    def _build_index(self):
+        """Build FAISS index for fast retrieval."""
+        if self.embeddings is not None:
+            dimension = self.embeddings.shape[1]
+            self.index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
+            
+            # Normalize embeddings for cosine similarity
+            faiss.normalize_L2(self.embeddings)
+            self.index.add(self.embeddings.astype('float32'))
     
     def retrieve(self, query: str, k: int = 5) -> List[RetrievalResult]:
-        """Retrieve top-k documents."""
-        if not self.documents:
+        """Retrieve relevant documents for a query."""
+        if self.index is None or len(self.documents) == 0:
             return []
         
-        query_embedding = self.embedding_model.embed_query(query)
+        # Encode query
+        query_embedding = self.encoder.encode([query], convert_to_numpy=True)
+        faiss.normalize_L2(query_embedding)
         
-        # Cosine similarity
-        similarities = self.index @ query_embedding
-        similarities /= (np.linalg.norm(self.index, axis=1) * np.linalg.norm(query_embedding))
-        
-        # Top-k
-        top_indices = np.argsort(similarities)[::-1][:k]
+        # Search
+        scores, indices = self.index.search(query_embedding.astype('float32'), k)
         
         results = []
-        for rank, idx in enumerate(top_indices):
-            results.append(RetrievalResult(
-                document=self.documents[idx],
-                score=float(similarities[idx]),
-                rank=rank
-            ))
+        for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+            if idx < len(self.documents):
+                results.append(RetrievalResult(
+                    document=self.documents[idx],
+                    score=float(score),
+                    rank=i + 1
+                ))
         
         return results
 
 
-# ============================================================
-# RERANKING
-# ============================================================
-
-class Reranker:
+class SparseRetriever:
     """
-    Cross-encoder reranker.
-    
-    Unlike bi-encoders (separate embedding), cross-encoders
-    jointly encode query-document pairs for better relevance.
-    
-    Use after initial retrieval to refine top-k results.
+    Sparse retrieval using TF-IDF.
     """
     
-    def __init__(self, rerank_fn: Optional[Callable] = None):
-        self.rerank_fn = rerank_fn
-    
-    def rerank(self, query: str, results: List[RetrievalResult],
-               top_k: int = 3) -> List[RetrievalResult]:
-        """Rerank results."""
-        if self.rerank_fn:
-            pairs = [(query, r.document.content) for r in results]
-            scores = self.rerank_fn(pairs)
-            
-            for result, score in zip(results, scores):
-                result.score = score
-        
-        results.sort(key=lambda x: x.score, reverse=True)
-        
-        for i, result in enumerate(results[:top_k]):
-            result.rank = i
-        
-        return results[:top_k]
-
-
-# ============================================================
-# CONTEXT ASSEMBLY
-# ============================================================
-
-class ContextAssembler:
-    """
-    Assemble retrieved documents into LLM context.
-    
-    Strategies:
-    - Simple: Concatenate all documents
-    - Stuffing: Fit as many as possible in context window
-    - Map-Reduce: Process each doc separately, then combine
-    """
-    
-    def __init__(self, max_tokens: int = 2048, strategy: str = 'stuffing'):
-        self.max_tokens = max_tokens
-        self.strategy = strategy
-    
-    def assemble(self, query: str, results: List[RetrievalResult]) -> str:
-        """Assemble context from retrieval results."""
-        if self.strategy == 'stuffing':
-            return self._stuffing(query, results)
-        else:
-            return self._simple(query, results)
-    
-    def _simple(self, query: str, results: List[RetrievalResult]) -> str:
-        """Simple concatenation."""
-        context_parts = []
-        for i, result in enumerate(results):
-            context_parts.append(f"[Document {i+1}]\n{result.document.content}")
-        
-        return '\n\n'.join(context_parts)
-    
-    def _stuffing(self, query: str, results: List[RetrievalResult]) -> str:
-        """Fit documents within token limit."""
-        context_parts = []
-        current_tokens = 0
-        
-        for i, result in enumerate(results):
-            doc_tokens = len(result.document.content.split())
-            
-            if current_tokens + doc_tokens > self.max_tokens:
-                break
-            
-            context_parts.append(f"[Document {i+1}]\n{result.document.content}")
-            current_tokens += doc_tokens
-        
-        return '\n\n'.join(context_parts)
-
-
-# ============================================================
-# RAG PIPELINE
-# ============================================================
-
-class RAGPipeline:
-    """
-    Complete RAG pipeline.
-    
-    Example:
-        >>> rag = RAGPipeline()
-        >>> rag.add_documents(documents)
-        >>> response = rag.query("What is RAG?")
-    """
-    
-    def __init__(self, 
-                 embedding_model: Optional[EmbeddingModel] = None,
-                 retriever: Optional[Retriever] = None,
-                 reranker: Optional[Reranker] = None,
-                 context_assembler: Optional[ContextAssembler] = None,
-                 llm_fn: Optional[Callable] = None):
-        
-        self.embedding_model = embedding_model or EmbeddingModel()
-        self.retriever = retriever or Retriever(self.embedding_model)
-        self.reranker = reranker
-        self.context_assembler = context_assembler or ContextAssembler()
-        self.llm_fn = llm_fn
+    def __init__(self):
+        self.vectorizer = TfidfVectorizer(
+            lowercase=True,
+            stop_words='english',
+            max_features=10000,
+            ngram_range=(1, 2)
+        )
+        self.documents: List[Document] = []
+        self.tfidf_matrix = None
     
     def add_documents(self, documents: List[Document]):
-        """Add documents to the pipeline."""
-        self.retriever.add_documents(documents)
-    
-    def query(self, query: str, k: int = 5, 
-              return_sources: bool = True) -> Dict[str, Any]:
-        """
-        Query the RAG pipeline.
+        """Add documents to the retriever."""
+        self.documents.extend(documents)
         
-        Returns:
-            Dict with 'answer', 'sources', 'context'
-        """
-        # Retrieve
-        results = self.retriever.retrieve(query, k=k)
+        # Extract content
+        contents = [doc.content for doc in documents]
         
-        # Rerank (optional)
-        if self.reranker:
-            results = self.reranker.rerank(query, results)
-        
-        # Assemble context
-        context = self.context_assembler.assemble(query, results)
-        
-        # Generate answer
-        if self.llm_fn:
-            prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-            answer = self.llm_fn(prompt)
+        # Fit or transform the TF-IDF matrix
+        if self.tfidf_matrix is None:
+            self.tfidf_matrix = self.vectorizer.fit_transform(contents)
         else:
-            answer = f"[Demo] Based on {len(results)} documents about: {query}"
+            new_tfidf = self.vectorizer.transform(contents)
+            from scipy.sparse import vstack
+            self.tfidf_matrix = vstack([self.tfidf_matrix, new_tfidf])
+    
+    def retrieve(self, query: str, k: int = 5) -> List[RetrievalResult]:
+        """Retrieve relevant documents for a query."""
+        if self.tfidf_matrix is None or len(self.documents) == 0:
+            return []
         
-        response = {'answer': answer, 'context': context}
+        # Transform query
+        query_tfidf = self.vectorizer.transform([query])
         
-        if return_sources:
-            response['sources'] = [
-                {'id': r.document.id, 'content': r.document.content[:200], 'score': r.score}
-                for r in results
-            ]
+        # Calculate cosine similarities
+        similarities = cosine_similarity(query_tfidf, self.tfidf_matrix).flatten()
         
-        return response
+        # Get top-k results
+        top_indices = np.argsort(similarities)[::-1][:k]
+        
+        results = []
+        for i, idx in enumerate(top_indices):
+            if idx < len(self.documents):
+                results.append(RetrievalResult(
+                    document=self.documents[idx],
+                    score=float(similarities[idx]),
+                    rank=i + 1
+                ))
+        
+        return results
 
 
-__all__ = [
-    'Document', 'RetrievalResult',
-    'TextChunker', 'EmbeddingModel', 'Retriever', 'Reranker',
-    'ContextAssembler', 'RAGPipeline'
-]
+class HybridRetriever:
+    """
+    Hybrid retrieval combining dense and sparse methods.
+    """
+    
+    def __init__(self, dense_weight: float = 0.7, sparse_weight: float = 0.3):
+        self.dense_retriever = DenseRetriever()
+        self.sparse_retriever = SparseRetriever()
+        self.dense_weight = dense_weight
+        self.sparse_weight = sparse_weight
+    
+    def add_documents(self, documents: List[Document]):
+        """Add documents to both retrievers."""
+        self.dense_retriever.add_documents(documents)
+        self.sparse_retriever.add_documents(documents)
+    
+    def retrieve(self, query: str, k: int = 5) -> List[RetrievalResult]:
+        """Retrieve using both methods and combine results."""
+        dense_results = self.dense_retriever.retrieve(query, k * 2)  # Get more results for combination
+        sparse_results = self.sparse_retriever.retrieve(query, k * 2)
+        
+        # Create a mapping from document ID to combined score
+        doc_scores: Dict[str, float] = {}
+        
+        # Add dense scores (normalize to 0-1 range)
+        if dense_results:
+            max_dense_score = max(r.score for r in dense_results) if dense_results else 1
+            for result in dense_results:
+                doc_scores[result.document.id] = result.score / max_dense_score * self.dense_weight
+        
+        # Add sparse scores (normalize to 0-1 range)
+        if sparse_results:
+            max_sparse_score = max(r.score for r in sparse_results) if sparse_results else 1
+            for result in sparse_results:
+                if result.document.id in doc_scores:
+                    doc_scores[result.document.id] += result.score / max_sparse_score * self.sparse_weight
+                else:
+                    doc_scores[result.document.id] = result.score / max_sparse_score * self.sparse_weight
+        
+        # Sort by combined score
+        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)[:k]
+        
+        results = []
+        for i, (doc_id, score) in enumerate(sorted_docs):
+            # Find the document in our collection
+            doc = next((d for d in self.dense_retriever.documents if d.id == doc_id), None)
+            if doc:
+                results.append(RetrievalResult(
+                    document=doc,
+                    score=score,
+                    rank=i + 1
+                ))
+        
+        return results
+
+
+class RAGModel:
+    """
+    RAG model combining retrieval and generation.
+    """
+    
+    def __init__(
+        self, 
+        retriever_strategy: RetrievalStrategy,
+        generator_model: str = "gpt2", 
+        **retriever_kwargs
+    ):
+        self.retriever_strategy = retriever_strategy
+        
+        # Initialize retriever based on strategy
+        if retriever_strategy == RetrievalStrategy.DENSE:
+            self.retriever = DenseRetriever(**retriever_kwargs)
+        elif retriever_strategy == RetrievalStrategy.SPARSE:
+            self.retriever = SparseRetriever()
+        elif retriever_strategy == RetrievalStrategy.HYBRID:
+            self.retriever = HybridRetriever(**retriever_kwargs)
+        else:
+            raise ValueError(f"Unsupported retrieval strategy: {retriever_strategy}")
+        
+        # Initialize generator
+        self.generator_model = generator_model
+        self.generator = pipeline(
+            "text-generation", 
+            model=generator_model,
+            tokenizer=generator_model,
+            device=0 if torch.cuda.is_available() else -1
+        )
+        
+        self.documents: List[Document] = []
+    
+    def add_documents(self, documents: List[Union[Document, Dict[str, Any]]]):
+        """Add documents to the RAG system."""
+        processed_docs = []
+        
+        for doc in documents:
+            if isinstance(doc, dict):
+                # Convert dict to Document
+                processed_docs.append(Document(
+                    id=doc.get('id', str(len(self.documents))),
+                    content=doc['content'],
+                    metadata=doc.get('metadata', {})
+                ))
+            else:
+                processed_docs.append(doc)
+        
+        self.documents.extend(processed_docs)
+        self.retriever.add_documents(processed_docs)
+    
+    def retrieve(self, query: str, k: int = 5) -> List[RetrievalResult]:
+        """Retrieve relevant documents for a query."""
+        return self.retriever.retrieve(query, k)
+    
+    def generate(self, query: str, k: int = 3, max_length: int = 200) -> str:
+        """
+        Generate a response using retrieved documents.
+        
+        Args:
+            query: User query
+            k: Number of documents to retrieve
+            max_length: Maximum length of generated response
+            
+        Returns:
+            Generated response
+        """
+        # Retrieve relevant documents
+        retrieved_docs = self.retrieve(query, k)
+        
+        if not retrieved_docs:
+            # If no documents found, generate based on query alone
+            prompt = f"Question: {query}\n\nI don't have specific information to answer this question."
+            return self.generator(prompt, max_length=max_length)[0]['generated_text']
+        
+        # Construct context from retrieved documents
+        context_parts = []
+        for doc in retrieved_docs:
+            context_parts.append(f"Document {doc.rank}: {doc.document.content}")
+        
+        context = "\n\n".join(context_parts)
+        
+        # Construct the full prompt
+        prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+        
+        # Generate response
+        generated = self.generator(
+            prompt, 
+            max_length=max_length,
+            pad_token_id=self.generator.tokenizer.eos_token_id
+        )
+        
+        # Extract just the answer part
+        full_text = generated[0]['generated_text']
+        answer_start = full_text.find("Answer:") + len("Answer:")
+        answer = full_text[answer_start:].strip()
+        
+        return answer
+    
+    def query(self, query: str, k: int = 3, max_length: int = 200) -> Dict[str, Any]:
+        """
+        Complete RAG query with both retrieval and generation.
+        
+        Args:
+            query: User query
+            k: Number of documents to retrieve
+            max_length: Maximum length of generated response
+            
+        Returns:
+            Dictionary with results
+        """
+        # Retrieve documents
+        retrieved_docs = self.retrieve(query, k)
+        
+        # Generate response
+        response = self.generate(query, k, max_length)
+        
+        return {
+            "query": query,
+            "retrieved_documents": [
+                {
+                    "id": doc.document.id,
+                    "content": doc.document.content,
+                    "score": doc.score,
+                    "rank": doc.rank,
+                    "metadata": doc.document.metadata
+                }
+                for doc in retrieved_docs
+            ],
+            "response": response,
+            "retriever_strategy": self.retriever_strategy.value
+        }
+
+
+class AdvancedRAGModel(RAGModel):
+    """
+    Advanced RAG model with additional features like query rewriting and reranking.
+    """
+    
+    def __init__(
+        self, 
+        retriever_strategy: RetrievalStrategy,
+        generator_model: str = "gpt2",
+        use_query_rewriting: bool = True,
+        use_reranking: bool = True,
+        **retriever_kwargs
+    ):
+        super().__init__(retriever_strategy, generator_model, **retriever_kwargs)
+        self.use_query_rewriting = use_query_rewriting
+        self.use_reranking = use_reranking
+        
+        # Initialize query rewriting model if needed
+        if use_query_rewriting:
+            self.query_rewriter = pipeline(
+                "text2text-generation",
+                model="facebook/bart-large-cnn",  # Example model for query rewriting
+                device=0 if torch.cuda.is_available() else -1
+            )
+    
+    def rewrite_query(self, query: str) -> str:
+        """Rewrite the query to improve retrieval."""
+        if not self.use_query_rewriting:
+            return query
+        
+        # Simple query rewriting using a text generation model
+        # In practice, you might use a specialized query rewriting model
+        prompt = f"Rewrite the following question to be more specific for document search: {query}"
+        
+        rewritten = self.query_rewriter(
+            prompt,
+            max_length=100,
+            pad_token_id=self.query_rewriter.tokenizer.eos_token_id
+        )
+        
+        # Extract the rewritten query
+        rewritten_text = rewritten[0]['generated_text']
+        return rewritten_text
+    
+    def rerank_documents(self, query: str, documents: List[RetrievalResult]) -> List[RetrievalResult]:
+        """Rerank documents based on query relevance."""
+        if not self.use_reranking or not documents:
+            return documents
+        
+        # Simple reranking based on lexical overlap
+        query_words = set(re.findall(r'\w+', query.lower()))
+        
+        for result in documents:
+            doc_words = set(re.findall(r'\w+', result.document.content.lower()))
+            overlap = len(query_words.intersection(doc_words))
+            result.score += overlap * 0.01  # Small boost for lexical overlap
+        
+        # Re-sort by updated scores
+        documents.sort(key=lambda x: x.score, reverse=True)
+        
+        # Update ranks
+        for i, result in enumerate(documents):
+            result.rank = i + 1
+        
+        return documents
+    
+    def query(self, query: str, k: int = 3, max_length: int = 200) -> Dict[str, Any]:
+        """
+        Advanced RAG query with query rewriting and reranking.
+        """
+        # Rewrite query if enabled
+        if self.use_query_rewriting:
+            rewritten_query = self.rewrite_query(query)
+            logger.info(f"Original query: {query}")
+            logger.info(f"Rewritten query: {rewritten_query}")
+        else:
+            rewritten_query = query
+        
+        # Retrieve documents
+        retrieved_docs = self.retrieve(rewritten_query, k * 2)  # Retrieve more for reranking
+        
+        # Rerank documents if enabled
+        if self.use_reranking:
+            retrieved_docs = self.rerank_documents(rewritten_query, retrieved_docs)
+        
+        # Take top k after reranking
+        retrieved_docs = retrieved_docs[:k]
+        
+        # Generate response
+        context_parts = []
+        for doc in retrieved_docs:
+            context_parts.append(f"Document {doc.rank}: {doc.document.content}")
+        
+        context = "\n\n".join(context_parts)
+        prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+        
+        generated = self.generator(
+            prompt, 
+            max_length=max_length,
+            pad_token_id=self.generator.tokenizer.eos_token_id
+        )
+        
+        full_text = generated[0]['generated_text']
+        answer_start = full_text.find("Answer:") + len("Answer:")
+        answer = full_text[answer_start:].strip()
+        
+        return {
+            "query": query,
+            "rewritten_query": rewritten_query if self.use_query_rewriting else query,
+            "retrieved_documents": [
+                {
+                    "id": doc.document.id,
+                    "content": doc.document.content,
+                    "score": doc.score,
+                    "rank": doc.rank,
+                    "metadata": doc.document.metadata
+                }
+                for doc in retrieved_docs
+            ],
+            "response": answer,
+            "retriever_strategy": self.retriever_strategy.value
+        }
+
+
+class GraphRAGModel:
+    """
+    Graph-based RAG model that uses knowledge graphs for retrieval.
+    """
+    
+    def __init__(self, generator_model: str = "gpt2"):
+        self.generator_model = generator_model
+        self.generator = pipeline(
+            "text-generation", 
+            model=generator_model,
+            tokenizer=generator_model,
+            device=0 if torch.cuda.is_available() else -1
+        )
+        
+        # Simple in-memory graph representation
+        self.entities: Dict[str, Any] = {}  # entity_id -> entity_info
+        self.relations: List[Dict[str, Any]] = []  # list of relations
+    
+    def add_entity(self, entity_id: str, entity_info: Dict[str, Any]):
+        """Add an entity to the knowledge graph."""
+        self.entities[entity_id] = {
+            "id": entity_id,
+            "info": entity_info,
+            "relations": []
+        }
+    
+    def add_relation(self, subject: str, predicate: str, obj: str, metadata: Dict[str, Any] = None):
+        """Add a relation to the knowledge graph."""
+        if metadata is None:
+            metadata = {}
+        
+        relation = {
+            "subject": subject,
+            "predicate": predicate,
+            "object": obj,
+            "metadata": metadata
+        }
+        
+        self.relations.append(relation)
+        
+        # Add to entity relations
+        if subject in self.entities:
+            self.entities[subject]["relations"].append(relation)
+        if obj in self.entities:
+            self.entities[obj]["relations"].append(relation)
+    
+    def retrieve_graph_context(self, query: str, k: int = 5) -> str:
+        """Retrieve relevant graph context for a query."""
+        # Simple approach: find entities that match query terms
+        query_lower = query.lower()
+        matched_entities = []
+        
+        for entity_id, entity_info in self.entities.items():
+            # Check if query terms match entity info
+            entity_text = f"{entity_id} {entity_info['info']}".lower()
+            if any(term in entity_text for term in query_lower.split()):
+                matched_entities.append(entity_id)
+        
+        # Build context from matched entities and their relations
+        context_parts = []
+        
+        for entity_id in matched_entities[:k]:
+            entity = self.entities[entity_id]
+            context_parts.append(f"Entity: {entity_id}")
+            context_parts.append(f"Info: {entity['info']}")
+            
+            # Add related entities
+            for relation in entity['relations']:
+                context_parts.append(f"Relation: {relation['subject']} {relation['predicate']} {relation['object']}")
+        
+        return "\n".join(context_parts)
+    
+    def query(self, query: str, k: int = 3, max_length: int = 200) -> Dict[str, Any]:
+        """Query the Graph RAG model."""
+        # Retrieve graph context
+        graph_context = self.retrieve_graph_context(query, k)
+        
+        # Construct prompt
+        prompt = f"Knowledge Graph Context:\n{graph_context}\n\nQuestion: {query}\n\nAnswer:"
+        
+        # Generate response
+        generated = self.generator(
+            prompt, 
+            max_length=max_length,
+            pad_token_id=self.generator.tokenizer.eos_token_id
+        )
+        
+        full_text = generated[0]['generated_text']
+        answer_start = full_text.find("Answer:") + len("Answer:")
+        answer = full_text[answer_start:].strip()
+        
+        return {
+            "query": query,
+            "graph_context": graph_context,
+            "response": answer,
+            "model_type": "GraphRAG"
+        }
+
+
+def create_rag_model(
+    strategy: RetrievalStrategy, 
+    model_name: str = "gpt2", 
+    **kwargs
+) -> Union[RAGModel, AdvancedRAGModel, GraphRAGModel]:
+    """
+    Factory function to create RAG models.
+    
+    Args:
+        strategy: Retrieval strategy
+        model_name: Name of the generator model
+        **kwargs: Additional arguments
+        
+    Returns:
+        RAG model instance
+    """
+    if strategy == RetrievalStrategy.HYBRID:
+        return AdvancedRAGModel(
+            retriever_strategy=strategy,
+            generator_model=model_name,
+            **kwargs
+        )
+    elif strategy == RetrievalStrategy.DENSE:
+        return RAGModel(
+            retriever_strategy=strategy,
+            generator_model=model_name,
+            **kwargs
+        )
+    elif strategy == RetrievalStrategy.SPARSE:
+        return RAGModel(
+            retriever_strategy=strategy,
+            generator_model=model_name,
+            **kwargs
+        )
+    else:
+        raise ValueError(f"Unsupported strategy: {strategy}")
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample documents
+    sample_docs = [
+        Document(
+            id="doc1",
+            content="Machine learning is a method of data analysis that automates analytical model building.",
+            metadata={"source": "wikipedia", "topic": "ML"}
+        ),
+        Document(
+            id="doc2", 
+            content="Deep learning is part of a broader family of machine learning methods based on artificial neural networks.",
+            metadata={"source": "wikipedia", "topic": "Deep Learning"}
+        ),
+        Document(
+            id="doc3",
+            content="Natural language processing is a subfield of linguistics, computer science, and artificial intelligence.",
+            metadata={"source": "wikipedia", "topic": "NLP"}
+        )
+    ]
+    
+    # Create and test a dense RAG model
+    rag_model = create_rag_model(RetrievalStrategy.DENSE)
+    rag_model.add_documents(sample_docs)
+    
+    # Query the model
+    result = rag_model.query("What is machine learning?")
+    print("RAG Response:", result["response"])
+    print("Retrieved Documents:", len(result["retrieved_documents"]))
+    
+    # Test advanced RAG with query rewriting and reranking
+    advanced_rag = AdvancedRAGModel(
+        retriever_strategy=RetrievalStrategy.HYBRID,
+        use_query_rewriting=True,
+        use_reranking=True
+    )
+    advanced_rag.add_documents(sample_docs)
+    
+    advanced_result = advanced_rag.query("Explain deep learning concepts")
+    print("\nAdvanced RAG Response:", advanced_result["response"])
+    print("Retrieved Documents:", len(advanced_result["retrieved_documents"]))
