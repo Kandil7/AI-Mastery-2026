@@ -152,7 +152,13 @@ curl http://localhost:8000/health
 | [docs/ML_ESSAY_ANSWERS.md](docs/ML_ESSAY_ANSWERS.md) | **Essay Answers** - MLE vs MAP, PCA/SVD, CNN architecture |
 | [docs/guide/00_index.md](docs/guide/00_index.md) | Guide Index - Table of contents for all documentation |
 
----
+### 📓 Featured Notebooks
+
+| Notebook | Description | Topics |
+|----------|-------------|--------|
+| [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) | **Deep Mathematical Foundations** (96KB, 61 cells) | Linear Algebra, Calculus, Optimization, Probability, Bayesian Optimization |
+| [mlops_end_to_end.ipynb](research/mlops_end_to_end.ipynb) | Complete MLOps Demo | Training, Deployment, Monitoring |
+
 
 ## ✨ Features
 
