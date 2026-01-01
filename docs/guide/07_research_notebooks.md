@@ -18,8 +18,27 @@ Each weekly directory contains a notebook that aligns with the project's "White-
 
 This is a high-level overview of the topics covered in the research notebooks.
 
+### 🌟 Featured: Deep Mathematical Foundations
+
+Before starting the weekly curriculum, we recommend completing our comprehensive mathematics notebook:
+
+**📓 `notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb`** (96KB, 61 cells)
+
+| Chapter | Topics | Industrial Applications |
+|---------|--------|------------------------|
+| 1 | Linear Algebra | Google PageRank, Netflix SVD |
+| 2 | Calculus | Backpropagation, Self-Attention |
+| 3 | Optimization | SVM Dual Form, ADMM |
+| 4 | Probability | VAE, t-SNE |
+| 5 | Integration | Monte Carlo, Normalizing Flows |
+| 6 | Networks | Facebook Link Prediction |
+| 7 | Bayesian Opt | Gaussian Processes, Google Vizier |
+
+---
+
 *   **Week 0: Math (`research/week0-math`)**
-    *   Focuses on the mathematical foundations of AI, likely covering linear algebra concepts like matrix multiplication.
+    *   Focuses on the mathematical foundations of AI, covering linear algebra concepts like matrix multiplication.
+    *   📓 **See also**: `deep_ml_mathematics_complete.ipynb` for an in-depth treatment
 
 *   **Week 1: Similarity (`research/week1-similarity`)**
     *   Explores vector similarity metrics, a core concept for search and retrieval.
