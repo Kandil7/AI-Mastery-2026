@@ -145,18 +145,12 @@ curl http://localhost:8000/health
 
 | Document | Description |
 |----------|-------------|
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | **Complete User Guide** - Installation, examples, API reference, troubleshooting |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | **Complete User Guide** - Installation, examples, API reference |
+| [docs/PRODUCTION_RAG_GUIDE.md](docs/PRODUCTION_RAG_GUIDE.md) | **Production RAG** - 5 pillars of enterprise RAG |
+| [docs/ML_STUDY_GUIDE.md](docs/ML_STUDY_GUIDE.md) | **ML Study Guide** - Quiz, formulas, real-world applications |
+| [docs/ML_GLOSSARY.md](docs/ML_GLOSSARY.md) | **ML Glossary** - 50+ terms with mathematical definitions |
+| [docs/ML_ESSAY_ANSWERS.md](docs/ML_ESSAY_ANSWERS.md) | **Essay Answers** - MLE vs MAP, PCA/SVD, CNN architecture |
 | [docs/guide/00_index.md](docs/guide/00_index.md) | Guide Index - Table of contents for all documentation |
-| [docs/guide/01_getting_started.md](docs/guide/01_getting_started.md) | Getting Started Tutorial |
-| [docs/guide/02_core_concepts.md](docs/guide/02_core_concepts.md) | White-Box Approach Philosophy |
-| [docs/guide/03_module_core.md](docs/guide/03_module_core.md) | Core Math Module Reference |
-| [docs/guide/04_module_ml.md](docs/guide/04_module_ml.md) | ML Algorithms Reference |
-| [docs/guide/05_module_llm.md](docs/guide/05_module_llm.md) | LLM Engineering Reference |
-| [docs/guide/06_module_production.md](docs/guide/06_module_production.md) | Production Components |
-| [docs/guide/07_research_notebooks.md](docs/guide/07_research_notebooks.md) | 17-Week Learning Program |
-| [docs/guide/08_contribution_guide.md](docs/guide/08_contribution_guide.md) | Contribution Guidelines |
-| [docs/guide/09_deployment_guide.md](docs/guide/09_deployment_guide.md) | Deployment Instructions |
-| [docs/guide/10_capstone_project.md](docs/guide/10_capstone_project.md) | **Capstone: GitHub Issue Classifier** |
 
 ---
 
@@ -261,27 +255,30 @@ adapter = LoRAAdapter(base_model, rank=8, alpha=16)
 
 ### 🚀 Production Components (`src/production/`)
 
+**Production RAG Modules:**
+```python
+from src.production import (
+    # Data Pipeline (Pillar 1)
+    ProductionDataPipeline, SemanticChunker, HierarchicalChunker,
+    
+    # Query Enhancement (Pillar 3)
+    QueryEnhancementPipeline, HyDEGenerator, MultiQueryGenerator,
+    
+    # Cost Optimization (Pillar 5)
+    SemanticCache, ModelRouter, CostOptimizer,
+    
+    # Observability (Pillar 4)
+    RAGObservability, QualityMonitor, LatencyTracker
+)
+```
+
 **FastAPI Service:**
 ```python
-# API endpoints
 GET  /health          # Health check
 POST /predict         # Single prediction
 POST /predict/batch   # Batch predictions
 GET  /models          # List models
-GET  /models/{id}     # Model info
-POST /models/reload   # Hot reload models
 GET  /metrics         # Prometheus metrics
-```
-
-**Make API Requests:**
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Prediction
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{"features": [1.0, 2.0, 3.0, 4.0, 5.0], "model_name": "logistic_model"}'
 ```
 
 ### 🖥️ Web Interface (`app/main.py`)
@@ -490,24 +487,37 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
 
 ---
 
-## 📚 Learning Path
+## 📚 Learning Path & Resources
 
-The project includes a **17-week structured program** in `research/`:
+### 17-Week Learning Program (`research/`)
 
-| Week | Topic | Notebook |
+| Week | Topic | Key Notebook |
 |------|-------|----------|
-| 1-3 | Mathematical Foundations | `00_foundation/` |
-| 4 | Linear Algebra | `01_linear_algebra/` |
-| 5 | Probability & Statistics | `02_probability/` |
-| 6 | Optimization | `03_optimization/` |
-| 7 | Classical ML | `04_classical_ml/` |
-| 8-9 | Neural Networks | `05_neural_networks/` |
-| 10-11 | Deep Learning | `06_deep_learning/` |
-| 12 | Transformers | `07_transformers/` |
-| 13-14 | LLM Engineering | `08_llm/` |
-| 15 | RAG Systems | `09_rag/` |
-| 16 | Production | `10_production/` |
-| 17 | Capstone | `mlops_end_to_end.ipynb` |
+| 1-2 | Embeddings & Probability | `week1_embeddings`, `week2_probability` |
+| 3 | Mathematical Foundations | `week3_math_foundations` (SVD, PCA, GD) |
+| 5 | Backend Development | `week5_backend` (FastAPI) |
+| 6 | Retrieval Systems | `week6_retrieval` |
+| 8 | Reranking | `week8_reranking` |
+| 9 | CNN Architecture | `week9_cnn_architecture` |
+| 10-11 | Evaluation & Orchestration | `week10_evaluation`, `week11_orchestration` |
+| 12-14 | Fine-tuning, Deployment, Advanced | `week12-14` notebooks |
+| 15-16 | Capstone & Interview Prep | `week15_capstone`, `week16_interview` |
+
+### Case Studies
+
+| Case Study | Topics |
+|------------|--------|
+| `legal_document_rag_system/` | RAG for legal documents |
+| `medical_diagnosis_agent/` | AI diagnostic agent |
+| `supply_chain_optimization/` | LP, MILP, demand forecasting |
+
+### Interview Preparation (`interviews/`)
+
+| Category | Files |
+|----------|-------|
+| **ML Theory** | deep_learning, optimization, model_evaluation |
+| **Coding** | ml_algorithms, data_structures |
+| **System Design** | llm_infrastructure, rag_system, fraud_detection |
 
 ---
 

@@ -1,275 +1,274 @@
 name: Main Branch CI/CD
 
 on:
-    push:
-        branches: [main]
-    pull_request:
-        branches: [main]
-    schedule:
-        - cron: "0 0 * * 0" # Weekly on Sunday
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * 0" # Weekly on Sunday
 
 env:
-    PYTHON_VERSION: "3.10"
-    REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: "3.10"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-    # ============================================
-    # Quality Gates
-    # ============================================
-    code-quality:
-        name: 🔍 Code Quality
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Quality Gates
+  # ============================================
+  code-quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-            - name: Install linters
-              run: |
-                  pip install black isort flake8 mypy
-                  pip install types-requests types-PyYAML
+      - name: Install linters
+        run: |
+          pip install black isort flake8 mypy
+          pip install types-requests types-PyYAML
 
-            - name: Check Black formatting
-              run: black --check --diff src/ tests/ scripts/
+      - name: Check Black formatting
+        run: black --check --diff src/ tests/ scripts/
 
-            - name: Check isort imports
-              run: isort --check-only --diff src/ tests/ scripts/
+      - name: Check isort imports
+        run: isort --check-only --diff src/ tests/ scripts/
 
-            - name: Flake8 linting
-              run: flake8 src/ tests/ --max-line-length=120 --statistics
+      - name: Flake8 linting
+        run: flake8 src/ tests/ --max-line-length=120 --statistics
 
-            - name: MyPy type checking
-              run: mypy src/ --ignore-missing-imports --no-error-summary || true
+      - name: MyPy type checking
+        run: mypy src/ --ignore-missing-imports --no-error-summary || true
 
-    # ============================================
-    # Test Suite
-    # ============================================
-    test:
-        name: 🧪 Tests
-        runs-on: ubuntu-latest
-        needs: code-quality
-        strategy:
-            matrix:
-                python-version: ["3.10", "3.11", "3.12"]
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Test Suite
+  # ============================================
+  test:
+    name: 🧪 Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ matrix.python-version }}
-                  cache: "pip"
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
-            - name: Install dependencies
-              run: |
-                  pip install -r requirements-minimal.txt
-                  pip install pytest pytest-cov pytest-asyncio httpx
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-minimal.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
 
-            - name: Run unit tests
-              run: pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+      - name: Run unit tests
+        run: pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
-            - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v4
-              with:
-                  file: ./coverage.xml
-                  flags: unittests
-                  fail_ci_if_error: false
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
 
-    # ============================================
-    # Performance Benchmarks
-    # ============================================
-    benchmark:
-        name: 📊 Performance Benchmarks
-        runs-on: ubuntu-latest
-        needs: test
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Performance Benchmarks
+  # ============================================
+  benchmark:
+    name: 📊 Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-            - name: Install dependencies
-              run: pip install -r requirements-minimal.txt
+      - name: Install dependencies
+        run: pip install -r requirements-minimal.txt
 
-            - name: Run inference benchmarks
-              run: |
-                  python -c "
-                  import time
-                  import numpy as np
-                  from src.ml.classical import SVMScratch, RandomForestScratch
+      - name: Run inference benchmarks
+        run: |
+          python -c "
+          import time
+          import numpy as np
+          from src.ml.classical import SVMScratch, RandomForestScratch
 
-                  # Generate test data
-                  X = np.random.randn(1000, 10)
-                  y = (X.sum(axis=1) > 0).astype(int)
+          # Generate test data
+          X = np.random.randn(1000, 10)
+          y = (X.sum(axis=1) > 0).astype(int)
 
-                  # SVM benchmark
-                  svm = SVMScratch(n_iterations=100)
-                  start = time.time()
-                  svm.fit(X[:800], y[:800])
-                  train_time = time.time() - start
+          # SVM benchmark
+          svm = SVMScratch(n_iterations=100)
+          start = time.time()
+          svm.fit(X[:800], y[:800])
+          train_time = time.time() - start
 
-                  start = time.time()
-                  for _ in range(100):
-                      svm.predict(X[800:])
-                  infer_time = (time.time() - start) / 100
+          start = time.time()
+          for _ in range(100):
+              svm.predict(X[800:])
+          infer_time = (time.time() - start) / 100
 
-                  print(f'SVM Training: {train_time:.3f}s')
-                  print(f'SVM Inference (200 samples): {infer_time*1000:.2f}ms')
-                  print(f'SVM p95 latency: {infer_time*1000*1.5:.2f}ms')
+          print(f'SVM Training: {train_time:.3f}s')
+          print(f'SVM Inference (200 samples): {infer_time*1000:.2f}ms')
+          print(f'SVM p95 latency: {infer_time*1000*1.5:.2f}ms')
 
-                  # Random Forest benchmark
-                  rf = RandomForestScratch(n_estimators=10, max_depth=5)
-                  start = time.time()
-                  rf.fit(X[:800], y[:800])
-                  train_time = time.time() - start
+          # Random Forest benchmark
+          rf = RandomForestScratch(n_estimators=10, max_depth=5)
+          start = time.time()
+          rf.fit(X[:800], y[:800])
+          train_time = time.time() - start
 
-                  start = time.time()
-                  for _ in range(100):
-                      rf.predict(X[800:])
-                  infer_time = (time.time() - start) / 100
+          start = time.time()
+          for _ in range(100):
+              rf.predict(X[800:])
+          infer_time = (time.time() - start) / 100
 
-                  print(f'RF Training: {train_time:.3f}s')
-                  print(f'RF Inference (200 samples): {infer_time*1000:.2f}ms')
-                  "
+          print(f'RF Training: {train_time:.3f}s')
+          print(f'RF Inference (200 samples): {infer_time*1000:.2f}ms')
+          "
 
-    # ============================================
-    # Security Scanning
-    # ============================================
-    security:
-        name: 🔒 Security Scan
-        runs-on: ubuntu-latest
-        needs: code-quality
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Security Scanning
+  # ============================================
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-            - name: Install security tools
-              run: pip install safety bandit pip-audit
+      - name: Install security tools
+        run: pip install safety bandit pip-audit
 
-            - name: Dependency audit
-              run: pip-audit -r requirements-minimal.txt || true
+      - name: Dependency audit
+        run: pip-audit -r requirements-minimal.txt || true
 
-            - name: Bandit security scan
-              run: bandit -r src/ -ll -f json -o bandit-report.json || true
+      - name: Bandit security scan
+        run: bandit -r src/ -ll -f json -o bandit-report.json || true
 
-            - name: Upload security report
-              uses: actions/upload-artifact@v4
-              with:
-                  name: security-report
-                  path: bandit-report.json
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: bandit-report.json
 
-    # ============================================
-    # Docker Build & Push
-    # ============================================
-    docker:
-        name: 🐳 Docker Build
-        runs-on: ubuntu-latest
-        needs: [test, security]
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        permissions:
-            contents: read
-            packages: write
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Docker Build & Push
+  # ============================================
+  docker:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            - name: Login to Container Registry
-              uses: docker/login-action@v3
-              with:
-                  registry: ${{ env.REGISTRY }}
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Extract metadata
-              id: meta
-              uses: docker/metadata-action@v5
-              with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-                  tags: |
-                      type=sha
-                      type=raw,value=latest
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=raw,value=latest
 
-            - name: Build and push
-              uses: docker/build-push-action@v5
-              with:
-                  context: .
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    # ============================================
-    # Model Validation
-    # ============================================
-    model-validation:
-        name: 🤖 Model Validation
-        runs-on: ubuntu-latest
-        needs: test
-        steps:
-            - uses: actions/checkout@v4
+  # ============================================
+  # Model Validation
+  # ============================================
+  model-validation:
+    name: 🤖 Model Validation
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
-                  cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-            - name: Install dependencies
-              run: pip install -r requirements-minimal.txt
+      - name: Install dependencies
+        run: pip install -r requirements-minimal.txt
 
-            - name: Train models
-              run: python scripts/train_save_models.py
+      - name: Train models
+        run: python scripts/train_save_models.py
 
-            - name: Validate model accuracy
-              run: |
-                  python -c "
-                  import json
-                  with open('models/models_metadata.json') as f:
-                      meta = json.load(f)
+      - name: Validate model accuracy
+        run: |
+          python -c "
+          import json
+          with open('models/models_metadata.json') as f:
+              meta = json.load(f)
 
-                  for model_name, info in meta.items():
-                      if model_name == 'default_model':
-                          continue
-                      accuracy = info.get('accuracy', info.get('metrics', {}).get('accuracy', 0))
-                      print(f'{model_name}: accuracy={accuracy:.2%}')
-                      assert accuracy > 0.80, f'{model_name} accuracy below threshold'
+          for model_name, info in meta.items():
+              if model_name == 'default_model':
+                  continue
+              accuracy = info.get('accuracy', info.get('metrics', {}).get('accuracy', 0))
+              print(f'{model_name}: accuracy={accuracy:.2%}')
+              assert accuracy > 0.80, f'{model_name} accuracy below threshold'
 
-                  print('✅ All models passed validation')
-                  "
+          print('✅ All models passed validation')
+          "
 
-            - name: Upload model artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: trained-models
-                  path: models/
-                  retention-days: 7
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-models
+          path: models/
+          retention-days: 7
 
-    # ============================================
-    # Deployment (on release)
-    # ============================================
-    deploy:
-        name: 🚀 Deploy
-        runs-on: ubuntu-latest
-        needs: [docker, model-validation]
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        environment: production
-        steps:
-            - name: Deploy notification
-              run: |
-                  echo "🚀 Ready for deployment"
-                  echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-                  echo "Models validated and artifacts uploaded"
+  # ============================================
+  # Deployment (on release)
+  # ============================================
+  deploy:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    needs: [docker, model-validation]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy notification
+        run: |
+          echo "🚀 Ready for deployment"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Models validated and artifacts uploaded"
