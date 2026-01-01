@@ -22,6 +22,11 @@ The AI-Mastery-2026 toolkit is built on the "White-Box Approach" philosophy, emp
 
 ## Mathematical Foundations
 
+> 📓 **Deep Dive Notebook**: For a comprehensive exploration with industrial applications, see:
+> `notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb`
+>
+> Covers: Linear Algebra (PageRank, Netflix SVD), Calculus (Backprop, Self-Attention), Optimization (SVM, ADMM), Probability (VAE, t-SNE), Bayesian Optimization (Gaussian Processes)
+
 ### Core Mathematical Operations
 
 #### Vector Operations

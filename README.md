@@ -152,7 +152,13 @@ curl http://localhost:8000/health
 | [docs/ML_ESSAY_ANSWERS.md](docs/ML_ESSAY_ANSWERS.md) | **Essay Answers** - MLE vs MAP, PCA/SVD, CNN architecture |
 | [docs/guide/00_index.md](docs/guide/00_index.md) | Guide Index - Table of contents for all documentation |
 
----
+### 📓 Featured Notebooks
+
+| Notebook | Description | Topics |
+|----------|-------------|--------|
+| [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) | **Deep Mathematical Foundations** (96KB, 61 cells) | Linear Algebra, Calculus, Optimization, Probability, Bayesian Optimization |
+| [mlops_end_to_end.ipynb](research/mlops_end_to_end.ipynb) | Complete MLOps Demo | Training, Deployment, Monitoring |
+
 
 ## ✨ Features
 
@@ -489,16 +495,32 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
 
 ## 📚 Learning Path & Resources
 
+### 🧮 Deep Mathematical Foundations
+
+Start with our comprehensive mathematics notebook that covers the theoretical foundations:
+
+| Topic | Description | Industrial Applications |
+|-------|-------------|------------------------|
+| **Linear Algebra** | Vectors, Matrices, Eigenvalues, SVD | Google PageRank, Netflix Recommendations |
+| **Calculus** | Gradients, Jacobians, Chain Rule | Backpropagation, Self-Attention (Transformers) |
+| **Optimization** | Lagrange, Convex, ADMM | SVM, Uber Budget Allocation |
+| **Probability** | Entropy, KL Divergence, VAE | Generative Models, t-SNE |
+| **Bayesian Optimization** | Gaussian Processes, Acquisition Functions | Google Vizier, Hyperparameter Tuning |
+
+📓 **Notebook**: [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) (96KB, 61 cells)
+
 ### 17-Week Learning Program (`research/`)
 
 | Week | Topic | Key Notebook |
 |------|-------|----------|
+| 0 | Mathematical Foundations | `deep_ml_mathematics_complete.ipynb` ⭐ |
 | 1-2 | Embeddings & Probability | `week1_embeddings`, `week2_probability` |
-| 3 | Mathematical Foundations | `week3_math_foundations` (SVD, PCA, GD) |
+| 3 | ML Core Algorithms | `week3_ml_core` |
+| 4 | Transformers | `week4_transformers` |
 | 5 | Backend Development | `week5_backend` (FastAPI) |
-| 6 | Retrieval Systems | `week6_retrieval` |
+| 6-7 | Retrieval Systems | `week6_retrieval`, `week7_retrieval` |
 | 8 | Reranking | `week8_reranking` |
-| 9 | CNN Architecture | `week9_cnn_architecture` |
+| 9 | CNN Architecture | `week9_cnn` |
 | 10-11 | Evaluation & Orchestration | `week10_evaluation`, `week11_orchestration` |
 | 12-14 | Fine-tuning, Deployment, Advanced | `week12-14` notebooks |
 | 15-16 | Capstone & Interview Prep | `week15_capstone`, `week16_interview` |

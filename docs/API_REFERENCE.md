@@ -746,3 +746,130 @@
 
 - `load_pytorch_model(path: str, model_class)`
   - Load a PyTorch model from disk
+
+## Production RAG (`src.production`)
+
+### Data Pipeline (`src.production.data_pipeline`)
+
+- `class SemanticChunker(chunk_size: int = 500, llm_caller: Optional[Callable] = None)`
+  - LLM-based semantic chunking that respects topic boundaries
+
+  - `chunk(document: Document) -> List[DocumentChunk]`
+    - Split document semantically
+
+- `class HierarchicalChunker(parent_chunk_size: int = 2000, child_chunk_size: int = 400)`
+  - Creates parent-child chunk relationships for context preservation
+
+  - `chunk(document: Document) -> List[DocumentChunk]`
+    - Create hierarchical chunks with relationships
+
+- `class MetadataExtractor`
+  - Automatic metadata enrichment (entities, dates, topics)
+
+  - `extract(document: Document) -> Dict[str, Any]`
+    - Extract metadata from document
+
+- `class ProductionDataPipeline`
+  - Complete ingestion pipeline: parse → extract → chunk → validate
+
+  - `process(content: str, format: str, doc_id: Optional[str] = None) -> List[DocumentChunk]`
+    - Process raw content into indexed chunks
+
+### Query Enhancement (`src.production.query_enhancement`)
+
+- `class QueryRewriter(llm_caller: Optional[Callable] = None)`
+  - LLM-based query optimization
+
+  - `rewrite(query: str) -> List[str]`
+    - Rewrite query into optimized variants
+
+- `class HyDEGenerator(llm_caller: Optional[Callable] = None)`
+  - Hypothetical Document Embeddings generator
+
+  - `generate(query: str) -> str`
+    - Generate hypothetical document for query
+
+- `class MultiQueryGenerator(llm_caller: Optional[Callable] = None)`
+  - Multi-Query Retrieval generator
+
+  - `generate(query: str, n: int = 4) -> List[str]`
+    - Generate diverse query variants
+
+- `class QueryEnhancementPipeline`
+  - Unified query enhancement pipeline
+
+  - `enhance(query: str) -> EnhancedQuery`
+    - Enhance query with all strategies
+
+### Caching & Cost (`src.production.caching`)
+
+- `class SemanticCache(embedder: Optional[Callable] = None, similarity_threshold: float = 0.90)`
+  - Vector-based semantic cache for LLM responses
+
+  - `get(query: str) -> Optional[str]`
+    - Get cached response using semantic similarity
+
+  - `set(query: str, response: str) -> None`
+    - Cache a query-response pair
+
+- `class ModelRouter(models: Optional[Dict[int, str]] = None)`
+  - Intelligent model routing based on query complexity
+
+  - `route(query: str) -> Tuple[str, QueryClassification]`
+    - Route query to appropriate model tier
+
+- `class CostTracker(pricing: Optional[Dict[str, Tuple[float, float]]] = None)`
+  - Token usage and cost tracking
+
+  - `record(model: str, prompt_tokens: int, completion_tokens: int) -> float`
+    - Record a model invocation and return cost
+
+- `class CostOptimizer`
+  - Unified cost optimization layer
+
+  - `get_cached(query: str) -> Optional[str]`
+    - Check cache for query
+
+  - `cache_and_track(...) -> float`
+    - Cache response and track cost
+
+### Observability (`src.production.observability`)
+
+- `class LatencyTracker(window_size: int = 1000)`
+  - Track and analyze latency percentiles (P50, P90, P95, P99)
+
+  - `record(operation: str, latency_ms: float) -> None`
+    - Record a latency observation
+
+  - `get_stats(operation: str) -> LatencyStats`
+    - Get latency statistics
+
+- `class QualityMonitor(llm_judge: Optional[Callable] = None)`
+  - Automated quality assessment for RAG responses
+
+  - `assess(query: str, response: str, context: List[str]) -> QualityScore`
+    - Assess response quality (faithfulness, relevance, hallucination)
+
+- `class RAGMetrics`
+  - Prometheus-compatible metrics collection
+
+  - `inc(name: str, value: int = 1) -> None`
+    - Increment a counter
+
+  - `observe(name: str, value: float) -> None`
+    - Add observation to histogram
+
+  - `export_prometheus() -> str`
+    - Export metrics in Prometheus text format
+
+- `class RAGObservability`
+  - Unified observability layer
+
+  - `track_request(request_type: str) -> RequestTracker`
+    - Context manager for tracking request timing
+
+  - `record_cache_hit(hit: bool) -> None`
+    - Record cache hit/miss
+
+  - `get_dashboard() -> Dict[str, Any]`
+    - Get comprehensive dashboard data

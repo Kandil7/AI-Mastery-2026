@@ -45,5 +45,31 @@ clean:
 	rm -rf .pytest_cache/
 	rm -rf .coverage
 	rm -rf htmlcov/
+	rm -rf results/
 
-.PHONY: install test test-cov lint format docker-build docker-run run docs clean
+# Run performance benchmarks
+benchmark:
+	python scripts/run_benchmarks.py --iterations 100
+
+# Run benchmarks and save results
+benchmark-save:
+	python scripts/run_benchmarks.py --iterations 100 --output results/benchmark_report.json
+
+# Run production server (multiple workers)
+run-prod:
+	uvicorn src.production.api:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Check formatting without applying
+format-check:
+	black src/ tests/ --check
+	isort src/ tests/ --check
+
+# Stop docker services  
+docker-stop:
+	docker-compose down
+
+# View docker logs
+docker-logs:
+	docker-compose logs -f
+
+.PHONY: install test test-cov lint format docker-build docker-run run docs clean benchmark benchmark-save run-prod format-check docker-stop docker-logs

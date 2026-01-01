@@ -21,6 +21,9 @@ make docker-run
 
 ## Table of Contents
 
+0.  **[Deep Mathematical Foundations](../notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb)** ⭐ NEW
+    *   Comprehensive notebook with industrial applications: Linear Algebra (PageRank, Netflix), Calculus (Backprop, Attention), Optimization (SVM, ADMM), Probability (VAE, t-SNE), Bayesian Optimization
+
 1.  **[Getting Started](./01_getting_started.md)**
     *   A detailed guide on installation, environment setup, and verification.
 
@@ -89,9 +92,11 @@ AI-Mastery-2026/
 
 | Component | File | Description |
 |-----------|------|-------------|
+| **Math Foundations** | `notebooks/.../deep_ml_mathematics_complete.ipynb` | 96KB notebook covering 7 chapters, industrial applications |
 | **API** | `src/production/api.py` | FastAPI with real model inference |
 | **RAG** | `src/llm/rag.py` | Dense/Sparse/Hybrid retrieval |
 | **Neural Net** | `src/ml/deep_learning.py` | Dense, LSTM, Conv2D layers |
 | **Classical ML** | `src/ml/classical.py` | LR, SVM, Tree, RandomForest |
 | **Web UI** | `app/main.py` | Streamlit chat interface |
+
 
