@@ -9,17 +9,18 @@ This comprehensive guide covers everything you need to know to use the AI-Master
 1. [Introduction](#1-introduction)
 2. [Installation Guide](#2-installation-guide)
 3. [Project Structure](#3-project-structure)
-4. [Core Modules](#4-core-modules)
-5. [Classical Machine Learning](#5-classical-machine-learning)
-6. [Deep Learning](#6-deep-learning)
-7. [LLM Engineering](#7-llm-engineering)
-8. [Production API](#8-production-api)
-9. [Web Interface](#9-web-interface)
-10. [Docker Deployment](#10-docker-deployment)
-11. [Monitoring & Observability](#11-monitoring--observability)
-12. [Testing](#12-testing)
-13. [Troubleshooting](#13-troubleshooting)
-14. [FAQ](#14-faq)
+4. [Mathematical Foundations](#4-mathematical-foundations) ⭐ NEW
+5. [Core Modules](#5-core-modules)
+6. [Classical Machine Learning](#6-classical-machine-learning)
+7. [Deep Learning](#7-deep-learning)
+8. [LLM Engineering](#8-llm-engineering)
+9. [Production API](#9-production-api)
+10. [Web Interface](#10-web-interface)
+11. [Docker Deployment](#11-docker-deployment)
+12. [Monitoring & Observability](#12-monitoring--observability)
+13. [Testing](#13-testing)
+14. [Troubleshooting](#14-troubleshooting)
+15. [FAQ](#15-faq)
 
 ---
 
@@ -43,7 +44,7 @@ AI-Mastery-2026 is a **full-stack AI engineering toolkit** designed for learning
 
 ### What You'll Learn
 
-- Linear algebra, calculus, optimization
+- Linear algebra, calculus, optimization (with industrial applications)
 - Classical ML algorithms (from scratch)
 - Neural networks and deep learning
 - Transformer architecture and attention
@@ -51,7 +52,24 @@ AI-Mastery-2026 is a **full-stack AI engineering toolkit** designed for learning
 - Production deployment with Docker
 - Monitoring with Prometheus/Grafana
 
+### 📓 Start Here: Deep Mathematical Foundations Notebook
+
+Before diving into the code, we recommend starting with our comprehensive mathematics notebook:
+
+**File**: `notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb`
+
+| Chapter | Topics | Real-World Applications |
+|---------|--------|------------------------|
+| 1. Linear Algebra | Vectors, Matrices, SVD, Eigenvalues | Google PageRank, Netflix Recommendations |
+| 2. Calculus | Gradients, Jacobians, Chain Rule | Backpropagation, Self-Attention |
+| 3. Optimization | Lagrange, Convex, ADMM | SVM, Uber Budget Allocation |
+| 4. Probability | Entropy, KL Divergence, VAE | Generative Models, t-SNE |
+| 5. Integration | Monte Carlo, Importance Sampling | Bayesian Inference |
+| 6. Networks | Random Walks, Link Prediction | Facebook Friend Suggestions |
+| 7. Bayesian Opt | Gaussian Processes, Acquisition | Google Vizier |
+
 ---
+
 
 ## 2. Installation Guide
 
@@ -213,14 +231,117 @@ AI-Mastery-2026/
 
 ---
 
-## 4. Core Modules
+## 4. Mathematical Foundations
 
-### 4.1 Math Operations (`src/core/math_operations.py`)
+The AI-Mastery-2026 project includes a comprehensive **Deep Mathematical Foundations** notebook that covers the theoretical underpinnings of machine learning with industrial applications.
+
+### 4.1 Notebook Overview
+
+**Location**: `notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb`
+
+**Specs**: 96KB, 61 cells (29 markdown + 32 code)
+
+### 4.2 Topics Covered
+
+#### Chapter 1: Linear Algebra
+- **Dot Product & Cosine Similarity** - From-scratch implementation for NLP embeddings
+- **Matrix Transformations** - Rotation, scaling, shearing with visualization
+- **Convolution as Matrix Multiplication** - Toeplitz matrices for CNNs
+- **Eigenvalues & PageRank** - Google's ranking algorithm from scratch
+- **SVD & Netflix Recommendations** - FunkSVD collaborative filtering
+
+```python
+# Example: PageRank from the notebook
+def pagerank(adj_matrix, damping=0.85, max_iter=100):
+    n = adj_matrix.shape[0]
+    out_degree = adj_matrix.sum(axis=1)
+    M = (adj_matrix.T / out_degree).T
+    r = np.ones(n) / n
+    for _ in range(max_iter):
+        r = damping * M @ r + (1 - damping) / n
+    return r
+```
+
+#### Chapter 2: Calculus
+- **Gradients & Jacobian Matrix** - Numerical and analytical computation
+- **Backpropagation** - Step-by-step chain rule through a 2-layer network
+- **Self-Attention Mechanism** - Complete Transformer attention implementation
+
+```python
+# Example: Self-Attention from the notebook
+def scaled_dot_product_attention(Q, K, V):
+    d_k = Q.shape[-1]
+    scores = Q @ K.T / np.sqrt(d_k)  # Scale
+    weights = softmax(scores)         # Normalize
+    return weights @ V                # Weighted sum
+```
+
+#### Chapter 3: Optimization
+- **Lagrange Multipliers** - Constrained optimization with visualization
+- **SVM Dual Form** - Quadratic programming implementation
+- **ADMM** - Alternating Direction Method of Multipliers for LASSO
+
+#### Chapter 4: Probability & Information Theory
+- **Entropy & KL Divergence** - Information-theoretic foundations
+- **Variational Autoencoders** - ELBO derivation and reparameterization trick
+- **t-SNE** - Visualization with KL divergence minimization
+
+```python
+# Example: KL Divergence for VAE
+def kl_divergence_gaussian(mu, log_var):
+    """KL between N(mu, exp(log_var)) and N(0, 1)"""
+    return -0.5 * np.sum(1 + log_var - mu**2 - np.exp(log_var))
+```
+
+#### Chapter 5: Advanced Integration
+- **Monte Carlo Integration** - Numerical estimation of integrals
+- **Importance Sampling** - Variance reduction techniques
+- **Normalizing Flows** - Change of variables for density estimation
+
+#### Chapter 6: Network Analysis
+- **Link Prediction** - Common neighbors, Adamic-Adar scores
+- **Supervised Random Walks** - Facebook's friend suggestion algorithm
+
+#### Chapter 7: Bayesian Optimization
+- **Gaussian Processes** - Prediction with uncertainty quantification
+- **Acquisition Functions** - Expected Improvement for hyperparameter tuning
+
+### 4.3 Industrial Applications
+
+| Topic | Company | Application |
+|-------|---------|-------------|
+| Eigenvalues | Google | PageRank web ranking |
+| SVD | Netflix | Movie recommendations |
+| Self-Attention | OpenAI | GPT, ChatGPT |
+| SVM | Various | Classification systems |
+| ADMM | Uber | Budget allocation across cities |
+| Gaussian Processes | Google | Vizier hyperparameter tuning |
+| Random Walks | Facebook | Friend suggestions |
+
+### 4.4 Getting Started
+
+```bash
+# Open the notebook
+jupyter notebook notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb
+```
+
+Each section includes:
+1. **Theory** - Mathematical explanation with LaTeX equations
+2. **Example** - Step-by-step numerical calculation
+3. **Code** - Complete Python/NumPy implementation
+4. **Visualization** - Plots and diagrams
+
+---
+
+## 5. Core Modules
+
+### 5.1 Math Operations (`src/core/math_operations.py`)
 
 **Vector Operations:**
 
 ```python
 from src.core.math_operations import dot_product, cosine_similarity
+
 
 # Dot product
 a = np.array([1, 2, 3])
