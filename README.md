@@ -157,7 +157,8 @@ curl http://localhost:8000/health
 | Notebook | Description | Topics |
 |----------|-------------|--------|
 | [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) | **Deep Mathematical Foundations** (96KB, 61 cells) | Linear Algebra, Calculus, Optimization, Probability, Bayesian Optimization |
-| [modern_integration_methods.ipynb](notebooks/01_mathematical_foundations/modern_integration_methods.ipynb) | **Modern Integration Methods** | Newton-Cotes, Gaussian Quadrature, Monte Carlo, Normalizing Flows, Time Series |
+| [modern_integration_methods.ipynb](notebooks/01_mathematical_foundations/modern_integration_methods.ipynb) | **Modern Integration Methods** | Newton-Cotes, Gaussian Quadrature, Monte Carlo, Normalizing Flows |
+| [advanced_integration_mcmc_vi.ipynb](notebooks/01_mathematical_foundations/advanced_integration_mcmc_vi.ipynb) | **Advanced MCMC & Variational Inference** ⭐ | Metropolis-Hastings, HMC, NUTS, Mean-Field VI, SVGD, Case Studies |
 | [mlops_end_to_end.ipynb](research/mlops_end_to_end.ipynb) | Complete MLOps Demo | Training, Deployment, Monitoring |
 
 
@@ -205,6 +206,32 @@ from src.core.normalizing_flows import PlanarFlow, RadialFlow, FlowChain
 # Density estimation (Spotify recommendations, Waymo trajectory)
 flow = FlowChain([PlanarFlow(d=2), RadialFlow(d=2)])
 z_new, log_det = flow.forward(z)
+```
+
+#### MCMC Methods
+```python
+from src.core.mcmc import (
+    metropolis_hastings, HamiltonianMonteCarlo, nuts_sampler,
+    effective_sample_size, gelman_rubin_diagnostic
+)
+
+# Bayesian inference with HMC (Airbnb pricing, Uber demand)
+hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=0.1, n_leapfrog=10)
+result = hmc.sample(initial_state, n_samples=5000)
+print(f"ESS: {result.diagnostics['ess']}, Acceptance: {result.acceptance_rate:.2%}")
+```
+
+#### Variational Inference
+```python
+from src.core.variational_inference import (
+    GaussianVariational, MeanFieldVI, BayesianLinearRegressionVI, svgd
+)
+
+# Fast Bayesian inference with VI (Netflix, Spotify)
+q = GaussianVariational(d=10)
+vi = MeanFieldVI(q, learning_rate=0.01)
+result = vi.fit(log_joint, grad_log_joint, n_iterations=1000)
+print(f"Posterior mean: {q.mean}, std: {q.std}")
 ```
 
 #### Optimization Algorithms
