@@ -27,6 +27,13 @@ class Vector:
         """Scalar multiplication"""
         return Vector([x * other for x in self.data])
 
+    def __truediv__(self, other: Union[float, int]) -> 'Vector':
+        """Scalar division"""
+        if other == 0:
+            raise ValueError("Division by zero")
+        return Vector([x / other for x in self.data])
+
+
     def dot(self, other: 'Vector') -> float:
         """Dot product"""
         if self.size != other.size:
@@ -142,4 +149,43 @@ class Matrix:
         # Extract inverse (right half)
         inv_data = [row[n:] for row in aug]
         return Matrix(inv_data)
+
+    def eigenvalues(self, iterations: int = 100) -> float:
+        """
+        Compute dominant eigenvalue using Power Iteration.
+        Returns the largest eigenvalue (magnitude).
+        """
+        if self.rows != self.cols:
+            raise ValueError("Matrix must be square")
+            
+        n = self.rows
+        # Start with random vector (all 1s is safer than random for deterministic behavior here)
+        b_k = Vector([1.0] * n)
+        
+        for _ in range(iterations):
+            # Calculate the matrix-by-vector product Ab
+            # We don't have Matrix * Vector yet, so do it manually or use matmul
+            # Using manual row-vector dot product for speed
+            new_data = []
+            for i in range(n):
+                # row i dotted with b_k
+                val = sum(self.data[i][j] * b_k.data[j] for j in range(n))
+                new_data.append(val)
+            
+            b_k1 = Vector(new_data)
+            
+            # Normalize
+            norm = b_k1.norm()
+            if norm < 1e-10: 
+                break
+            b_k = b_k1 / norm
+            
+        # Rayleigh quotient: (b_k^T * A * b_k) / (b_k^T * b_k)
+        # Note: b_k is already normalized, so denom is 1
+        # Re-compute A * b_k one last time
+        Ab = Vector([sum(self.data[i][j] * b_k.data[j] for j in range(n)) for i in range(n)])
+        eigencalc = b_k.dot(Ab)
+        
+        return eigencalc
+
 
