@@ -345,6 +345,12 @@ def minimize(
         optimizer = Momentum(learning_rate)
     elif method == 'adam':
         optimizer = Adam(learning_rate)
+    elif method == 'rmsprop':
+        optimizer = RMSprop(learning_rate)
+    elif method == 'adagrad':
+        optimizer = AdaGrad(learning_rate)
+    elif method == 'nadam':
+        optimizer = NAdam(learning_rate)
     else:
         raise ValueError(f"Unknown optimization method: {method}")
     
