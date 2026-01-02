@@ -576,39 +576,104 @@ result = vi.optimize(n_iterations=2000, learning_rate=0.01)
 
 ### 5.8 Advanced Deep Integration (`src/core/advanced_integration.py`)
 
-**Neural ODEs:**
+This module provides state-of-the-art integration techniques bridging mathematical foundations with modern deep learning.
+
+**Neural ODEs with Uncertainty Quantification:**
 
 ```python
-from src.core.advanced_integration import NeuralODE, ODEFunc
+from src.core.advanced_integration import NeuralODE, ODEFunc, robot_dynamics_demo
 import torch
 
 # Define dynamics and model
-func = ODEFunc(dim=2)
-model = NeuralODE(func)
+func = ODEFunc(dim=2, hidden_dim=64)
+model = NeuralODE(func, method='rk4')
 
-# Integrate trajectory with uncertainty
-mean, std, _ = model.integrate_with_uncertainty(x0, t_span)
+# Initial state and time span
+x0 = torch.tensor([[0.0, 1.0]])
+t_span = torch.linspace(0, 10, 101)
+
+# Integrate with uncertainty (Monte Carlo Dropout)
+mean_path, std_path, trajectories = model.integrate_with_uncertainty(
+    x0, t_span, num_samples=50
+)
+# mean_path: (101, 1, 2) - Expected trajectory
+# std_path: (101, 1, 2) - Uncertainty at each time step
+
+# Quick demo (Boston Dynamics Atlas-style robot dynamics)
+results = robot_dynamics_demo(dim=2, t_max=10.0)
 ```
 
-**Federated Integration:**
+**Multi-Modal Healthcare Integration:**
 
 ```python
-from src.core.advanced_integration import FederatedIntegrator
+from src.core.advanced_integration import (
+    MultiModalIntegrator, generate_patient_data
+)
+import torch
 
-# Combine risk estimates from multiple hospitals
-hospitals = [{'local_risk': 0.2, 'local_uncertainty': 0.05, 'sample_size': 100}, ...]
-integrator = FederatedIntegrator(hospitals)
-global_risk, global_unc = integrator.bayesian_weighting(hospitals)
+# Generate synthetic patient data (Mayo Clinic-style)
+data = generate_patient_data(n_samples=1000)
+# Returns clinical_data, xray_data, text_data, labels
+
+# Create multi-modal fusion model
+model = MultiModalIntegrator(
+    clinical_dim=5, xray_dim=3, text_dim=4, hidden_dim=64
+)
+
+# Prepare tensors
+clinical = torch.tensor(data['clinical_data'], dtype=torch.float32)
+xray = torch.tensor(data['xray_data'], dtype=torch.float32)
+text = torch.tensor(data['text_data'], dtype=torch.float32)
+
+# Predict with MC Dropout uncertainty
+predictions, uncertainty = model.predict_with_confidence(
+    clinical, xray, text, n_samples=50
+)
+# High uncertainty cases should be flagged for human review
 ```
 
-**De-Biasing Integration:**
+**Federated Learning Integration:**
 
 ```python
-from src.core.advanced_integration import biased_lending_simulation
+from src.core.advanced_integration import (
+    FederatedHospital, FederatedIntegrator, federated_demo
+)
 
-# Simulate and analyze bias in integrated decision systems
-results = biased_lending_simulation(n_samples=5000)
-# Returns sensitive_attr, approved, true_worth, perceived_worth
+# Create distributed hospital nodes (Apple HealthKit-style)
+hospitals = [
+    FederatedHospital(0, 'young', n_patients=300),
+    FederatedHospital(1, 'elderly', n_patients=250),
+    FederatedHospital(2, 'mixed', n_patients=400),
+]
+
+# Aggregate using Bayesian weighting (privacy-preserving)
+integrator = FederatedIntegrator(hospitals, aggregation_method='bayesian_weighting')
+global_risk, global_uncertainty = integrator.aggregate()
+
+# Compare aggregation strategies
+results = federated_demo(n_hospitals=5, n_rounds=3)
+# Compares: simple_average, sample_weighted, uncertainty_weighted, bayesian_weighting
+```
+
+**Ethics & Bias Analysis:**
+
+```python
+from src.core.advanced_integration import (
+    biased_lending_simulation, analyze_bias, fairness_test
+)
+
+# Simulate biased lending system (IBM AI Fairness 360-style)
+results = biased_lending_simulation(n_samples=10000, bias_factor=0.4)
+
+# Analyze bias metrics
+metrics = analyze_bias(results)
+print(f"Approval rate disparity: {metrics['approval_disparity']:.2%}")
+print(f"Disparate impact ratio: {metrics['disparate_impact_ratio']:.2f}")
+# Ratio < 0.8 indicates potential discrimination
+
+# Comprehensive fairness test for any classifier
+fairness = fairness_test(predictions, labels, sensitive_attr)
+print(f"FPR disparity: {fairness['fairness_metrics']['fpr_disparity']:.4f}")
 ```
 
 ---

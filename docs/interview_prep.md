@@ -293,3 +293,92 @@ Focus on:
 | Model serving | <50ms |
 | Embedding search (1M vectors) | <10ms |
 | RAG retrieval | <500ms end-to-end |
+
+---
+
+## 🔬 Advanced Integration Methods
+
+### Neural ODEs
+
+**Q: What is the adjoint method in Neural ODEs, and why is it important?**
+
+The adjoint method computes gradients in O(1) memory regardless of integration steps:
+- Instead of storing all intermediate states (backprop through solver), we solve an augmented ODE backward in time
+- This makes training practical for long time horizons
+- Trade-off: More compute (solve ODE twice) for less memory
+
+**Q: How do Neural ODEs handle uncertainty quantification?**
+
+Two main approaches:
+1. **MC Dropout**: Keep dropout active during inference, run multiple passes
+2. **Input perturbation**: Add small noise to initial state, measure trajectory variance
+
+Both capture epistemic uncertainty—what the model doesn't know.
+
+---
+
+### Federated Learning
+
+**Q: What are the main aggregation strategies in Federated Learning?**
+
+| Strategy | Formula | Best When |
+|----------|---------|-----------|
+| FedAvg | Σ(n_k/n) × w_k | IID data across clients |
+| Inverse variance | Σ(1/σ²) × w_k | Known uncertainties |
+| Bayesian | Σ(n_k/σ²) × w_k | Non-IID with uncertainty |
+
+**Q: How does differential privacy work in federated settings?**
+
+- Add calibrated noise to gradients before aggregation
+- Noise scale: σ ∝ sensitivity / ε (privacy budget)
+- Trade-off: More privacy → more noise → lower accuracy
+- Apple uses ε ≈ 8 for HealthKit analytics
+
+---
+
+### AI Ethics & Fairness
+
+**Q: What is disparate impact, and how do you measure it?**
+
+Disparate impact occurs when a neutral policy has unequal effects on protected groups:
+```
+Disparate Impact Ratio = (Approval Rate_minority) / (Approval Rate_majority)
+```
+- Ratio < 0.8 triggers legal scrutiny (80% rule)
+- Also measure: FPR parity, FNR parity, calibration
+
+**Q: Name three bias mitigation strategies.**
+
+1. **Pre-processing**: Resampling, reweighting, representation learning
+2. **In-processing**: Fairness constraints, adversarial debiasing
+3. **Post-processing**: Threshold adjustment, calibration
+
+**Q: What's the Impossibility Theorem in fairness?**
+
+You cannot simultaneously satisfy:
+- Calibration (P(Y=1|score=s) same across groups)
+- FPR parity
+- FNR parity
+
+...unless base rates are equal or predictor is perfect. Must choose trade-offs.
+
+---
+
+### Integration Interview Coding Challenge
+
+**Q: Implement Bayesian weighted aggregation for federated estimates.**
+
+```python
+def bayesian_aggregate(estimates):
+    """
+    estimates: list of {'risk': float, 'uncertainty': float, 'n': int}
+    """
+    weights = [e['n'] / (e['uncertainty']**2 + 1e-8) for e in estimates]
+    total_weight = sum(weights)
+    
+    global_risk = sum(w * e['risk'] for w, e in zip(weights, estimates)) / total_weight
+    global_unc = 1 / np.sqrt(sum(e['n'] / (e['uncertainty']**2 + 1e-8) for e in estimates))
+    
+    return global_risk, global_unc
+```
+
