@@ -462,3 +462,54 @@ def extract_features(f, a, b, n_samples=1000):
     }
 ```
 
+---
+
+## 🎮 Reinforcement Learning Integration
+
+### Policy Gradient
+
+**Q: Explain how Monte Carlo integration is used in REINFORCE.**
+
+**A**: REINFORCE estimates the policy gradient via Monte Carlo sampling:
+
+$$\nabla J(\theta) = \mathbb{E}\left[\sum_t \nabla \log \pi_\theta(a_t|s_t) \cdot G_t\right]$$
+
+We sample trajectories and average gradient estimates - this is Monte Carlo integration over the trajectory distribution.
+
+**Q: What is the exploration-exploitation tradeoff in MCTS?**
+
+MCTS uses UCB to balance:
+```
+Q(s,a) + c · P(s,a) · √(N(s)) / (1 + N(s,a))
+```
+- **Exploitation**: Q(s,a) favors high-value actions
+- **Exploration**: Second term favors rarely-visited actions
+
+---
+
+## 🔬 Causal Inference
+
+### Treatment Effect Estimation
+
+**Q: Why is Doubly Robust estimation preferred over IPW?**
+
+Doubly Robust is consistent if EITHER propensity OR outcome model is correct:
+
+```python
+tau_dr = mu1(X) - mu0(X) + T*(Y-mu1(X))/e(X) - (1-T)*(Y-mu0(X))/(1-e(X))
+```
+
+This "double protection" makes it robust to model misspecification.
+
+**Q: Implement propensity score trimming.**
+
+```python
+def trim_propensity_scores(ps, min_val=0.05, max_val=0.95):
+    """Trim extreme PS to reduce variance in IPW."""
+    return np.clip(ps, min_val, max_val)
+```
+
+**Q: What is the fundamental problem of causal inference?**
+
+We can never observe both Y(1) AND Y(0) for the same individual. This is a missing data problem - we use statistical assumptions (ignorability, overlap) to estimate effects.
+
