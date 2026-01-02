@@ -73,11 +73,15 @@ setup(
         "scikit-learn>=1.0.0",
         "torch>=1.12.0",
         "fastapi>=0.78.0",
+        "uvicorn[standard]>=0.17.0",  # Moved to core for easier running
         "pydantic>=1.9.0",
         "requests>=2.28.0",
+        "httpx>=0.23.0",
         "tqdm>=4.64.0",
         "python-dotenv>=0.20.0",
         "numba>=0.55.0",
+        "joblib>=1.1.0",
+        "streamlit>=1.10.0",
     ],
     
     extras_require=EXTRAS,
@@ -86,6 +90,7 @@ setup(
         "console_scripts": [
             "ai-train=scripts.train_save_models:main",
             "ai-benchmark=scripts.run_benchmarks:main",
+            "ai-app=src.production.api:start_server",  # Added entry point for API
         ],
     },
     include_package_data=True,
