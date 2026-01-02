@@ -157,8 +157,11 @@ AI-Mastery-2026/
 │   ├── core/                         # Mathematical foundations
 │   │   ├── __init__.py
 │   │   ├── math_operations.py        # Vector ops, matrix ops, activations
-│   │   ├── optimization.py           # SGD, Adam, gradient methods
-│   │   └── probability.py            # Distributions, sampling, info theory
+│   │   ├── optimization.py           # SGD, Adam, RMSprop, AdaGrad, NAdam, schedulers
+│   │   ├── probability.py            # Distributions, sampling, info theory
+│   │   ├── integration.py            # Newton-Cotes, Gaussian Quadrature, Monte Carlo
+│   │   ├── normalizing_flows.py      # Planar, Radial flows, density estimation
+│   │   └── time_series.py            # EKF, UKF, Particle Filter, RTS smoother
 │   │
 │   ├── ml/                           # Machine Learning
 │   │   ├── __init__.py
@@ -400,53 +403,48 @@ X_reduced = pca(X, n_components=2)
 U, S, Vt = svd(A)
 ```
 
-### 4.2 Optimization (`src/core/optimization.py`)
+### 5.2 Optimization (`src/core/optimization.py`)
 
-**Gradient Descent:**
+**Optimizers:**
 
 ```python
-from src.core.optimization import SGD, Adam
+from src.core.optimization import (
+    GradientDescent, Momentum, Adam, RMSprop, AdaGrad, NAdam
+)
 
-# Stochastic Gradient Descent
-optimizer = SGD(learning_rate=0.01, momentum=0.9)
-
-# Adam optimizer
+# Adam optimizer (OpenAI GPT training)
 optimizer = Adam(learning_rate=0.001, beta1=0.9, beta2=0.999)
+params = optimizer.step(params, gradients)
 
-# Update weights
-weights = optimizer.update(weights, gradients)
+# RMSprop (DeepMind DQN)
+optimizer = RMSprop(learning_rate=0.01, rho=0.9)
+
+# NAdam (Nesterov + Adam)
+optimizer = NAdam(learning_rate=0.001)
 ```
 
-**Regularization:**
+**Learning Rate Schedulers:**
 
 ```python
-from src.core.optimization import l1_regularization, l2_regularization
+from src.core.optimization import (
+    StepDecay, ExponentialDecay, CosineAnnealing, WarmupScheduler
+)
 
-# L1 (Lasso): λ Σ|w|
-l1_penalty = l1_regularization(weights, lambda_=0.01)
+# Warmup for Transformers (BERT, GPT training)
+scheduler = WarmupScheduler(
+    initial_lr=0.001, 
+    warmup_steps=1000, 
+    total_steps=10000
+)
 
-# L2 (Ridge): λ Σw²
-l2_penalty = l2_regularization(weights, lambda_=0.01)
+# Cosine annealing (EfficientNet)
+scheduler = CosineAnnealing(initial_lr=0.1, T_max=100)
 ```
 
-### 4.3 Probability (`src/core/probability.py`)
-
-**Distributions:**
+### 5.3 Probability (`src/core/probability.py`)
 
 ```python
-from src.core.probability import gaussian_pdf, bernoulli, multinomial
-
-# Gaussian PDF
-p = gaussian_pdf(x, mean=0, std=1)
-
-# Sample from distributions
-samples = bernoulli(p=0.5, size=100)
-```
-
-**Information Theory:**
-
-```python
-from src.core.probability import entropy, kl_divergence, mutual_information
+from src.core.probability import entropy, kl_divergence, gaussian_pdf
 
 # Shannon entropy: H(X) = -Σ p(x) log p(x)
 H = entropy(probabilities)
@@ -455,9 +453,90 @@ H = entropy(probabilities)
 kl = kl_divergence(P, Q)
 ```
 
+### 5.4 Time Series & State Estimation (`src/core/time_series.py`)
+
+**Kalman Filters:**
+
+```python
+from src.core.time_series import (
+    ExtendedKalmanFilter, UnscentedKalmanFilter, GaussianState
+)
+
+# Extended Kalman Filter (Tesla FSD, robot localization)
+ekf = ExtendedKalmanFilter(
+    f=dynamics_function,      # x_{t+1} = f(x_t)
+    h=observation_function,   # y_t = h(x_t)
+    F_jacobian=F_jac,         # Jacobian of f
+    H_jacobian=H_jac,         # Jacobian of h
+    Q=process_noise,
+    R=observation_noise
+)
+
+initial_state = GaussianState(mean=np.zeros(4), cov=np.eye(4))
+result = ekf.filter(observations, initial_state)
+# result.means: (T, n) filtered state estimates
+# result.covs: (T, n, n) covariances
+```
+
+**Particle Filter:**
+
+```python
+from src.core.time_series import ParticleFilter
+
+# For multimodal distributions (Waymo localization)
+pf = ParticleFilter(
+    f=dynamics,
+    h=observation,
+    process_noise_sampler=lambda n: np.random.randn(n, 2) * 0.1,
+    observation_log_likelihood=log_likelihood,
+    n_particles=1000
+)
+
+means, variances, ess = pf.filter(observations, initial_particles)
+```
+
+### 5.5 Numerical Integration (`src/core/integration.py`)
+
+```python
+from src.core.integration import (
+    trapezoidal_rule, simpsons_rule,      # Newton-Cotes
+    gauss_legendre, gauss_hermite_expectation,  # Gaussian Quadrature
+    monte_carlo_integrate, importance_sampling   # Monte Carlo
+)
+
+# Trapezoidal rule (Boeing aerodynamics)
+result = trapezoidal_rule(lambda x: x**2, a=0, b=1, n=100)
+
+# Gaussian expectation (BlackRock risk modeling)
+expected = gauss_hermite_expectation(f, mu=0, sigma=1, n_points=10)
+
+# Monte Carlo (Netflix recommendations, CERN particle physics)
+result = monte_carlo_integrate(f, bounds=[(0, 1), (0, 1)], n_samples=10000)
+```
+
+### 5.6 Normalizing Flows (`src/core/normalizing_flows.py`)
+
+```python
+from src.core.normalizing_flows import PlanarFlow, RadialFlow, FlowChain
+
+# Build flow chain (Spotify recommendations, Waymo trajectories)
+flow = FlowChain([
+    PlanarFlow(d=2),
+    RadialFlow(d=2),
+    PlanarFlow(d=2)
+])
+
+# Transform samples
+z = np.random.randn(100, 2)  # Base distribution
+z_transformed, log_det = flow.forward(z)
+
+# Compute log probability
+log_prob = flow.log_prob(z_transformed, base_log_prob=gaussian_base_log_prob)
+```
+
 ---
 
-## 5. Classical Machine Learning
+## 6. Classical Machine Learning
 
 ### 5.1 Linear Regression
 
