@@ -9,8 +9,12 @@ This comprehensive guide covers everything you need to know to use the AI-Master
 1. [Introduction](#1-introduction)
 2. [Installation Guide](#2-installation-guide)
 3. [Project Structure](#3-project-structure)
-4. [Mathematical Foundations](#4-mathematical-foundations) ⭐ NEW
+4. [Mathematical Foundations](#4-mathematical-foundations)
 5. [Core Modules](#5-core-modules)
+   - [Optimization](#52-optimization)
+   - [Time Series](#54-time-series--state-estimation)
+   - [Integration](#55-numerical-integration)
+   - [Normalizing Flows](#56-normalizing-flows)
 6. [Classical Machine Learning](#6-classical-machine-learning)
 7. [Deep Learning](#7-deep-learning)
 8. [LLM Engineering](#8-llm-engineering)
@@ -19,8 +23,9 @@ This comprehensive guide covers everything you need to know to use the AI-Master
 11. [Docker Deployment](#11-docker-deployment)
 12. [Monitoring & Observability](#12-monitoring--observability)
 13. [Testing](#13-testing)
-14. [Troubleshooting](#14-troubleshooting)
-15. [FAQ](#15-faq)
+14. [Interview Preparation](#14-interview-preparation) ⭐ NEW
+15. [Troubleshooting](#15-troubleshooting)
+16. [FAQ](#16-faq)
 
 ---
 
