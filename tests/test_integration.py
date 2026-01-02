@@ -475,5 +475,358 @@ class TestUtilities:
         assert len(results['mean_errors']) == 2
 
 
+# =============================================================================
+# MCMC TESTS
+# =============================================================================
+
+from src.core.mcmc import (
+    metropolis_hastings, HamiltonianMonteCarlo, nuts_sampler,
+    effective_sample_size, gelman_rubin_diagnostic, mcmc_diagnostics,
+    autocorrelation, thinning
+)
+
+
+class TestMetropolisHastings:
+    """Tests for Metropolis-Hastings sampler."""
+    
+    def test_mh_samples_shape(self):
+        """MH should return correct number of samples."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        result = metropolis_hastings(log_prob, np.zeros(2), n_samples=100, n_burnin=10, seed=42)
+        
+        assert result.samples.shape == (100, 2)
+        assert len(result.log_probs) == 100
+    
+    def test_mh_gaussian_mean(self):
+        """MH should estimate mean of standard normal correctly."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        result = metropolis_hastings(log_prob, np.zeros(1), n_samples=5000, n_burnin=1000, seed=42)
+        
+        sample_mean = np.mean(result.samples)
+        assert abs(sample_mean) < 0.1  # Should be close to 0
+    
+    def test_mh_acceptance_rate_reasonable(self):
+        """MH acceptance rate should be in reasonable range."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        result = metropolis_hastings(log_prob, np.zeros(3), n_samples=1000, proposal_std=1.0, seed=42)
+        
+        assert 0.1 < result.acceptance_rate < 0.9
+    
+    def test_mh_diagnostics_computed(self):
+        """MH should compute diagnostics."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        result = metropolis_hastings(log_prob, np.zeros(2), n_samples=500, seed=42)
+        
+        assert 'ess' in result.diagnostics
+        assert 'mean' in result.diagnostics
+        assert len(result.diagnostics['ess']) == 2
+
+
+class TestHamiltonianMonteCarlo:
+    """Tests for HMC sampler."""
+    
+    def test_hmc_samples_shape(self):
+        """HMC should return correct number of samples."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=0.1, n_leapfrog=10)
+        result = hmc.sample(np.zeros(3), n_samples=100, n_burnin=10, seed=42)
+        
+        assert result.samples.shape == (100, 3)
+    
+    def test_hmc_gaussian_variance(self):
+        """HMC should estimate variance of standard normal correctly."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=0.1, n_leapfrog=20)
+        result = hmc.sample(np.zeros(2), n_samples=2000, n_burnin=500, seed=42)
+        
+        sample_var = np.var(result.samples[:, 0])
+        assert 0.8 < sample_var < 1.2  # Should be close to 1
+    
+    def test_hmc_high_acceptance_rate(self):
+        """HMC should have higher acceptance rate than MH."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=0.1, n_leapfrog=10)
+        result = hmc.sample(np.zeros(5), n_samples=500, seed=42)
+        
+        assert result.acceptance_rate > 0.5
+    
+    def test_hmc_step_size_adaptation(self):
+        """HMC should adapt step size during burn-in."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=1.0, n_leapfrog=10)
+        initial_step = hmc.step_size
+        
+        hmc.sample(np.zeros(3), n_samples=100, n_burnin=200, adapt_step_size=True, seed=42)
+        
+        # Step size should have changed
+        assert hmc.step_size != initial_step
+
+
+class TestNUTS:
+    """Tests for No-U-Turn Sampler."""
+    
+    def test_nuts_samples_shape(self):
+        """NUTS should return correct number of samples."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        result = nuts_sampler(
+            log_prob, grad_log_prob, np.zeros(2),
+            n_samples=50, n_burnin=10, max_tree_depth=5, seed=42
+        )
+        
+        assert result.samples.shape == (50, 2)
+    
+    def test_nuts_reasonable_samples(self):
+        """NUTS samples should be reasonable for standard normal."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        result = nuts_sampler(
+            log_prob, grad_log_prob, np.zeros(2),
+            n_samples=200, n_burnin=50, step_size=0.1, seed=42
+        )
+        
+        # Samples should be within reasonable range for N(0,1)
+        assert np.all(np.abs(result.samples) < 5)
+
+
+class TestMCMCDiagnostics:
+    """Tests for MCMC diagnostic functions."""
+    
+    def test_ess_positive(self):
+        """ESS should be positive."""
+        samples = np.random.randn(1000, 3)
+        ess = effective_sample_size(samples)
+        
+        assert np.all(ess > 0)
+        assert len(ess) == 3
+    
+    def test_ess_upper_bound(self):
+        """ESS should be at most n_samples."""
+        samples = np.random.randn(500, 2)
+        ess = effective_sample_size(samples)
+        
+        # ESS can't exceed number of samples
+        assert np.all(ess <= 500)
+    
+    def test_gelman_rubin_converged_chains(self):
+        """R-hat should be close to 1 for converged chains."""
+        # Generate 4 chains from the same distribution
+        chains = [np.random.randn(500, 2) for _ in range(4)]
+        r_hat = gelman_rubin_diagnostic(chains)
+        
+        # For identical distributions, R-hat should be close to 1
+        assert np.all(r_hat < 1.1)
+    
+    def test_autocorrelation_starts_at_one(self):
+        """Autocorrelation at lag 0 should be 1."""
+        samples = np.random.randn(200)
+        acf = autocorrelation(samples, max_lag=50)
+        
+        assert np.isclose(acf[0], 1.0)
+    
+    def test_thinning_reduces_samples(self):
+        """Thinning should reduce number of samples."""
+        samples = np.random.randn(100, 3)
+        thinned = thinning(samples, thin=5)
+        
+        assert thinned.shape == (20, 3)
+    
+    def test_mcmc_diagnostics_structure(self):
+        """MCMC diagnostics should return expected structure."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        result = metropolis_hastings(log_prob, np.zeros(2), n_samples=200, seed=42)
+        
+        diagnostics = mcmc_diagnostics(result, param_names=['x', 'y'])
+        
+        assert 'n_samples' in diagnostics
+        assert 'acceptance_rate' in diagnostics
+        assert 'ess' in diagnostics
+        assert 'x' in diagnostics['ess']
+        assert 'summary' in diagnostics
+
+
+# =============================================================================
+# VARIATIONAL INFERENCE TESTS
+# =============================================================================
+
+from src.core.variational_inference import (
+    GaussianVariational, MeanFieldVI, compute_elbo,
+    BayesianLinearRegressionVI, svgd, VIResult
+)
+
+
+class TestGaussianVariational:
+    """Tests for Gaussian variational family."""
+    
+    def test_gaussian_sample_shape(self):
+        """Samples should have correct shape."""
+        q = GaussianVariational(d=5)
+        samples = q.sample(100)
+        
+        assert samples.shape == (100, 5)
+    
+    def test_gaussian_log_prob_shape(self):
+        """Log prob should have correct shape."""
+        q = GaussianVariational(d=3)
+        z = np.random.randn(10, 3)
+        log_probs = q.log_prob(z)
+        
+        assert log_probs.shape == (10,)
+    
+    def test_gaussian_entropy_positive(self):
+        """Entropy should be positive for reasonable variances."""
+        q = GaussianVariational(d=2, log_std=np.zeros(2))
+        entropy = q.entropy()
+        
+        assert entropy > 0
+    
+    def test_kl_to_standard_normal_zero_at_standard(self):
+        """KL to N(0,I) should be zero when q = N(0,I)."""
+        q = GaussianVariational(d=3, mean=np.zeros(3), log_std=np.zeros(3))
+        kl = q.kl_to_standard_normal()
+        
+        assert np.isclose(kl, 0.0, atol=1e-10)
+    
+    def test_kl_positive_for_different_distribution(self):
+        """KL should be positive for different distributions."""
+        q = GaussianVariational(d=2, mean=np.array([1.0, 2.0]), log_std=np.zeros(2))
+        kl = q.kl_to_standard_normal()
+        
+        assert kl > 0
+
+
+class TestMeanFieldVI:
+    """Tests for Mean-Field Variational Inference."""
+    
+    def test_mfvi_step_updates_params(self):
+        """Single VI step should update parameters."""
+        q = GaussianVariational(d=2)
+        initial_mean = q.mean.copy()
+        
+        log_joint = lambda z: -0.5 * np.sum((z - 1)**2, axis=1)
+        grad_log_joint = lambda z: -(z - 1)
+        
+        vi = MeanFieldVI(q, learning_rate=0.1)
+        vi.step(log_joint, grad_log_joint)
+        
+        # Parameters should have changed
+        assert not np.allclose(q.mean, initial_mean)
+    
+    def test_mfvi_elbo_increases(self):
+        """ELBO should generally increase during optimization."""
+        q = GaussianVariational(d=1)
+        
+        log_joint = lambda z: -0.5 * np.sum(z**2, axis=1)
+        grad_log_joint = lambda z: -z
+        
+        vi = MeanFieldVI(q, learning_rate=0.1, n_samples=50)
+        
+        elbos = []
+        for _ in range(20):
+            elbo = vi.step(log_joint, grad_log_joint)
+            elbos.append(elbo)
+        
+        # Average ELBO in second half should be >= first half
+        assert np.mean(elbos[10:]) >= np.mean(elbos[:10]) - 0.5
+    
+    def test_mfvi_fit_returns_result(self):
+        """Fit should return VIResult with expected fields."""
+        q = GaussianVariational(d=2)
+        
+        log_joint = lambda z: -0.5 * np.sum(z**2, axis=1)
+        grad_log_joint = lambda z: -z
+        
+        vi = MeanFieldVI(q, learning_rate=0.01)
+        result = vi.fit(log_joint, grad_log_joint, n_iterations=50, verbose=False)
+        
+        assert isinstance(result, VIResult)
+        assert len(result.elbo_history) == 50
+        assert 'mean' in result.variational_params
+        assert 'log_std' in result.variational_params
+
+
+class TestBayesianLinearRegression:
+    """Tests for Bayesian Linear Regression with VI."""
+    
+    def test_blr_fit_sets_params(self):
+        """Fit should set mean and covariance."""
+        X = np.random.randn(50, 3)
+        y = X @ np.array([1, 2, 3]) + 0.1 * np.random.randn(50)
+        
+        blr = BayesianLinearRegressionVI()
+        blr.fit(X, y)
+        
+        assert blr.mean is not None
+        assert blr.cov is not None
+        assert blr.mean.shape == (3,)
+        assert blr.cov.shape == (3, 3)
+    
+    def test_blr_predicts_correctly(self):
+        """Predictions should be close to true values."""
+        np.random.seed(42)
+        X = np.random.randn(100, 2)
+        true_w = np.array([1.5, -2.0])
+        y = X @ true_w + 0.1 * np.random.randn(100)
+        
+        blr = BayesianLinearRegressionVI(alpha=0.1, beta=100)
+        blr.fit(X, y)
+        
+        # Check learned weights are close
+        assert np.allclose(blr.mean, true_w, atol=0.2)
+    
+    def test_blr_uncertainty_increases_away_from_data(self):
+        """Predictive uncertainty should be higher for extrapolation."""
+        np.random.seed(42)
+        X_train = np.random.randn(50, 1)  # Training data around 0
+        y_train = 2 * X_train.ravel() + 0.1 * np.random.randn(50)
+        
+        blr = BayesianLinearRegressionVI()
+        blr.fit(X_train, y_train)
+        
+        # Compare uncertainty at 0 vs far from data
+        X_near = np.array([[0.0]])
+        X_far = np.array([[10.0]])
+        
+        _, std_near = blr.predict(X_near)
+        _, std_far = blr.predict(X_far)
+        
+        assert std_far > std_near
+
+
+class TestSVGD:
+    """Tests for Stein Variational Gradient Descent."""
+    
+    def test_svgd_preserves_particle_count(self):
+        """SVGD should preserve number of particles."""
+        log_prob = lambda x: -0.5 * np.sum(x**2)
+        grad_log_prob = lambda x: -x
+        
+        initial = np.random.randn(50, 2)
+        final = svgd(log_prob, grad_log_prob, initial, n_iterations=10)
+        
+        assert final.shape == (50, 2)
+    
+    def test_svgd_moves_toward_mode(self):
+        """Particles should move toward high probability regions."""
+        log_prob = lambda x: -0.5 * np.sum((x - 2)**2)  # Mode at 2
+        grad_log_prob = lambda x: -(x - 2)
+        
+        initial = np.random.randn(30, 1) * 0.1  # Start near 0
+        final = svgd(log_prob, grad_log_prob, initial, n_iterations=100, learning_rate=0.5)
+        
+        # Particles should move toward 2
+        assert np.mean(final) > 1.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

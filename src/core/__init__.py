@@ -30,3 +30,20 @@ from src.core.optimization import (
     CosineAnnealing, WarmupScheduler,
     minimize, lagrange_multipliers, newton_raphson
 )
+
+# MCMC Methods
+from src.core.mcmc import (
+    MCMCResult,
+    metropolis_hastings, HamiltonianMonteCarlo, nuts_sampler,
+    effective_sample_size, gelman_rubin_diagnostic, mcmc_diagnostics,
+    autocorrelation, thinning, trace_plot_data,
+    bayesian_logistic_regression_hmc
+)
+
+# Variational Inference
+from src.core.variational_inference import (
+    VIResult, GaussianVariational,
+    compute_elbo, compute_elbo_gradient,
+    MeanFieldVI, StochasticVI, coordinate_ascent_vi,
+    BayesianLinearRegressionVI, svgd
+)
