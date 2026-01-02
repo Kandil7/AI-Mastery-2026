@@ -11,15 +11,15 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 > **Goal**: Land senior Full Stack AI Engineer role
 
 ### ⚡ Daily Deep Work Ritual
-*   **07:00 - 08:30**: **Block 1 (Core Tech)**
-    *   *Rule*: **Code First**. Open `src/` implementation & `tests/` immediately.
-    *   Run tests to see behavior. Modify code to break/fix it.
-    *   Only consult external docs if stuck for >15 min.
+*   **07:00 - 08:30**: **Top-Down Learning (Context)**
+    *   *Rule*: **Projects First**. Pick the "Shippable Artifact" from `Q1_ROADMAP.md`.
+    *   Example: "I need to build a Linear Algebra library." -> Read about Matrix Multiplication -> Implement `src/core/linear_algebra.py`.
 *   **08:30 - 08:45**: break
-*   **08:45 - 10:15**: **Block 2 (Application/Project)**
-    *   Build the weekly "Artifact" (e.g., API endpoint, UI, Pipeline).
-    *   Focus on "Definition of Done".
-*   **Closing Ritual**: Log entry in `docs/LEARNING_LOG.md`. progress, push to GitHub
+*   **08:45 - 10:15**: **Bottom-Up Construction (Code)**
+    *   Write the 'Core Algorithm' from scratch (no libraries).
+    *   Write unit tests to verify your math.
+    *   **Focus**: 1 Unit of Progress (1 feature/algo working).
+*   **Closing Ritual**: Log entry in `docs/LEARNING_LOG.md`, push to GitHub.
 
 ### Weekly Review (Sunday, 30 min)
 - [ ] What shipped this week? (commit count, files changed)
