@@ -157,6 +157,7 @@ curl http://localhost:8000/health
 | Notebook | Description | Topics |
 |----------|-------------|--------|
 | [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) | **Deep Mathematical Foundations** (96KB, 61 cells) | Linear Algebra, Calculus, Optimization, Probability, Bayesian Optimization |
+| [modern_integration_methods.ipynb](notebooks/01_mathematical_foundations/modern_integration_methods.ipynb) | **Modern Integration Methods** | Newton-Cotes, Gaussian Quadrature, Monte Carlo, Normalizing Flows, Time Series |
 | [mlops_end_to_end.ipynb](research/mlops_end_to_end.ipynb) | Complete MLOps Demo | Training, Deployment, Monitoring |
 
 
