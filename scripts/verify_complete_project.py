@@ -41,16 +41,18 @@ def run_all_tests():
     
     def test_mcmc():
         from src.core.mcmc import metropolis_hastings
+        import numpy as np
         samples = metropolis_hastings(
-            log_prob=lambda x: -0.5 * x**2,
-            initial_state=0.0,
+            log_prob=lambda x: -0.5 * np.sum(x**2),
+            initial_state=np.array([0.0]),
             n_samples=100
         )
         assert len(samples.samples) == 100
     
     def test_vi():
-        from src.core.variational_inference import MeanFieldVI
-        vi = MeanFieldVI(dim=2)
+        from src.core.variational_inference import MeanFieldVI, GaussianVariational
+        q = GaussianVariational(d=2)
+        vi = MeanFieldVI(variational=q)
         assert vi is not None
     
     if test_module("Integration", test_integration): results['passed'] += 1
@@ -93,8 +95,8 @@ def run_all_tests():
         assert 0.2 < result < 0.5
     
     def test_ppl():
-        from src.core.ppl_integration import BayesianRegression
-        model = BayesianRegression('custom')
+        from src.core.ppl_integration import NumpyMCMCRegression
+        model = NumpyMCMCRegression()
         assert model is not None
     
     def test_adaptive():
