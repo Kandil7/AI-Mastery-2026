@@ -9,9 +9,9 @@ def debug_module(name, import_func):
     print(f"\nTesting {name}...")
     try:
         import_func()
-        print(f"✅ {name} SUCCESS")
+        print(f"[OK] {name} SUCCESS")
     except Exception:
-        print(f"❌ {name} FAILED")
+        print(f"[FAIL] {name} FAILED")
         traceback.print_exc()
 
 def test_mcmc():
