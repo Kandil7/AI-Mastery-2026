@@ -6,6 +6,35 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 
 ---
 
+## 🧠 Daily Deep Work Ritual (Q1 2026)
+
+> **Goal**: Land senior Full Stack AI Engineer role
+
+### ⚡ Daily Deep Work Ritual
+*   **07:00 - 08:30**: **Block 1 (Core Tech)**
+    *   *Rule*: **Code First**. Open `src/` implementation & `tests/` immediately.
+    *   Run tests to see behavior. Modify code to break/fix it.
+    *   Only consult external docs if stuck for >15 min.
+*   **08:30 - 08:45**: break
+*   **08:45 - 10:15**: **Block 2 (Application/Project)**
+    *   Build the weekly "Artifact" (e.g., API endpoint, UI, Pipeline).
+    *   Focus on "Definition of Done".
+*   **Closing Ritual**: Log entry in `docs/LEARNING_LOG.md`. progress, push to GitHub
+
+### Weekly Review (Sunday, 30 min)
+- [ ] What shipped this week? (commit count, files changed)
+- [ ] What blocked progress?
+- [ ] Single focus for next week?
+- [ ] Update `INTERVIEW_TRACKER.md`
+
+### Entry Ritual
+1. Same time, same place
+2. Notifications off (phone on DND)
+3. Only these tabs open: VS Code, Terminal, AI-Mastery-2026
+4. Start with: `git status` → review `Q1_ROADMAP.md` → pick first task
+
+---
+
 ### Phase 1: Foundational Backend and MLOps Integration ✅
 
 - [x] **Task 1.1: Integrate a Real Pre-trained Model**
@@ -98,7 +127,35 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 | Phase 2: RAG App | 4 | ✅ Complete |
 | Phase 3: AI | 3 | ✅ Complete |
 | Phase 4: Docs | 3 | ✅ Complete |
-| **Total** | **14** | ✅ **All Complete** |
+| **Phase 5: Enhancements** | **4** | ✅ **Complete** |
+| **Total** | **18** | ✅ **All Complete** |
+
+### Phase 5: Project Enhancements (New) ✅
+
+- [x] **Time Series Module** (`src/core/time_series.py`)
+    - Extended Kalman Filter (EKF)
+    - Unscented Kalman Filter (UKF)
+    - Particle Filter (Sequential Monte Carlo)
+    - RTS Smoother
+    - Comprehensive tests in `tests/test_time_series.py`
+
+- [x] **Optimization Expansion** (`src/core/optimization.py`)
+    - RMSprop, AdaGrad, NAdam optimizers
+    - Learning rate schedulers (StepDecay, ExponentialDecay, CosineAnnealing, Warmup)
+    - Industrial use cases and interview questions
+
+- [x] **Modern Integration Methods** (`notebooks/01_mathematical_foundations/`)
+    - Newton-Cotes quadrature
+    - Gaussian Quadrature (Gauss-Hermite, Gauss-Legendre)
+    - Monte Carlo Integration
+    - Normalizing Flows (Planar, Radial)
+
+- [x] **Interview Preparation Guide** (`docs/INTERVIEW_PREP.md`)
+    - ML fundamentals Q&A
+    - Deep learning and Transformers
+    - LLM engineering and RAG
+    - System design scenarios
+    - Behavioral interview tips
 
 ## Git Commits
 
@@ -108,3 +165,6 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 4. `feat: add SVM, LSTM, Conv2D, MaxPool2D, Flatten layers with tests`
 5. `docs: add capstone project guide and update dependencies`
 6. `docs: add comprehensive user guide and MLOps notebook`
+7. `feat: add time series module (EKF, UKF, Particle Filter)`
+8. `feat: expand optimization module with schedulers`
+9. `docs: add interview preparation guide`

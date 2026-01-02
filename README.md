@@ -157,6 +157,8 @@ curl http://localhost:8000/health
 | Notebook | Description | Topics |
 |----------|-------------|--------|
 | [deep_ml_mathematics_complete.ipynb](notebooks/01_mathematical_foundations/deep_ml_mathematics_complete.ipynb) | **Deep Mathematical Foundations** (96KB, 61 cells) | Linear Algebra, Calculus, Optimization, Probability, Bayesian Optimization |
+| [modern_integration_methods.ipynb](notebooks/01_mathematical_foundations/modern_integration_methods.ipynb) | **Modern Integration Methods** | Newton-Cotes, Gaussian Quadrature, Monte Carlo, Normalizing Flows |
+| [advanced_integration_mcmc_vi.ipynb](notebooks/01_mathematical_foundations/advanced_integration_mcmc_vi.ipynb) | **Advanced MCMC & Variational Inference** ⭐ | Metropolis-Hastings, HMC, NUTS, Mean-Field VI, SVGD, Case Studies |
 | [mlops_end_to_end.ipynb](research/mlops_end_to_end.ipynb) | Complete MLOps Demo | Training, Deployment, Monitoring |
 
 
@@ -166,16 +168,82 @@ curl http://localhost:8000/health
 
 From-scratch implementations of fundamental operations:
 
+#### Math Operations
 ```python
 from src.core.math_operations import (
-    dot_product, matrix_multiply, matrix_inverse,
-    sigmoid, relu, softmax, tanh,
-    cross_entropy, mse, pca, svd
+    matrix_multiply, matrix_inverse, sigmoid, relu, softmax, pca, svd
 )
 
-# Example: PCA from scratch
-from src.core.math_operations import pca
-X_reduced = pca(X, n_components=2)
+X_reduced = pca(X, n_components=2)  # Dimensionality reduction
+```
+
+#### Time Series & State Estimation
+```python
+from src.core.time_series import (
+    ExtendedKalmanFilter, UnscentedKalmanFilter, ParticleFilter, rts_smoother
+)
+
+# Create EKF for nonlinear system tracking (Tesla FSD, Boston Dynamics)
+ekf = ExtendedKalmanFilter(f, h, F_jacobian, H_jacobian, Q, R)
+result = ekf.filter(observations, initial_state)
+```
+
+#### Numerical Integration
+```python
+from src.core.integration import (
+    trapezoidal_rule, simpsons_rule, gauss_legendre, gauss_hermite_expectation,
+    monte_carlo_integrate, importance_sampling, BayesianQuadrature
+)
+
+# Monte Carlo for high-dimensional integrals (Netflix, CERN)
+result = monte_carlo_integrate(f, bounds, n_samples=10000)
+```
+
+#### Normalizing Flows
+```python
+from src.core.normalizing_flows import PlanarFlow, RadialFlow, FlowChain
+
+# Density estimation (Spotify recommendations, Waymo trajectory)
+flow = FlowChain([PlanarFlow(d=2), RadialFlow(d=2)])
+z_new, log_det = flow.forward(z)
+```
+
+#### MCMC Methods
+```python
+from src.core.mcmc import (
+    metropolis_hastings, HamiltonianMonteCarlo, nuts_sampler,
+    effective_sample_size, gelman_rubin_diagnostic
+)
+
+# Bayesian inference with HMC (Airbnb pricing, Uber demand)
+hmc = HamiltonianMonteCarlo(log_prob, grad_log_prob, step_size=0.1, n_leapfrog=10)
+result = hmc.sample(initial_state, n_samples=5000)
+print(f"ESS: {result.diagnostics['ess']}, Acceptance: {result.acceptance_rate:.2%}")
+```
+
+#### Variational Inference
+```python
+from src.core.variational_inference import (
+    GaussianVariational, MeanFieldVI, BayesianLinearRegressionVI, svgd
+)
+
+# Fast Bayesian inference with VI (Netflix, Spotify)
+q = GaussianVariational(d=10)
+vi = MeanFieldVI(q, learning_rate=0.01)
+result = vi.fit(log_joint, grad_log_joint, n_iterations=1000)
+print(f"Posterior mean: {q.mean}, std: {q.std}")
+```
+
+#### Optimization Algorithms
+```python
+from src.core.optimization import (
+    Adam, RMSprop, AdaGrad, NAdam,
+    CosineAnnealing, WarmupScheduler
+)
+
+# Adam with warmup (for Transformers, GPT training)
+optimizer = Adam(learning_rate=0.001)
+scheduler = WarmupScheduler(initial_lr=0.001, warmup_steps=1000, total_steps=10000)
 ```
 
 ### 🤖 Classical Machine Learning (`src/ml/classical.py`)
@@ -533,13 +601,19 @@ Start with our comprehensive mathematics notebook that covers the theoretical fo
 | `medical_diagnosis_agent/` | AI diagnostic agent |
 | `supply_chain_optimization/` | LP, MILP, demand forecasting |
 
-### Interview Preparation (`interviews/`)
+### Interview Preparation
 
-| Category | Files |
-|----------|-------|
-| **ML Theory** | deep_learning, optimization, model_evaluation |
-| **Coding** | ml_algorithms, data_structures |
-| **System Design** | llm_infrastructure, rag_system, fraud_detection |
+📓 **Comprehensive Guide**: [docs/INTERVIEW_PREP.md](docs/INTERVIEW_PREP.md)
+
+| Section | Topics |
+|---------|--------|
+| **ML Fundamentals** | Bias-variance, regularization (L1/L2), optimization |
+| **Deep Learning** | Backpropagation, attention, Transformers |
+| **LLM Engineering** | RAG, LoRA, chunking strategies |
+| **System Design** | Recommendation systems, fraud detection |
+| **Behavioral** | STAR method, handling ambiguity |
+
+**Also see:** `interviews/` directory for additional question banks.
 
 ---
 
