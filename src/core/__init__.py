@@ -40,6 +40,15 @@ from src.core.mcmc import (
     bayesian_logistic_regression_hmc
 )
 
+# Advanced Integration
+from src.core.advanced_integration import (
+    NeuralODE,
+    ODEFunc,
+    MultiModalIntegrator,
+    FederatedIntegrator,
+    biased_lending_simulation
+)
+
 # Variational Inference
 from src.core.variational_inference import (
     VIResult, GaussianVariational,
