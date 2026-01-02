@@ -73,10 +73,13 @@ def run_all_tests():
     # =========================================================================
     print("\n[Phase 3-8] Advanced Integration...")
     
+    print("\n[Phase 3-8] Advanced Integration...")
+    
     def test_advanced():
-        from src.core.advanced_integration import NeuralODE, MultiModalIntegrator
-        ode = NeuralODE(state_dim=2, hidden_dim=16)
-        mmi = MultiModalIntegrator()
+        from src.core.advanced_integration import NeuralODE, MultiModalIntegrator, ODEFunc
+        func = ODEFunc(dim=2, hidden_dim=16)
+        ode = NeuralODE(func=func)
+        mmi = MultiModalIntegrator(clinical_dim=5, xray_dim=3, text_dim=4)
         assert ode is not None and mmi is not None
     
     if test_module("Advanced Integration", test_advanced): results['passed'] += 1
@@ -91,8 +94,8 @@ def run_all_tests():
     
     def test_hardware():
         from src.core.hardware_accelerated_integration import monte_carlo_cpu
-        result = monte_carlo_cpu(lambda x: x**2, 1000)
-        assert 0.2 < result < 0.5
+        estimate, error = monte_carlo_cpu(lambda x: x**2, a=0, b=1, n_samples=1000)
+        assert 0.2 < estimate < 0.5
     
     def test_ppl():
         from src.core.ppl_integration import NumpyMCMCRegression
@@ -103,7 +106,8 @@ def run_all_tests():
         from src.core.adaptive_integration import AdaptiveIntegrator
         integrator = AdaptiveIntegrator()
         result = integrator.integrate(lambda x: x**2, 0, 1)
-        assert 0.3 < result['result'] < 0.4
+        # Result is an object, access .estimate
+        assert 0.3 < result.estimate < 0.4
     
     if test_module("Hardware Acceleration", test_hardware): results['passed'] += 1
     else: 
