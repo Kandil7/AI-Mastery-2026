@@ -11,7 +11,10 @@
 
 **A comprehensive AI Engineer Toolkit built from first principles**
 
-[Quick Start](#quick-start) • [Benchmarks](#-performance-benchmarks) • [Documentation](#documentation) • [Features](#features) • [Architecture](#architecture)
+**A comprehensive AI Engineer Toolkit built from first principles**
+
+[Quick Start](#quick-start) • [Benchmarks](#-performance-benchmarks) • [Documentation](#documentation) • [Features](#features) • [Week 1 Sprint](#-week-1-sprint-rag--production) • [Architecture](#architecture)
+
 
 </div>
 
@@ -77,7 +80,9 @@ AI-Mastery-2026 is a production-ready AI engineering toolkit that follows the **
 - 🧠 **Deep Learning** - Dense, LSTM, Conv2D layers with backpropagation
 - 🔤 **LLM Engineering** - Attention, RAG, LoRA fine-tuning, Agents
 - 🚀 **Production** - FastAPI, Docker, Prometheus, Grafana
+- 📅 **Week 1 Sprint** - RAG Pipeline, Full Stack App, Evaluation Framework
 - 📚 **17-Week Learning Program** - Jupyter notebooks for structured learning
+
 
 ---
 
@@ -370,6 +375,20 @@ streamlit run app/main.py
 ```
 
 ---
+
+## 📅 Week 1 Sprint: RAG & Production
+
+We have successfully completed the first sprint focused on **Production RAG**:
+
+1.  **Hybrid Retrieval**: Combined Dense (Search) and Sparse (BM25) retrieval using `HybridRetriever`.
+2.  **RAG Evaluation**: Built a pipeline (`RAGEvaluator`) measuring faithfulness, answer relevance, and context precision.
+3.  **Full Stack App**:
+    *   **Backend**: FastAPI serving RAG endpoints.
+    *   **Frontend**: Streamlit UI for chat and document ingestion.
+4.  **Stress Testing**: Verified system stability under load (50+ concurrent users).
+
+---
+
 
 ## 🏗️ Architecture
 
