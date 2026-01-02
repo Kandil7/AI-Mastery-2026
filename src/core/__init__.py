@@ -68,7 +68,7 @@ from src.core.ppl_integration import (
     PYMC_AVAILABLE, TFP_AVAILABLE
 )
 from src.core.adaptive_integration import (
-    AdaptiveIntegrator, FunctionCharacteristics
+    AdaptiveIntegrator, FunctionFeatures
 )
 
 # Phase 10: RL Integration and Causal Inference
@@ -93,5 +93,5 @@ from src.core.differential_privacy import (
     PrivacyBudget, PrivateEstimate
 )
 from src.core.energy_efficient import (
-    EnergyEfficientIntegrator, DeviceProfile, IntegrationResult, DEVICE_PROFILES
+    EnergyEfficientIntegrator, DeviceProfile, DEVICE_PROFILES
 )
