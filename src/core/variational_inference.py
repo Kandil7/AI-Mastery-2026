@@ -290,9 +290,9 @@ def compute_elbo_gradient(
     # Gradient w.r.t. mean: E[∇_z log p(z,x)]
     grad_mean = np.mean(grad_values, axis=0)
     
-    # Gradient w.r.t. log_std: E[∇_z log p(z,x) * ε * σ] - 1
-    # The -1 comes from the entropy gradient
-    grad_log_std = np.mean(grad_values * eps * std, axis=0) - 1
+    # Gradient w.r.t. log_std: E[∇_z log p(z,x) * ε * σ] + 1
+    # The +1 comes from the entropy gradient (H = log σ + c, ∇ H = 1)
+    grad_log_std = np.mean(grad_values * eps * std, axis=0) + 1
     
     # ELBO estimate
     log_q = variational.log_prob(z)
