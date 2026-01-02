@@ -64,7 +64,8 @@ from src.core.hardware_accelerated_integration import (
     NUMBA_AVAILABLE, TORCH_AVAILABLE
 )
 from src.core.ppl_integration import (
-    BayesianRegression, PPLComparison
+    BayesianRegressionBase, NumpyMCMCRegression, PPLResult,
+    PYMC_AVAILABLE, TFP_AVAILABLE
 )
 from src.core.adaptive_integration import (
     AdaptiveIntegrator, FunctionCharacteristics
