@@ -539,7 +539,80 @@ z_transformed, log_det = flow.forward(z)
 log_prob = flow.log_prob(z_transformed, base_log_prob=gaussian_base_log_prob)
 ```
 
+### 5.7 MCMC & Variational Inference (`src/core/mcmc.py`, `src/core/variational_inference.py`)
+
+**MCMC Sampling:**
+
+```python
+from src.core.mcmc import metropolis_hastings, HamiltonianMonteCarlo
+
+# Metropolis-Hastings
+samples, acceptance_rate = metropolis_hastings(
+    log_prob_func, initial_state=0.0, n_samples=1000, step_size=0.5
+)
+
+# Hamiltonian Monte Carlo (NUTS)
+hmc = HamiltonianMonteCarlo(log_prob_func, grad_log_prob_func)
+result = hmc.sample(initial_state, n_samples=1000)
+print(f"ESS: {result.ess}")
+```
+
+**Variational Inference:**
+
+```python
+from src.core.variational_inference import MeanFieldVI, GaussianVariational
+
+# Define variational family
+variational_dist = GaussianVariational(dim=2)
+
+# Run optimization (VI)
+vi = MeanFieldVI(
+    log_prob_func=target_log_prob,
+    variational_family=variational_dist,
+    n_samples=10
+)
+result = vi.optimize(n_iterations=2000, learning_rate=0.01)
+```
+
+### 5.8 Advanced Deep Integration (`src/core/advanced_integration.py`)
+
+**Neural ODEs:**
+
+```python
+from src.core.advanced_integration import NeuralODE, ODEFunc
+import torch
+
+# Define dynamics and model
+func = ODEFunc(dim=2)
+model = NeuralODE(func)
+
+# Integrate trajectory with uncertainty
+mean, std, _ = model.integrate_with_uncertainty(x0, t_span)
+```
+
+**Federated Integration:**
+
+```python
+from src.core.advanced_integration import FederatedIntegrator
+
+# Combine risk estimates from multiple hospitals
+hospitals = [{'local_risk': 0.2, 'local_uncertainty': 0.05, 'sample_size': 100}, ...]
+integrator = FederatedIntegrator(hospitals)
+global_risk, global_unc = integrator.bayesian_weighting(hospitals)
+```
+
+**De-Biasing Integration:**
+
+```python
+from src.core.advanced_integration import biased_lending_simulation
+
+# Simulate and analyze bias in integrated decision systems
+results = biased_lending_simulation(n_samples=5000)
+# Returns sensitive_attr, approved, true_worth, perceived_worth
+```
+
 ---
+
 
 ## 6. Classical Machine Learning
 
