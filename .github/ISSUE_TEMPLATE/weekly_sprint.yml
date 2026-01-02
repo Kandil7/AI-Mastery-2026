@@ -1,0 +1,57 @@
+name: 📅 Weekly Sprint
+description: Track weekly learning sprint with concrete deliverables
+title: "[Sprint] Week X: [Focus Area]"
+labels: ["sprint", "q1-2026"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Weekly Sprint Template
+        Break down into 2-3 hour tasks. No "study Chapter X" - only build/implement.
+
+  - type: input
+    id: week-goal
+    attributes:
+      label: 🎯 Week Goal
+      description: One sentence describing the main deliverable
+      placeholder: "Build and deploy RAG system with evaluation metrics"
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: ✅ Tasks (2-3 hours each)
+      description: Concrete implementation tasks
+      value: |
+        - [ ] Task 1: [Description] (2h)
+        - [ ] Task 2: [Description] (2h)
+        - [ ] Task 3: [Description] (3h)
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: 📦 Deliverable
+      description: What ships at end of week?
+      value: |
+        - [ ] Code pushed to repo
+        - [ ] README with architecture diagram
+        - [ ] Tests passing
+        - [ ] Demo/notebook working
+    validations:
+      required: true
+
+  - type: input
+    id: interview-question
+    attributes:
+      label: 🎤 Interview Prep Tie-in
+      description: One interview question this week's work helps answer
+      placeholder: "Design a RAG system for 10K documents"
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: 🚧 Blockers / Notes
+      description: Any obstacles or context

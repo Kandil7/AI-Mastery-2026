@@ -167,6 +167,36 @@ def run_all_tests():
     else: results['failed'] += 1
     
     # =========================================================================
+    # Phase 13: Q1 2026 Optimization & Sprints (New)
+    # =========================================================================
+    print("\n[Phase 13] Q1 2026 Sprint Optimization...")
+    
+    def test_sprint_structure():
+        import os
+        required_paths = [
+            "Q1_ROADMAP.md",
+            "docs/LEARNING_LOG.md",
+            "docs/BACKLOG.md",
+            "sprints/week01_rag_production/README.md",
+            "sprints/week01_rag_production/api.py",
+            "sprints/week01_rag_production/ui.py",
+            "sprints/week01_rag_production/stress_test.py",
+            "sprints/week01_rag_production/notebooks/day2_eval_pipeline.ipynb"
+        ]
+        
+        missing = []
+        for p in required_paths:
+            if not os.path.exists(p):
+                missing.append(p)
+        
+        if missing:
+            raise FileNotFoundError(f"Missing optimization files: {missing}")
+        return True
+
+    if test_module("Sprint Structure", test_sprint_structure): results['passed'] += 1
+    else: results['failed'] += 1
+    
+    # =========================================================================
     # Summary
     # =========================================================================
     print("\n" + "=" * 70)

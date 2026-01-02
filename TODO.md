@@ -6,6 +6,35 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 
 ---
 
+## 🧠 Daily Deep Work Ritual (Q1 2026)
+
+> **Goal**: Land senior Full Stack AI Engineer role
+
+### ⚡ Daily Deep Work Ritual
+*   **07:00 - 08:30**: **Block 1 (Core Tech)**
+    *   *Rule*: **Code First**. Open `src/` implementation & `tests/` immediately.
+    *   Run tests to see behavior. Modify code to break/fix it.
+    *   Only consult external docs if stuck for >15 min.
+*   **08:30 - 08:45**: break
+*   **08:45 - 10:15**: **Block 2 (Application/Project)**
+    *   Build the weekly "Artifact" (e.g., API endpoint, UI, Pipeline).
+    *   Focus on "Definition of Done".
+*   **Closing Ritual**: Log entry in `docs/LEARNING_LOG.md`. progress, push to GitHub
+
+### Weekly Review (Sunday, 30 min)
+- [ ] What shipped this week? (commit count, files changed)
+- [ ] What blocked progress?
+- [ ] Single focus for next week?
+- [ ] Update `INTERVIEW_TRACKER.md`
+
+### Entry Ritual
+1. Same time, same place
+2. Notifications off (phone on DND)
+3. Only these tabs open: VS Code, Terminal, AI-Mastery-2026
+4. Start with: `git status` → review `Q1_ROADMAP.md` → pick first task
+
+---
+
 ### Phase 1: Foundational Backend and MLOps Integration ✅
 
 - [x] **Task 1.1: Integrate a Real Pre-trained Model**
