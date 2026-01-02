@@ -24,8 +24,9 @@ This comprehensive guide covers everything you need to know to use the AI-Master
 12. [Monitoring & Observability](#12-monitoring--observability)
 13. [Testing](#13-testing)
 14. [Interview Preparation](#14-interview-preparation) ⭐ NEW
-15. [Troubleshooting](#15-troubleshooting)
-16. [FAQ](#16-faq)
+16. [Troubleshooting](#16-troubleshooting)
+17. [FAQ](#17-faq)
+
 
 ---
 
@@ -109,7 +110,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Step 5: Verify installation
+# Step 5: Verify installation
 python -c "from src.ml.classical import SVMScratch; print('✅ Installation successful!')"
+
+# Note: This will generate 'models/models_metadata.json' used for validation
+python scripts/train_save_models.py
+
 ```
 
 ### 2.3 Using Make
@@ -1742,7 +1748,18 @@ class TestSVMScratch:
 
 ---
 
-## 13. Troubleshooting
+## 15. Troubleshooting
+
+### 15.1 Docker Image Name Issues
+If you encounter `invalid character` errors during Docker build/push, ensure your GitHub repository name does not contain uppercase letters when used as an image tag. The CI/CD pipeline handles this automatically by lowercasing the `IMAGE_NAME`.
+
+### 15.2 Model Validation Failures
+If `scripts/train_save_models.py` runs but CI fails on validation:
+- Ensure `models_metadata.json` contains `test_accuracy` (for classifiers) or `test_r2` (for regressors).
+- The validation script applies different thresholds: 0.80 for general models, 0.65 for Logistic Regression, and 0.60 for Regressors.
+
+### 15.3 Import Errors (Legacy Modules)
+If you see `ImportError: cannot import name 'DataType'`, ensuring you are running from the project root. The `sys.path` is automatically adjusted in scripts, but manual execution might require `export PYTHONPATH=$PYTHONPATH:.`.
 
 ### Common Issues
 
@@ -1813,7 +1830,7 @@ docker-compose up -d postgres
 
 ---
 
-## 14. FAQ
+## 16. FAQ
 
 **Q: Can I use this for production?**
 A: Yes! The toolkit includes production-ready components (FastAPI, Docker, monitoring). However, review security settings before deploying to public environments.
