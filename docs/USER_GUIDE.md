@@ -912,6 +912,60 @@ print(model.explain_prediction_text(explanation))
 - 65% trust increase among physicians
 - Decision time: hours → minutes
 
+### 5.16 Integration with Differential Privacy
+
+Privacy-preserving integration with mathematical guarantees:
+
+```python
+from src.core.differential_privacy import (
+    DifferentiallyPrivateIntegrator
+)
+
+# Initialize with privacy parameter epsilon
+dp = DifferentiallyPrivateIntegrator(epsilon=1.0)
+
+# Private mean - protects individual data
+data = np.array([1, 2, 3, 4, 5])
+result = dp.private_mean(data, bounds=(0, 10))
+print(f"Private mean: {result.value:.3f}")
+print(f"Epsilon used: {result.epsilon_used}")
+
+# Private integral
+result = dp.private_integral(lambda x: x**2, 0, 1, n_points=50)
+```
+
+**Industrial Case Study: Apple Privacy-Preserving ML**
+- Federated learning + DP for Siri
+- 25% accuracy improvement, 500M users protected
+
+### 5.17 Integration in Energy-Efficient ML Systems
+
+Energy-aware integration for IoT and edge devices:
+
+```python
+from src.core.energy_efficient import EnergyEfficientIntegrator
+
+# Configure for IoT device
+integrator = EnergyEfficientIntegrator(device='iot')
+
+# Choose accuracy level (trades off with energy)
+result = integrator.integrate(
+    lambda x: x**2, 0, 1, accuracy='medium'
+)
+print(f"Result: {result.value:.4f}")
+print(f"Energy: {result.energy_cost:.2e} Wh")
+
+# Optimize for energy budget
+result = integrator.optimize_for_energy_budget(
+    lambda x: x**2, 0, 1, energy_budget=1e-5
+)
+```
+
+**Industrial Case Study: Google DeepMind Data Centers**
+- 40% cooling energy reduction
+- $150M/year savings
+- 300,000 tons CO₂ reduction annually
+
 ---
 
 

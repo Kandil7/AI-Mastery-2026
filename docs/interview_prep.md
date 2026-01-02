@@ -558,3 +558,37 @@ def approx_shap(model, x, j, background, n=100):
     return np.mean(contributions)
 ```
 
+---
+
+## 🔒 Differential Privacy
+
+**Q: What is the privacy-accuracy tradeoff?**
+
+Lower ε = stronger privacy, more noise:
+- ε = 0.1: Very private, ~30% error
+- ε = 1.0: Good balance, ~10% error
+- ε = 10: Low privacy, <1% error
+
+**Q: Laplace vs Gaussian mechanism?**
+
+- **Laplace**: Pure ε-DP, good for single queries
+- **Gaussian**: (ε,δ)-DP, better composition for multiple queries
+
+---
+
+## ⚡ Energy-Efficient Integration
+
+**Q: Best method for IoT devices?**
+
+1. **Gauss-Legendre (n=3-5)**: Minimal evals, good for smooth functions
+2. **Sparse Grid**: High dimensions
+3. **Adaptive**: When accuracy is critical
+
+**Q: Energy model for integration?**
+
+```python
+E_total = E_compute + E_memory + E_comm
+# IoT: ~0.1W compute, 0.05W memory
+# Mobile: ~1W compute, 0.3W memory
+```
+
