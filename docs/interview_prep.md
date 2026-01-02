@@ -513,3 +513,48 @@ def trim_propensity_scores(ps, min_val=0.05, max_val=0.95):
 
 We can never observe both Y(1) AND Y(0) for the same individual. This is a missing data problem - we use statistical assumptions (ignorability, overlap) to estimate effects.
 
+---
+
+## 📊 Graph Neural Networks
+
+### Bayesian GNNs
+
+**Q: How does uncertainty propagate in Bayesian GNNs?**
+
+Uncertainty propagates through message passing:
+1. Each layer samples weights from variational posterior
+2. Neighbor aggregation combines uncertainties
+3. Output uncertainty reflects both structure and weight uncertainty
+
+**Q: What is the aggregation formula in GCN?**
+
+$$h_v^{(k)} = \sigma\left(W \cdot \text{AGGREGATE}(\{h_u^{(k-1)} : u \in \mathcal{N}(v) \cup \{v\}\})\right)$$
+
+---
+
+## 🔍 Explainable AI (XAI)
+
+### SHAP Values
+
+**Q: Why is SHAP preferred over feature importance?**
+
+SHAP provides:
+1. **Local explanations**: Per-prediction contributions
+2. **Consistent**: Satisfies game-theoretic fairness
+3. **Additive**: Contributions sum to prediction
+
+**Q: Approximate SHAP for one feature.**
+
+```python
+def approx_shap(model, x, j, background, n=100):
+    contributions = []
+    for _ in range(n):
+        coalition = np.random.binomial(1, 0.5, len(x)).astype(bool)
+        coalition[j] = False
+        bg = background[np.random.randint(len(background))]
+        x_without = bg.copy(); x_without[coalition] = x[coalition]
+        x_with = x_without.copy(); x_with[j] = x[j]
+        contributions.append(model.predict(x_with) - model.predict(x_without))
+    return np.mean(contributions)
+```
+

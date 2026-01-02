@@ -848,10 +848,75 @@ het_analysis = causal.analyze_heterogeneous_effects(
 - 40% campaign reduction, same conversions
 - $100M/year savings
 
+### 5.14 Integration in Graph Neural Networks
+
+Bayesian GNNs for uncertainty-aware graph learning:
+
+```python
+from src.core.gnn_integration import (
+    BayesianGCN,
+    generate_synthetic_graph
+)
+
+# Generate graph data
+graph = generate_synthetic_graph(num_nodes=200, num_classes=3)
+
+# Create Bayesian GCN with uncertainty
+model = BayesianGCN(
+    input_dim=graph.num_features,
+    hidden_dim=32,
+    output_dim=3,
+    num_samples=10  # Monte Carlo samples for uncertainty
+)
+
+# Train and evaluate
+losses = model.train_step(graph, num_epochs=50)
+metrics = model.evaluate(graph)
+print(f"Test Accuracy: {metrics['test_accuracy']:.2%}")
+print(f"Confident Prediction Accuracy: {metrics['confident_accuracy']:.2%}")
+
+# Get predictions with uncertainty
+prediction = model.predict(graph)
+high_uncertainty_nodes = np.argsort(prediction.uncertainty)[-5:]
+```
+
+**Industrial Case Study: Meta Social Graph**
+- Bayesian GNNs for fraud detection
+- 42% fraud reduction, 28% engagement increase
+
+### 5.15 Integration for Explainable AI (XAI)
+
+SHAP-based model interpretability:
+
+```python
+from src.core.explainable_ai import ExplainableModel
+
+# Create explainable model
+model = ExplainableModel(model_type='random_forest')
+
+# Generate medical data
+data = model.generate_medical_data(n_samples=500)
+model.train(data['X'], data['y'], data['feature_names'])
+
+# Global feature importance
+global_exp = model.get_global_importance(data['X'])
+print("Top features:", list(global_exp.feature_importance.keys())[:3])
+
+# Local explanation for one patient
+explanation = model.predict_with_explanation(data['X'][:1])[0]
+print(model.explain_prediction_text(explanation))
+```
+
+**Industrial Case Study: IBM Watson for Oncology**
+- SHAP + Bayesian uncertainty for cancer treatment
+- 65% trust increase among physicians
+- Decision time: hours → minutes
+
 ---
 
 
 ## 6. Classical Machine Learning
+
 
 
 
