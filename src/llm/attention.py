@@ -507,16 +507,25 @@ class AttentionWithRoPE(nn.Module):
         # x: (batch_size, seq_len, num_heads, d_k)
         # positions: (batch_size, seq_len)
         
-        # Get sinusoidal positions
-        freqs = torch.einsum("i, j -> ij", positions.to(self.inv_freq.dtype), self.inv_freq)
-        emb = torch.cat((freqs, freqs), dim=-1)
+        batch_size, seq_len = positions.shape
+        
+        # Get sinusoidal positions - use the position indices directly
+        pos_float = positions.float()  # (batch_size, seq_len)
+        
+        # Create frequency tensor: (seq_len, d_k/2)
+        freqs = torch.einsum("bs, d -> bsd", pos_float, self.inv_freq.to(pos_float.device))
+        # freqs shape: (batch_size, seq_len, d_k/2)
+        
+        emb = torch.cat((freqs, freqs), dim=-1)  # (batch_size, seq_len, d_k)
+        
+        # Expand for heads: (batch_size, seq_len, 1, d_k)
+        cos_vals = emb.cos().unsqueeze(2)
+        sin_vals = emb.sin().unsqueeze(2)
         
         # Apply rotation
-        cos_vals = emb.cos().unsqueeze(1)  # (batch_size, 1, seq_len, d_k)
-        sin_vals = emb.sin().unsqueeze(1)  # (batch_size, 1, seq_len, d_k)
-        
         x_rotated = (x * cos_vals) + (self.rotate_half(x) * sin_vals)
         return x_rotated
+
     
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """

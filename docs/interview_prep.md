@@ -382,3 +382,83 @@ def bayesian_aggregate(estimates):
     return global_risk, global_unc
 ```
 
+---
+
+## 🚀 Hardware Acceleration & Adaptive Integration
+
+### GPU Acceleration
+
+**Q: When does GPU acceleration provide the most benefit for Monte Carlo integration?**
+
+**A:** GPU acceleration excels when:
+1. **Large sample sizes** (>50,000) - Parallelism overcomes kernel launch overhead
+2. **Complex function evaluations** - More compute per sample amortizes memory transfer
+3. **Batch processing** - Multiple integrals computed simultaneously
+
+The **break-even point** is typically around 50,000 samples; below this, Numba/CPU may be faster.
+
+**Q: Explain the trade-off between Numba and GPU acceleration.**
+
+| Aspect | Numba | GPU |
+|--------|-------|-----|
+| Startup | Fast | Slow (kernel compilation) |
+| Best for | Medium problems (10K-1M) | Large problems (>1M) |
+| Memory | CPU RAM | GPU VRAM (limited) |
+| Flexibility | Any Python code | Needs framework (PyTorch/TF) |
+
+---
+
+### PPL Comparison
+
+**Q: Compare PyMC3, TensorFlow Probability, and Stan for Bayesian inference.**
+
+| Library | Best For |
+|---------|----------|
+| **PyMC3** | Rapid prototyping of complex hierarchical models |
+| **TFP** | Production systems integrated with deep learning |
+| **Stan** | Rigorous statistical research, maximum accuracy |
+
+**Q: What is the ELBO and why is it important for variational inference?**
+
+Evidence Lower BOund:
+$$\text{ELBO} = \mathbb{E}_{q(z)}[\log p(x,z) - \log q(z)]$$
+
+Key properties:
+1. Maximizing ELBO ≈ minimizing KL divergence to true posterior
+2. Tractable when posterior is intractable
+3. Enables gradient-based optimization (vs. sampling)
+
+---
+
+### Adaptive Integration
+
+**Q: How would you design an adaptive integrator that selects methods automatically?**
+
+Key components:
+1. **Feature extraction**: Analyze function smoothness, modes, sharp transitions
+2. **Method library**: Gaussian quadrature, Monte Carlo, Bayesian quadrature, Simpson
+3. **Selection model**: Random Forest classifier trained on function-method pairs
+4. **Fallback strategy**: If selected method fails, try alternatives in order
+
+Critical features:
+- **Smoothness** = 1 / mean(|gradient|)
+- **Modality** = number of peaks
+- **Sharp transitions** = proportion of extreme gradients
+
+**Q: Implement a simple function feature extractor.**
+
+```python
+def extract_features(f, a, b, n_samples=1000):
+    """Extract features for method selection."""
+    x = np.linspace(a, b, n_samples)
+    y = np.array([f(xi) for xi in x])
+    gradients = np.gradient(y, x)
+    
+    return {
+        'smoothness': 1.0 / (np.mean(np.abs(gradients)) + 1e-8),
+        'num_modes': len(find_peaks(y / y.max())[0]),
+        'variance': np.var(y),
+        'sharp_transitions': np.sum(np.abs(gradients) > np.percentile(np.abs(gradients), 95)) / n_samples
+    }
+```
+
