@@ -64,9 +64,38 @@ def benchmark_inverse(n: int):
     print(f"NumPy is {speedup:.2f}x faster")
 
 
+def benchmark_eigenvalues(n: int):
+    print(f"\n--- Benchmarking Eigenvalues (Power Iteration) ({n}x{n}) ---")
+    
+    # Generate symmetric matrix for real eigenvalues
+    data = np.random.rand(n, n)
+    data = (data + data.T) / 2
+    data_list = data.tolist()
+    
+    # 1. Custom Implementation
+    mat = Matrix(data_list)
+    start_time = time.time()
+    eig_custom = mat.eigenvalues(iterations=50)
+    custom_time = time.time() - start_time
+    print(f"Custom Implementation: {custom_time:.6f} seconds (Max Eig: {eig_custom:.4f})")
+    
+    # 2. NumPy Implementation
+    start_time = time.time()
+    eig_np = np.max(np.abs(np.linalg.eigvals(data)))
+    np_time = time.time() - start_time
+    print(f"NumPy Implementation:  {np_time:.6f} seconds (Max Eig: {eig_np:.4f})")
+    
+    diff = abs(eig_custom - eig_np)
+    print(f"Accuracy Diff: {diff:.6f}")
+    
+    speedup = custom_time / np_time if np_time > 0 else 0
+    print(f"NumPy is {speedup:.2f}x faster")
+
 if __name__ == "__main__":
     print("🚀 Week 1 Benchmark: The Cost of Abstraction")
     benchmark_matmul(50)
-    benchmark_inverse(30) # Inverse is O(n^3) and expensive
+    benchmark_inverse(30)
+    benchmark_eigenvalues(50)
+
 
     # benchmark_matmul(500) # Large (Warning: O(n^3) in Python is slow!)

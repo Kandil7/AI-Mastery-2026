@@ -1,0 +1,3 @@
+[console_scripts]
+ai-benchmark = scripts.run_benchmarks:main
+ai-train = scripts.train_save_models:main

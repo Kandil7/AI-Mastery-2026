@@ -1,0 +1,6 @@
+case_studies
+interviews
+notebooks
+scripts
+src
+tests
