@@ -457,6 +457,26 @@ async def legacy_predict(request: PredictionRequest):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
+class ChatRequest(BaseModel):
+    """Request model for chat/RAG."""
+    query: str
+    k: int = 3
+
+
+@app.post("/chat/completions")
+async def chat_completions(request: ChatRequest):
+    """
+    Chat completion endpoint (RAG placeholder).
+    
+    Currently returns a mock response to ensure frontend connectivity.
+    Real RAG integration will be added in the next phase.
+    """
+    return {
+        "response": f"I received your query: '{request.query}'.\n\n(Note: The full RAG system is currently being integrated into the API. This is a confirmation that the endpoint is reachable.)",
+        "sources": ["System Placeholder"]
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
