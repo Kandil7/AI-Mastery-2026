@@ -56,3 +56,41 @@ from src.core.variational_inference import (
     MeanFieldVI, StochasticVI, coordinate_ascent_vi,
     BayesianLinearRegressionVI, svgd
 )
+
+# Phase 9: Hardware Acceleration, PPL, Adaptive Integration
+from src.core.hardware_accelerated_integration import (
+    HardwareAcceleratedIntegrator,
+    monte_carlo_cpu,
+    NUMBA_AVAILABLE, TORCH_AVAILABLE
+)
+from src.core.ppl_integration import (
+    BayesianRegression, PPLComparison
+)
+from src.core.adaptive_integration import (
+    AdaptiveIntegrator, FunctionCharacteristics
+)
+
+# Phase 10: RL Integration and Causal Inference
+from src.core.rl_integration import (
+    RLIntegrationSystem, Episode, PolicyGradientResult
+)
+from src.core.causal_inference import (
+    CausalInferenceSystem, ATEResult, CATEResult
+)
+
+# Phase 11: GNN Integration and Explainable AI
+from src.core.gnn_integration import (
+    BayesianGCN, BayesianGCNLayer, GraphData, generate_synthetic_graph
+)
+from src.core.explainable_ai import (
+    ExplainableModel, TreeSHAP, FeatureExplanation, GlobalExplanation
+)
+
+# Phase 12: Differential Privacy and Energy Efficiency
+from src.core.differential_privacy import (
+    DifferentiallyPrivateIntegrator, DifferentiallyPrivateBayesianQuadrature,
+    PrivacyBudget, PrivateEstimate
+)
+from src.core.energy_efficient import (
+    EnergyEfficientIntegrator, DeviceProfile, IntegrationResult, DEVICE_PROFILES
+)
