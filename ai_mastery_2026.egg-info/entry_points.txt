@@ -1,0 +1,4 @@
+[console_scripts]
+ai-app = src.production.api:start_server
+ai-benchmark = scripts.run_benchmarks:main
+ai-train = scripts.train_save_models:main

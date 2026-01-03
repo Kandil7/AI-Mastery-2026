@@ -1,114 +1,93 @@
-# 🚀 Q1 2026: The "Senior Engineer" Sprint
+# Q1 2026 Roadmap: Foundations & Core Architecture
 
-**Goal**: Land a Senior Full Stack AI/ML Role by April 1st, 2026.
-
-## ⚡ Velocity Rules (Meta-Friction Cutting)
-1.  **"Fast Enough" Target**: Each week = **1 Notebook** (Concept) + **1 Artifact** (Merged Code/Feature).
-2.  **WIP Limit**: Max **2 active topics** at any time. Everything else goes to [`docs/BACKLOG.md`](docs/BACKLOG.md).
-3.  **Definition of Done**:
-    *   [ ] Explained in own words (short note in `docs/` or `LEARNING_LOG.md`)
-    *   [ ] Coded from scratch (or verified in `src/`)
-    *   [ ] Used in a pipeline (App or Demo Notebook)
-4.  **Code First**: Study `src/` implementation & tests *before* reading external articles.
-5.  **Feedback Loop**: Write a Weekly Entry in [`docs/LEARNING_LOG.md`](docs/LEARNING_LOG.md).
+**Theme:** "White-Box Mastery" – Build everything from scratch, then productionize.
+**Goal:** Land a Senior AI Engineer role by building a portfolio of deep technical understanding.
 
 ---
 
-## 🗓️ 12-Week Execution Plan2-3 portfolio projects + deep mastery of LLM/MLOps + interview prep.
+## 📅 Block 1: The Mathematician's Forge (Weeks 1-4)
+**Focus:** Linear Algebra, Calculus, Optimization, Classical ML from scratch.
+**Shippable Artifact:** `src/core` Python Library (published to PyPI or strongly documented).
+
+- **Week 1: Foundations & Linear Algebra**
+    - *Concept:* Vectors, matrices, eigenvalues without NumPy (initially), then optimized usage.
+    - *Code:* `src/core/math_operations.py`, `src/core/linear_algebra.py`.
+    - *Deliverable:* A "Numpy-lite" implementation and a benchmark script comparing it to real NumPy.
+
+- **Week 2: Optimization & Probability**
+    - *Concept:* Gradients, SGD, Adam, Lagrange Multipliers.
+    - *Code:* `src/core/optimization.py` (Adam/RMSProp from scratch).
+    - *Deliverable:* Interactive visualization of convergence rates for different optimizers.
+
+- **Week 3: Classical Machine Learning**
+    - *Concept:* Regression, SVM, Trees, Integration (Monte Carlo).
+    - *Code:* `src/ml/classical.py` (implementing `fit`/`predict` patterns).
+    - *Deliverable:* A simplified Scikit-Learn clone (`ai-mastery-sklearn`).
+
+- **Week 4: Neural Foundations**
+    - *Concept:* Backpropagation, Dense Layers, Activations.
+    - *Code:* `src/ml/deep_learning.py` (The "MicroGrad" moment).
+    - *Deliverable:* Training a neural network to solve MNIST using only `src/core`.
 
 ---
 
-## 📅 12-Week Sprint Plan
+## 📅 Block 2: Deep Learning & Transformers (Weeks 5-8)
+**Focus:** Architecture internals, Attention mechanisms, and Efficient Training.
+**Shippable Artifact:** A "Mini-Llama" training/inference script.
 
-### Phase 1: LLM & RAG Mastery (Weeks 1-4)
+- **Week 5: CNNs & Computer Vision**
+    - *Concept:* Convolutions, kernels, pooling, ResNets.
+    - *Code:* `src/ml/vision.py`.
+    - *Deliverable:* An image classifier API using `src/production/api.py`.
 
-| Week | Focus | Deliverable | Time |
-|------|-------|-------------|------|
-| **1** | RAG Deep Dive | Production RAG with hybrid retrieval + eval metrics | 6h |
-| **2** | Advanced Retrieval | Query enhancement (HyDE, multi-query) + reranking | 6h |
-| **3** | LLM Fine-tuning | LoRA fine-tune on custom dataset | 6h |
-| **4** | Agents & Orchestration | LangChain/LlamaIndex agent with tools | 6h |
+- **Week 6: Sequences & RNNs**
+    - *Concept:* RNNs, LSTMs, Vanishing gradients.
+    - *Code:* `src/ml/sequence.py`.
+    - *Deliverable:* A stock price predictor or text generator.
 
-**Interview Prep**: "Design a RAG system for legal documents at scale"
+- **Week 7: The Transformer Implementation**
+    - *Concept:* Self-Attention, Multi-Head, Positional Encodings.
+    - *Code:* `src/llm/attention.py`, `src/llm/transformer.py`.
+    - *Deliverable:* A "Build BERT from scratch" notebook.
 
----
-
-### Phase 2: Full Stack Integration (Weeks 5-8)
-
-| Week | Focus | Deliverable | Time |
-|------|-------|-------------|------|
-| **5** | Streamlit + FastAPI | AI-powered app with real-time inference | 6h |
-| **6** | MLOps Pipeline | Training → Evaluation → Deployment automation | 6h |
-| **7** | Monitoring & Observability | Prometheus + Grafana + custom ML metrics | 6h |
-| **8** | Portfolio Project #1 | **Ship**: Complete AI app with demo | 6h |
-
-**Interview Prep**: "How do you ensure model reliability in production?"
+- **Week 8: LLM Engineering**
+    - *Concept:* Tokenization, RoPE, KV-Cache.
+    - *Code:* `src/llm/model.py`.
+    - *Deliverable:* A script that loads pre-trained GPT-2 weights into your custom architecture.
 
 ---
 
-### Phase 3: System Design & Portfolio (Weeks 9-12)
+## 📅 Block 3: RAG & Production Systems (Weeks 9-12)
+**Focus:** Retrieval, Vector DBs, MLOps, and Deployment.
+**Shippable Artifact:** End-to-End Enterprise RAG System.
 
-| Week | Focus | Deliverable | Time |
-|------|-------|-------------|------|
-| **9** | System Design Practice | 2 mock designs: recommendation + fraud detection | 6h |
-| **10** | Portfolio Project #2 | **Ship**: Second portfolio piece | 6h |
-| **11** | Interview Prep Sprint | Technical + behavioral mock interviews | 6h |
-| **12** | Polish & Apply | README updates, GitHub profile, applications | 6h |
+- **Week 9: Vector Search & Embeddings**
+    - *Concept:* HNSW, LSH, Contrastive Loss.
+    - *Code:* `src/production/vector_db.py`.
+    - *Deliverable:* A custom vector database that passes recall tests.
 
-**Interview Prep**: STAR stories + system design whiteboarding
+- **Week 10: Advanced RAG Strategies**
+    - *Concept:* Hybrid Search, Re-ranking, Context Window management.
+    - *Code:* `src/llm/rag.py`.
+    - *Deliverable:* RAG Evaluation framework (Faithfulness/Relevance metrics).
 
----
+- **Week 11: MLOps & Orchestration**
+    - *Concept:* Docker, CI/CD, Prometheus, Grafana.
+    - *Code:* `.github/workflows/`, `docker-compose.yml`.
+    - *Deliverable:* A fully monitored deployment dashboard.
 
-## 🎯 Portfolio Project Ideas
-
-### Project 1: AI Document Assistant
-- **Stack**: Streamlit + FastAPI + RAG + ChromaDB
-- **Features**: Upload docs → Ask questions → Get cited answers
-- **Senior Signal**: Hybrid retrieval, caching, evaluation metrics
-
-### Project 2: ML Model Monitoring Dashboard
-- **Stack**: Streamlit + Prometheus + Custom metrics
-- **Features**: Model drift detection, latency tracking, alerts
-- **Senior Signal**: Production observability, data quality checks
-
-### Project 3: Fine-tuned Domain LLM
-- **Stack**: LoRA + Transformers + Gradio/Streamlit
-- **Features**: Domain-specific chat with evaluation
-- **Senior Signal**: Training pipeline, evaluation methodology
+- **Week 12: Capstone & Portfolio Polish**
+    - *Concept:* Documentation, Video Demos, Social Proof.
+    - *Action:* Clean up `READMEs`, record "Loom" walkthroughs.
+    - *Deliverable:* The "AI-Mastery-2026" repository reaches v1.0.
 
 ---
 
-## 📊 Weekly Tracking
+## 📈 Key Metrics (Units of Progress)
+- **Core Algo:** 1 core algorithm implemented from scratch/week.
+- **Paper:** 1 research paper read & summarized code-wise/week.
+- **App:** 1 feature shipped to production (local or cloud)/week.
 
-```markdown
-## Week X Review
-- [ ] 2×90-min deep work blocks completed (Mon-Fri)
-- [ ] Deliverable shipped
-- [ ] Interview question practiced
-- [ ] Commits pushed
-
-**Shipped**: 
-**Blocked by**:
-**Next week focus**:
-```
-
----
-
-## 🎤 Interview Prep Checklist
-
-### Technical
-- [ ] ML fundamentals (bias-variance, regularization, optimization)
-- [ ] Deep learning (backprop, attention, Transformers)
-- [ ] LLM engineering (RAG, fine-tuning, chunking)
-- [ ] System design (3+ scenarios practiced)
-
-### Behavioral (STAR Stories)
-- [ ] Technical challenge overcome
-- [ ] Debugging complex production issue
-- [ ] Leading without authority
-- [ ] Learning new technology quickly
-
-### Portfolio
-- [ ] 2 demo-able projects with live links
-- [ ] GitHub profile polished
-- [ ] LinkedIn updated with projects
+## 🛠 Tech Stack
+- **Languages:** Python, SQL, C++ (for extensions later).
+- **Libraries:** NumPy (Core), PyTorch (DL), FastAPI (Web), Docker (Ops).

@@ -1,57 +1,48 @@
-name: 📅 Weekly Sprint
-description: Track weekly learning sprint with concrete deliverables
-title: "[Sprint] Week X: [Focus Area]"
-labels: ["sprint", "q1-2026"]
+name: Weekly Sprint
+description: Plan and track a single week of AI mastery
+title: "Week [N]: [Theme/Concept]"
+labels: ["sprint"]
 body:
-  - type: markdown
+  - type: textarea
+    id: goal
     attributes:
-      value: |
-        ## Weekly Sprint Template
-        Break down into 2-3 hour tasks. No "study Chapter X" - only build/implement.
+      label: Sprint Goal
+      description: What is the SINGLE main outcome? (e.g., "Implement Transformer from scratch")
+      placeholder: "Build and verify a multi-head attention block."
+    validations:
+      required: true
 
-  - type: input
-    id: week-goal
+  - type: checkboxes
+    id: deep_work
     attributes:
-      label: 🎯 Week Goal
-      description: One sentence describing the main deliverable
-      placeholder: "Build and deploy RAG system with evaluation metrics"
+      label: Deep Work Sessions (3 Days)
+      description: Track your focused learning blocks.
+      options:
+        - label: "Day 1: Theory & Math (4h) - [Paper/Reference]"
+        - label: "Day 2: Core Implementation (4h) - [Code]"
+        - label: "Day 3: Optimization & Tests (4h) - [Refactor]"
+
+  - type: checkboxes
+    id: application
+    attributes:
+      label: Application Sessions (2 Days)
+      description: Apply what you learned to a real project.
+      options:
+        - label: "Day 4: Integration / App Feature"
+        - label: "Day 5: Deployment / Documentation / Demo"
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Shippable Artifacts
+      description: What will you commit to the repo?
+      placeholder: "- [ ] src/llm/attention.py\n- [ ] notebooks/week07_transformer.ipynb\n- [ ] README update with benchmarks"
     validations:
       required: true
 
   - type: textarea
-    id: tasks
+    id: reflection
     attributes:
-      label: ✅ Tasks (2-3 hours each)
-      description: Concrete implementation tasks
-      value: |
-        - [ ] Task 1: [Description] (2h)
-        - [ ] Task 2: [Description] (2h)
-        - [ ] Task 3: [Description] (3h)
-    validations:
-      required: true
-
-  - type: textarea
-    id: deliverable
-    attributes:
-      label: 📦 Deliverable
-      description: What ships at end of week?
-      value: |
-        - [ ] Code pushed to repo
-        - [ ] README with architecture diagram
-        - [ ] Tests passing
-        - [ ] Demo/notebook working
-    validations:
-      required: true
-
-  - type: input
-    id: interview-question
-    attributes:
-      label: 🎤 Interview Prep Tie-in
-      description: One interview question this week's work helps answer
-      placeholder: "Design a RAG system for 10K documents"
-
-  - type: textarea
-    id: blockers
-    attributes:
-      label: 🚧 Blockers / Notes
-      description: Any obstacles or context
+      label: Learning Log
+      description: Key takeaways, pitfalls, and 'Aha!' moments.
+      placeholder: "Realized why scaling by sqrt(d_k) is crucial..."

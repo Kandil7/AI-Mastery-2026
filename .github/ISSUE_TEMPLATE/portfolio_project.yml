@@ -1,76 +1,40 @@
-name: 🚀 Portfolio Project
-description: Senior-level portfolio piece for Full Stack AI Engineer role
-title: "[Portfolio] [Project Name]"
-labels: ["portfolio", "senior-level"]
+name: Portfolio Project
+description: Define a shippable, portfolio-worthy project (Week 4, 8, 12 milestones)
+title: "Project: [Name]"
+labels: ["portfolio"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Portfolio Project Template
-        Projects that demonstrate senior-level Full Stack AI engineering skills.
-
   - type: textarea
     id: problem
     attributes:
-      label: 🎯 Problem Statement
+      label: Problem Statement
       description: What real-world problem does this solve?
-      placeholder: |
-        - Business context
-        - Why it matters
-        - Target users
+      placeholder: "Current RAG systems hallucinate on legal documents due to poor context retrieval..."
     validations:
       required: true
 
   - type: textarea
-    id: architecture
+    id: solution
     attributes:
-      label: 🏗️ Architecture
-      description: System design overview
-      value: |
-        ```
-        [User] → [Streamlit UI] → [FastAPI] → [ML Model]
-                                      ↓
-                              [Vector DB / Cache]
-        ```
+      label: Technical Solution
+      description: Architecture and key technologies.
+      placeholder: "Hybrid Search (BM25 + HNSW) with Cohere Re-ranking..."
     validations:
       required: true
 
-  - type: textarea
-    id: tech-stack
+  - type: checkboxes
+    id: checklist
     attributes:
-      label: 🛠️ Tech Stack
-      value: |
-        - **Frontend**: Streamlit
-        - **Backend**: FastAPI, Python 3.10+
-        - **ML**: PyTorch / Transformers
-        - **Infrastructure**: Docker, Prometheus
-        - **Database**: PostgreSQL / ChromaDB
+      label: Definition of Done
+      options:
+        - label: "Codebase clean & modular"
+        - label: "Unit tests passing (>80% coverage)"
+        - label: "README with architecture diagram"
+        - label: "Video Demo (Loom/YouTube) embedded"
+        - label: "Live Deployment (Streamlit/FastAPI)"
 
   - type: textarea
-    id: success-metrics
+    id: metrics
     attributes:
-      label: 📊 Success Metrics
-      description: How do we measure success?
-      value: |
-        - [ ] Latency: p95 < XXms
-        - [ ] Accuracy/F1: > XX%
-        - [ ] Deployment: Live demo URL
-        - [ ] Tests: Coverage > 80%
-
-  - type: input
-    id: demo-link
-    attributes:
-      label: 🔗 Demo / Deployment
-      description: Link to live demo or video
-      placeholder: "https://..."
-
-  - type: textarea
-    id: interview-talking-points
-    attributes:
-      label: 🎤 Interview Talking Points
-      description: How to present this in interviews
-      value: |
-        - Challenge faced:
-        - Technical decision:
-        - Trade-off made:
-        - Result/impact:
+      label: Success Metrics
+      description: Quantifiable results.
+      placeholder: "Latency < 200ms, Retrieval Recall@10 > 90%..."
