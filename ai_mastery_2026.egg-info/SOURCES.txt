@@ -69,6 +69,7 @@ src/core/__init__.py
 src/core/adaptive_integration.py
 src/core/advanced_integration.py
 src/core/causal_inference.py
+src/core/causal_whitebox.py
 src/core/differential_privacy.py
 src/core/energy_efficient.py
 src/core/explainable_ai.py
@@ -80,8 +81,10 @@ src/core/math_operations.py
 src/core/mcmc.py
 src/core/normalizing_flows.py
 src/core/optimization.py
+src/core/optimization_whitebox.py
 src/core/ppl_integration.py
 src/core/probability.py
+src/core/probability_whitebox.py
 src/core/rl_integration.py
 src/core/time_series.py
 src/core/variational_inference.py
