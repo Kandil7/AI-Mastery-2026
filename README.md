@@ -8,7 +8,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-1.12+-red.svg)
 ![Coverage](https://img.shields.io/badge/Coverage-85%25-brightgreen.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Status](https://img.shields.io/badge/Status-Week%202%3A%20Optimization-orange)
+![Status](https://img.shields.io/badge/Status-Week%202%3A%20COMPLETE%20%E2%9C%85-brightgreen)
 
 **From First Principles to Production Scale.**
 *A 17-week roadmap to master the mathematics, algorithms, and engineering of modern AI.*
