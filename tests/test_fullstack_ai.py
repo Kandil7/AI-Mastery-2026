@@ -1118,6 +1118,649 @@ class TestNewModulesImport:
 
 
 # ============================================================
+# EDGE AI SAAS TESTS - Manufacturing QC
+# ============================================================
+
+class TestManufacturingQC:
+    """Tests for manufacturing quality control module."""
+    
+    def test_import_manufacturing_qc(self):
+        """Test manufacturing QC imports."""
+        from production.manufacturing_qc import (
+            DefectType, InspectionAction, PLCProtocol,
+            InspectionResult, QualityMetrics,
+            ImagePreprocessor, DefectDetector,
+            PLCInterface, QualityInspectionPipeline
+        )
+        assert True
+    
+    def test_defect_detector_initialization(self):
+        """Test DefectDetector initialization."""
+        from production.manufacturing_qc import DefectDetector, DefectType
+        
+        detector = DefectDetector(
+            num_classes=8,
+            input_size=(224, 224),
+            quantized=True
+        )
+        
+        assert detector.num_classes == 8
+        assert detector.quantized is True
+        assert detector.input_size == (224, 224)
+    
+    def test_defect_detector_prediction(self):
+        """Test DefectDetector prediction."""
+        from production.manufacturing_qc import DefectDetector, DefectType
+        
+        detector = DefectDetector(num_classes=8, quantized=True)
+        
+        # Create dummy image
+        image = np.random.rand(3, 224, 224).astype(np.float32)
+        
+        defect_type, confidence, features = detector.predict(image, return_features=True)
+        
+        assert isinstance(defect_type, DefectType)
+        assert 0 <= confidence <= 1
+        assert features is not None
+    
+    def test_plc_interface(self):
+        """Test PLC interface."""
+        from production.manufacturing_qc import PLCInterface, PLCProtocol
+        
+        plc = PLCInterface(
+            protocol=PLCProtocol.MODBUS_TCP,
+            host="192.168.1.100",
+            port=502
+        )
+        
+        # Connect (simulated)
+        assert plc.connect() is True
+        assert plc.connected is True
+        
+        # Write coil
+        assert plc.write_coil(100, True) is True
+        
+        # Trigger actions
+        assert plc.trigger_reject() is True
+        assert plc.trigger_pass() is True
+        
+        plc.disconnect()
+        assert plc.connected is False
+    
+    def test_quality_inspection_pipeline(self):
+        """Test QualityInspectionPipeline."""
+        from production.manufacturing_qc import (
+            DefectDetector, PLCInterface, QualityInspectionPipeline,
+            DefectType, InspectionAction
+        )
+        
+        detector = DefectDetector(num_classes=8, quantized=True)
+        plc = PLCInterface()
+        plc.connect()
+        
+        pipeline = QualityInspectionPipeline(
+            detector=detector,
+            plc=plc,
+            confidence_threshold=0.85,
+            review_threshold=0.5
+        )
+        
+        # Run inspection
+        image = np.random.rand(224, 224, 3).astype(np.float32)
+        result = pipeline.inspect(image, ground_truth=DefectType.NONE)
+        
+        assert result.inspection_id is not None
+        assert isinstance(result.defect_type, DefectType)
+        assert result.latency_ms > 0
+        
+        # Check metrics
+        metrics = pipeline.get_metrics()
+        assert metrics["total_inspections"] == 1
+    
+    def test_quality_metrics_calculation(self):
+        """Test QualityMetrics calculations."""
+        from production.manufacturing_qc import QualityMetrics
+        
+        metrics = QualityMetrics(
+            true_positives=90,
+            false_positives=5,
+            true_negatives=900,
+            false_negatives=5
+        )
+        
+        assert metrics.detection_rate == 90 / (90 + 5)  # Sensitivity
+        assert metrics.overkill_rate == 5 / (900 + 5)  # False positive rate
+        assert metrics.precision == 90 / (90 + 5)
+    
+    def test_image_preprocessor(self):
+        """Test ImagePreprocessor."""
+        from production.manufacturing_qc import ImagePreprocessor
+        
+        preprocessor = ImagePreprocessor(
+            target_size=(224, 224),
+            normalize=True,
+            enhance_contrast=True
+        )
+        
+        # Create dummy image
+        image = np.random.rand(100, 100, 3).astype(np.float32) * 255
+        
+        processed = preprocessor.preprocess(image)
+        
+        assert processed.shape[:2] == (224, 224)
+        assert processed.min() >= 0
+        assert processed.max() <= 1
+
+
+# ============================================================
+# EDGE AI SAAS TESTS - Medical Edge
+# ============================================================
+
+class TestMedicalEdge:
+    """Tests for medical edge AI module."""
+    
+    def test_import_medical_edge(self):
+        """Test medical edge imports."""
+        from production.medical_edge import (
+            MedicalDeviceType, ClinicalEventType, AlertSeverity,
+            ClinicalEvent, PrivacyBudget,
+            DifferentialPrivacy, FederatedLearningClient,
+            PersonalHealthTrainFramework, MedicalDevice,
+            NeuroCoreProcessor
+        )
+        assert True
+    
+    def test_differential_privacy_laplace(self):
+        """Test Laplace mechanism."""
+        from production.medical_edge import DifferentialPrivacy
+        
+        dp = DifferentialPrivacy(epsilon=1.0, delta=1e-5)
+        
+        value = 100.0
+        sensitivity = 1.0
+        
+        privatized = dp.laplace_mechanism(value, sensitivity)
+        
+        # Should be close but not exact (noise added)
+        assert privatized != value
+    
+    def test_differential_privacy_gaussian(self):
+        """Test Gaussian mechanism."""
+        from production.medical_edge import DifferentialPrivacy
+        
+        dp = DifferentialPrivacy(epsilon=1.0, delta=1e-5)
+        
+        vector = np.array([1.0, 2.0, 3.0])
+        sensitivity = 1.0
+        
+        privatized = dp.gaussian_mechanism(vector, sensitivity)
+        
+        assert privatized.shape == vector.shape
+        assert not np.allclose(privatized, vector)
+    
+    def test_privacy_budget(self):
+        """Test privacy budget tracking."""
+        from production.medical_edge import PrivacyBudget
+        
+        budget = PrivacyBudget(epsilon_budget=1.0, delta=1e-5)
+        
+        assert budget.can_query(0.1) is True
+        assert budget.consume(0.1) is True
+        assert budget.epsilon_used == 0.1
+        assert budget.remaining_budget == 0.9
+        
+        # Try to exceed budget
+        assert budget.can_query(1.0) is False
+    
+    def test_federated_learning_client(self):
+        """Test FederatedLearningClient."""
+        from production.medical_edge import FederatedLearningClient
+        
+        architecture = {"layer_sizes": [64, 32, 2]}
+        client = FederatedLearningClient(
+            client_id="hospital_001",
+            model_architecture=architecture
+        )
+        
+        # Add local data
+        X = np.random.randn(100, 64)
+        y = np.random.randint(0, 2, (100, 2)).astype(float)
+        client.add_local_data(X, y)
+        
+        # Train locally with DP
+        weight_update = client.train_local(epochs=2, apply_dp=True)
+        
+        assert len(weight_update) > 0
+        
+        # Create update for transmission
+        update = client.create_federated_update(weight_update)
+        assert update.client_id == "hospital_001"
+        assert len(update.gradients) > 0
+    
+    def test_medical_device(self):
+        """Test MedicalDevice."""
+        from production.medical_edge import (
+            create_fall_detection_device, ClinicalEventType
+        )
+        
+        device = create_fall_detection_device(
+            device_id="FALL_001",
+            patient_id="PT_ANON_123"
+        )
+        
+        # Process normal activity
+        normal_data = np.random.randn(128) * 0.5
+        event = device.process_sensor_data(normal_data, "accelerometer")
+        # May or may not detect event based on k-NN
+        
+        # Process fall-like data
+        fall_data = np.random.randn(128) * 0.5
+        fall_data[50:60] = np.random.randn(10) * 3.0  # Spike
+        event = device.process_sensor_data(fall_data, "accelerometer")
+        
+        # Get device status
+        status = device.get_device_status()
+        assert status["device_id"] == "FALL_001"
+    
+    def test_personal_health_train(self):
+        """Test Personal Health Train framework."""
+        from production.medical_edge import (
+            PersonalHealthTrainFramework, HealthStation, HealthTrain
+        )
+        
+        pht = PersonalHealthTrainFramework()
+        
+        # Register station
+        station = HealthStation(
+            station_id="hospital_001",
+            organization="General Hospital",
+            data_categories=["ecg", "vitals"],
+            access_policies={"research": True}
+        )
+        pht.register_station(station)
+        
+        # Submit train
+        train = HealthTrain(
+            train_id="model_v1",
+            algorithm="federated_training",
+            required_permissions=["research"],
+            created_by="research_team"
+        )
+        pht.submit_train(train)
+        pht.approve_train("model_v1")
+        
+        # Execute train
+        def executor(algorithm, policies):
+            return {"accuracy": 0.9}
+        
+        result = pht.execute_train("model_v1", "hospital_001", executor)
+        assert result["accuracy"] == 0.9
+    
+    def test_neuro_core_processor(self):
+        """Test NeuroCoreProcessor."""
+        from production.medical_edge import NeuroCoreProcessor, ClinicalEventType
+        
+        architecture = {"type": "knn", "k": 5}
+        neuro = NeuroCoreProcessor(architecture)
+        
+        # Add training examples
+        for _ in range(30):
+            neuro.add_training_example(
+                np.random.randn(64), ClinicalEventType.NORMAL
+            )
+        for _ in range(10):
+            neuro.add_training_example(
+                np.random.randn(64) * 2, ClinicalEventType.FALL_DETECTED
+            )
+        
+        # Classify
+        event_type, confidence = neuro.classify(np.random.randn(64))
+        assert isinstance(event_type, ClinicalEventType)
+        assert 0 <= confidence <= 1
+
+
+# ============================================================
+# EDGE AI SAAS TESTS - Industrial IoT
+# ============================================================
+
+class TestIndustrialIoT:
+    """Tests for industrial IoT predictive maintenance module."""
+    
+    def test_import_industrial_iot(self):
+        """Test industrial IoT imports."""
+        from production.industrial_iot import (
+            EquipmentType, SensorType, AlertSeverity, ProtocolType,
+            SensorReading, MaintenanceAlert, EquipmentHealth,
+            StoreAndForwardQueue, IndustrialSensor,
+            Autoencoder, IsolationForest, AnomalyDetector,
+            LSTMCell, RULPredictor, PredictiveMaintenanceEngine
+        )
+        assert True
+    
+    def test_autoencoder(self):
+        """Test Autoencoder anomaly detection."""
+        from production.industrial_iot import Autoencoder
+        
+        ae = Autoencoder(input_dim=10, latent_dim=4, hidden_dim=16)
+        
+        # Train on normal data
+        X_normal = np.random.randn(200, 10)
+        ae.fit(X_normal, epochs=20)
+        
+        assert ae.threshold is not None
+        
+        # Test detection
+        is_anomaly, score = ae.detect(np.random.randn(10))
+        assert isinstance(is_anomaly, bool)
+        assert score >= 0
+    
+    def test_isolation_forest(self):
+        """Test Isolation Forest."""
+        from production.industrial_iot import IsolationForest
+        
+        iso_forest = IsolationForest(n_trees=20, sample_size=64)
+        
+        # Train on normal data
+        X_normal = np.random.randn(200, 5)
+        iso_forest.fit(X_normal)
+        
+        assert iso_forest.threshold is not None
+        
+        # Detect
+        is_anomaly, score = iso_forest.detect(np.random.randn(5))
+        assert 0 <= score <= 1
+    
+    def test_anomaly_detector_ensemble(self):
+        """Test ensemble anomaly detector."""
+        from production.industrial_iot import AnomalyDetector
+        
+        detector = AnomalyDetector(input_dim=8, ae_weight=0.5, if_weight=0.5)
+        
+        # Train
+        X_normal = np.random.randn(200, 8)
+        detector.fit(X_normal, epochs=20)
+        
+        assert detector.trained is True
+        
+        # Detect
+        is_anomaly, combined, scores = detector.detect(np.random.randn(8))
+        assert "autoencoder" in scores
+        assert "isolation_forest" in scores
+    
+    def test_lstm_cell(self):
+        """Test LSTM cell."""
+        from production.industrial_iot import LSTMCell
+        
+        lstm = LSTMCell(input_dim=10, hidden_dim=32)
+        
+        x = np.random.randn(1, 10)
+        h_prev = np.zeros((1, 32))
+        c_prev = np.zeros((1, 32))
+        
+        h, c = lstm.forward(x, h_prev, c_prev)
+        
+        assert h.shape == (1, 32)
+        assert c.shape == (1, 32)
+    
+    def test_rul_predictor(self):
+        """Test RUL predictor."""
+        from production.industrial_iot import RULPredictor
+        
+        predictor = RULPredictor(input_dim=5, hidden_dim=16, sequence_length=20)
+        
+        # Forward pass
+        sequence = np.random.randn(20, 5)
+        rul, std = predictor.forward(sequence)
+        
+        assert rul > 0
+        assert std >= 0
+    
+    def test_store_and_forward_queue(self):
+        """Test Store-and-Forward queue."""
+        from production.industrial_iot import StoreAndForwardQueue
+        
+        queue = StoreAndForwardQueue(max_size_mb=10.0)
+        
+        # Enqueue messages
+        msg_id = queue.enqueue({"alert": "test"}, priority=2)
+        assert msg_id is not None
+        
+        # Check stats
+        stats = queue.get_stats()
+        assert stats["total_queued"] == 1
+        
+        # Set connected and sync
+        queue.set_connected(True)
+        sent = queue.sync(max_messages=10)
+        assert sent >= 0
+    
+    def test_industrial_sensor(self):
+        """Test IndustrialSensor."""
+        from production.industrial_iot import (
+            IndustrialSensor, SensorType, ProtocolType
+        )
+        
+        sensor = IndustrialSensor(
+            sensor_id="TEMP_001",
+            sensor_type=SensorType.TEMPERATURE,
+            protocol=ProtocolType.MODBUS_TCP,
+            address="100",
+            sampling_rate_hz=1.0
+        )
+        
+        # Read sensor
+        reading = sensor.read()
+        assert reading is not None
+        assert reading.sensor_type == SensorType.TEMPERATURE
+        assert reading.value is not None
+        
+        # Get time series
+        for _ in range(10):
+            sensor.read()
+        ts = sensor.get_time_series(n_samples=5)
+        assert len(ts) == 5
+    
+    def test_predictive_maintenance_engine(self):
+        """Test PredictiveMaintenanceEngine."""
+        from production.industrial_iot import create_pump_monitoring_system
+        
+        pdm = create_pump_monitoring_system("PUMP_001")
+        
+        # Train models
+        normal_data = np.random.randn(200, 4)
+        pdm.train_models(normal_data)
+        
+        # Collect readings and analyze
+        pdm.collect_readings()
+        alert = pdm.analyze()
+        # May or may not generate alert
+        
+        # Get health report
+        report = pdm.get_health_report()
+        assert report["equipment_id"] == "PUMP_001"
+        assert "health_score" in report
+
+
+# ============================================================
+# EDGE AI SAAS TESTS - Hybrid Inference
+# ============================================================
+
+class TestHybridInference:
+    """Tests for hybrid edge-cloud inference module."""
+    
+    def test_import_hybrid_inference(self):
+        """Test hybrid inference imports."""
+        from production.hybrid_inference import (
+            RoutingDecision, TaskComplexity, PrivacySensitivity,
+            InferenceRequest, InferenceResult, TaskRoutingPolicy,
+            ModelVersion, TaskRouter, SplitModelExecutor,
+            EdgeCloudOrchestrator, ModelVersionManager
+        )
+        assert True
+    
+    def test_task_router_initialization(self):
+        """Test TaskRouter initialization."""
+        from production.hybrid_inference import TaskRouter, TaskRoutingPolicy
+        
+        policy = TaskRoutingPolicy(
+            privacy_weight=0.3,
+            latency_weight=0.3,
+            cost_weight=0.2,
+            complexity_weight=0.2
+        )
+        
+        router = TaskRouter(policy)
+        
+        # Register models
+        router.register_edge_model(
+            "classifier", 10.0, ["classification"], 15.0
+        )
+        router.register_cloud_model(
+            "classifier", 500.0, ["classification"], 0.002, 100.0
+        )
+        
+        assert "classifier" in router.edge_models
+        assert "classifier" in router.cloud_models
+    
+    def test_task_routing_privacy(self):
+        """Test routing based on privacy."""
+        from production.hybrid_inference import (
+            TaskRouter, InferenceRequest, PrivacySensitivity, RoutingDecision
+        )
+        
+        router = TaskRouter()
+        router.register_edge_model("classifier", 10.0, ["classification"], 15.0)
+        
+        # Restricted data should route to edge
+        request = InferenceRequest(
+            request_id="REQ_001",
+            input_data=np.random.randn(10, 10),
+            model_name="classifier",
+            task_type="classification",
+            privacy_level=PrivacySensitivity.RESTRICTED
+        )
+        
+        decision, info = router.route(request)
+        assert decision == RoutingDecision.EDGE_ONLY
+    
+    def test_split_model_executor(self):
+        """Test SplitModelExecutor."""
+        from production.hybrid_inference import SplitModelExecutor
+        
+        edge_layers = [
+            lambda x: np.maximum(0, x),
+            lambda x: x * 0.9
+        ]
+        cloud_layers = [
+            lambda x: x + 0.1
+        ]
+        
+        executor = SplitModelExecutor(
+            edge_layers=edge_layers,
+            cloud_layers=cloud_layers,
+            split_point=2
+        )
+        
+        # Execute edge portion
+        input_data = np.random.randn(10, 10)
+        activations, latency = executor.execute_edge(input_data)
+        
+        assert activations.shape == input_data.shape
+        assert latency > 0
+    
+    def test_activation_compression(self):
+        """Test activation compression."""
+        from production.hybrid_inference import SplitModelExecutor
+        
+        executor = SplitModelExecutor([], [], 0)
+        
+        activations = np.random.randn(10, 10).astype(np.float32)
+        compressed, original_bytes = executor.compress_activations(activations)
+        
+        # Compressed should be smaller
+        assert compressed["data"].nbytes < original_bytes
+        
+        # Decompress
+        decompressed = executor.decompress_activations(compressed)
+        assert decompressed.shape == activations.shape
+    
+    def test_model_version_manager(self):
+        """Test ModelVersionManager."""
+        from production.hybrid_inference import ModelVersionManager
+        
+        mgr = ModelVersionManager()
+        
+        # Register compatible versions
+        version = mgr.register_version(
+            "classifier", "1.2.0", "1.2.3", split_point=4
+        )
+        assert version.compatible is True
+        
+        # Register incompatible versions
+        version2 = mgr.register_version(
+            "other_model", "1.0.0", "2.0.0"
+        )
+        assert version2.compatible is False
+        
+        # Try incompatible update
+        success, msg = mgr.update_edge("classifier", "3.0.0")
+        assert success is False
+        
+        # Coordinated update
+        success, msg = mgr.coordinated_update("classifier", "2.0.0", "2.0.1")
+        assert success is True
+    
+    def test_edge_cloud_orchestrator(self):
+        """Test EdgeCloudOrchestrator."""
+        from production.hybrid_inference import (
+            create_hybrid_inference_system, InferenceRequest,
+            PrivacySensitivity, RoutingDecision
+        )
+        
+        orchestrator = create_hybrid_inference_system()
+        
+        # Process request
+        request = InferenceRequest(
+            request_id="REQ_001",
+            input_data=np.random.randn(10, 10),
+            model_name="classifier",
+            task_type="classification",
+            privacy_level=PrivacySensitivity.INTERNAL
+        )
+        
+        result = orchestrator.infer(request)
+        
+        assert result.request_id == "REQ_001"
+        assert result.confidence >= 0
+        assert result.latency_ms > 0
+        assert isinstance(result.execution_location, RoutingDecision)
+    
+    def test_orchestrator_stats(self):
+        """Test orchestrator statistics."""
+        from production.hybrid_inference import (
+            create_hybrid_inference_system, InferenceRequest,
+            PrivacySensitivity
+        )
+        
+        orchestrator = create_hybrid_inference_system()
+        
+        # Process multiple requests
+        for _ in range(10):
+            request = InferenceRequest(
+                request_id=f"REQ_{np.random.randint(1000)}",
+                input_data=np.random.randn(10, 10),
+                model_name="classifier",
+                task_type="classification",
+                privacy_level=np.random.choice(list(PrivacySensitivity))
+            )
+            orchestrator.infer(request)
+        
+        stats = orchestrator.get_stats()
+        assert stats["total_requests"] == 10
+        assert stats["avg_latency_ms"] > 0
+
+
+# ============================================================
 # RUN TESTS
 # ============================================================
 
