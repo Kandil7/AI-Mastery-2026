@@ -96,11 +96,22 @@ All algorithms implemented **from first principles** to understand internal mech
 *   **RAG Pipeline**: `query_enhancement.py` (HyDE, Multi-Query), `data_pipeline.py`.
 *   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW, ACL filtering, drift detection).
 *   **Feature Store**: `feature_store.py` - Batch/streaming pipelines, freshness tracking (DoorDash Gigascale). *ENHANCED*
-*   **Edge AI**: `edge_ai.py` - Model compilation, OTA updates, fleet management (Siemens Industrial Edge). *NEW*
-*   **Trust Layer**: `trust_layer.py` - PII masking, content safety, audit logging. *NEW*
-*   **Ranking Pipeline**: `ranking_pipeline.py` - Multi-stage candidate ranking. *NEW*
+*   **Edge AI**: `edge_ai.py` - Model compilation, OTA updates, fleet management (Siemens Industrial Edge).
+*   **Trust Layer**: `trust_layer.py` - PII masking, content safety, audit logging.
+*   **Ranking Pipeline**: `ranking_pipeline.py` - Multi-stage candidate ranking.
 *   **Observability**: `monitoring.py` (Prometheus/Grafana), `observability.py`.
 *   **Serving**: `api.py` (FastAPI), Docker containerization.
+
+#### Edge AI SaaS Modules *NEW* 🔥
+
+Production-ready edge AI implementations with **~3,600+ lines** of from-scratch code:
+
+| Module | Lines | Key Components | Domain |
+|--------|-------|----------------|--------|
+| `manufacturing_qc.py` | ~850 | DefectDetector (CNN+INT8), PLCInterface (Modbus/OPC-UA), QualityInspectionPipeline | Manufacturing CV |
+| `medical_edge.py` | ~900 | DifferentialPrivacy (ε-δ), FederatedLearningClient (DP-FedAvg), NeuroCoreProcessor | Medical IoMT |
+| `industrial_iot.py` | ~1000 | Autoencoder, IsolationForest, LSTMCell, RULPredictor, StoreAndForwardQueue | Industrial PdM |
+| `hybrid_inference.py` | ~900 | TaskRouter, SplitModelExecutor, EdgeCloudOrchestrator, ModelVersionManager | Hybrid Edge-Cloud |
 
 ---
 
@@ -283,10 +294,10 @@ docker run -p 8000:8000 issue-classifier
 
 **Total Business Impact**: $22M+ across three case studies
 
-### Full Stack AI Case Studies *NEW*
+### Full Stack AI Case Studies *ENHANCED*
 
 | # | Case Study | Industry Reference | Key Topic |
-|---|------------|-------------------|-----------|
+|---|------------|-------------------|-----------| 
 | 1 | [Uber Eats GNN Recommendations](case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md) | Uber | GraphSAGE, Two-Tower |
 | 2 | [Notion AI RAG Architecture](case_studies/full_stack_ai/02_notion_ai_rag_architecture.md) | Notion | Hybrid Retrieval, Model Routing |
 | 3 | [Intercom Fin Support Agent](case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
@@ -294,6 +305,12 @@ docker run -p 8000:8000 issue-classifier
 | 5 | [Pinterest Ranking Pipeline](case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
 | 6 | [DoorDash Feature Store](case_studies/full_stack_ai/06_doordash_feature_store.md) | DoorDash | Streaming Features, Freshness SLA |
 | 7 | [Siemens Edge AI](case_studies/full_stack_ai/07_siemens_edge_ai.md) | Siemens | Edge Deployment, OTA Updates |
+| 8 | [Manufacturing Quality Control](case_studies/full_stack_ai/08_manufacturing_quality_control.md) | Darwin/Intrinsics | **CNN+INT8, PLC (<20ms)** |
+| 9 | [Medical IoMT Devices](case_studies/full_stack_ai/09_medical_iomt_devices.md) | Intrinsics | **Neuro Core, Federated Learning** |
+| 10 | [Industrial IoT PdM](case_studies/full_stack_ai/10_industrial_iot_pdm.md) | Barbara IoT | **Autoencoder, RUL, DDIL** |
+| 11 | [Hybrid Edge-Cloud](case_studies/full_stack_ai/11_hybrid_edge_cloud.md) | AWS Greengrass | **Task Routing, Split Inference** |
+
+**📚 Edge AI Engineer Roadmap**: [docs/edge_ai_engineer_roadmap.md](docs/edge_ai_engineer_roadmap.md)
 
 ---
 
