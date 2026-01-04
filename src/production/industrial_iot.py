@@ -480,7 +480,7 @@ class Autoencoder:
     def encode(self, x: np.ndarray) -> np.ndarray:
         """Encode input to latent space."""
         h1 = self._relu(x @ self.W_enc1 + self.b_enc1)
-        z = x @ self.W_enc2 + self.b_enc2  # Linear latent
+        z = h1 @ self.W_enc2 + self.b_enc2  # Use h1, not x
         return z
     
     def decode(self, z: np.ndarray) -> np.ndarray:

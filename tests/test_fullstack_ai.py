@@ -1451,7 +1451,7 @@ class TestIndustrialIoT:
         
         # Test detection
         is_anomaly, score = ae.detect(np.random.randn(10))
-        assert isinstance(is_anomaly, bool)
+        assert isinstance(is_anomaly, (bool, np.bool_))
         assert score >= 0
     
     def test_isolation_forest(self):
