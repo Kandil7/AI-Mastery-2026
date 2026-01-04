@@ -706,8 +706,421 @@ class TestFullStackIntegration:
 
 
 # ============================================================
+# EDGE AI TESTS
+# ============================================================
+
+class TestEdgeDevice:
+    """Tests for EdgeDevice."""
+    
+    def test_create_device(self):
+        """Test device creation."""
+        from production.edge_ai import EdgeDevice, DeviceStatus
+        
+        device = EdgeDevice(
+            device_id="dev_1",
+            name="Factory Floor 1",
+            location="Building A"
+        )
+        assert device.device_id == "dev_1"
+        assert device.status == DeviceStatus.OFFLINE
+        
+    def test_device_capability_check(self):
+        """Test device capability check."""
+        from production.edge_ai import EdgeDevice, DeviceStatus
+        
+        device = EdgeDevice(
+            device_id="dev_1",
+            name="Test Device",
+            capabilities={"memory_gb": 4, "gpu": False}
+        )
+        device.status = DeviceStatus.ONLINE
+        
+        # Should pass - low memory requirement
+        can_deploy, reason = device.can_deploy({"memory_gb": 1, "requires_gpu": False})
+        assert can_deploy is True
+        
+        # Should fail - GPU required
+        can_deploy, reason = device.can_deploy({"memory_gb": 1, "requires_gpu": True})
+        assert can_deploy is False
+
+
+class TestModelCompiler:
+    """Tests for ModelCompiler."""
+    
+    def test_compile_model(self):
+        """Test model compilation."""
+        from production.edge_ai import ModelCompiler, QuantizationType
+        
+        compiler = ModelCompiler()
+        weights = np.random.randn(100, 50).astype(np.float32)
+        
+        compiled = compiler.compile(
+            model_name="test_model",
+            model_weights=weights,
+            version="1.0.0",
+            quantization=QuantizationType.INT8
+        )
+        
+        assert compiled.compiled_size_mb <= compiled.original_size_mb
+        assert compiled.quantization == QuantizationType.INT8
+        
+    def test_compilation_stats(self):
+        """Test compilation statistics."""
+        from production.edge_ai import ModelCompiler, QuantizationType
+        
+        compiler = ModelCompiler()
+        weights = np.random.randn(100, 50).astype(np.float32)
+        
+        compiler.compile("model1", weights, quantization=QuantizationType.INT8)
+        compiler.compile("model2", weights, quantization=QuantizationType.FP16)
+        
+        stats = compiler.get_compilation_summary()
+        assert stats["total_compilations"] == 2
+
+
+class TestEdgeFleetManager:
+    """Tests for EdgeFleetManager."""
+    
+    def test_create_fleet(self):
+        """Test fleet creation."""
+        from production.edge_ai import create_sample_fleet
+        
+        fleet = create_sample_fleet(3)
+        assert len(fleet.devices) == 3
+        
+    def test_compile_and_deploy(self):
+        """Test compile and deploy workflow."""
+        from production.edge_ai import create_sample_fleet, QuantizationType
+        
+        fleet = create_sample_fleet(3)
+        weights = np.random.randn(100, 50).astype(np.float32)
+        
+        result = fleet.compile_and_deploy(
+            model_name="test_detector",
+            model_weights=weights,
+            version="1.0.0",
+            quantization=QuantizationType.INT8,
+            staged_rollout=False
+        )
+        
+        assert result["successful"] > 0
+        assert "compiled_model" in result
+
+
+class TestEdgeInference:
+    """Tests for EdgeInferenceEngine."""
+    
+    def test_local_inference(self):
+        """Test inference on edge device."""
+        from production.edge_ai import (
+            EdgeDevice, EdgeInferenceEngine, ModelCompiler,
+            QuantizationType, DeviceStatus
+        )
+        
+        device = EdgeDevice(
+            device_id="test_device",
+            name="Test",
+            capabilities={"memory_gb": 4, "gpu": False}
+        )
+        device.status = DeviceStatus.ONLINE
+        
+        engine = EdgeInferenceEngine(device)
+        
+        # Compile and load model
+        compiler = ModelCompiler()
+        weights = np.random.randn(100, 50).astype(np.float32)
+        model = compiler.compile("detector", weights, quantization=QuantizationType.INT8)
+        
+        engine.load_model(model)
+        
+        # Run inference
+        input_data = np.random.randn(1, 50)
+        result = engine.predict("detector", input_data)
+        
+        assert result.device_id == "test_device"
+        assert result.latency_ms > 0
+
+
+# ============================================================
+# ACL FILTER TESTS
+# ============================================================
+
+class TestACLFilter:
+    """Tests for ACLFilter."""
+    
+    def test_create_acl_metadata(self):
+        """Test ACL metadata creation."""
+        from production.vector_db import ACLFilter
+        
+        metadata = ACLFilter.create_acl_metadata(
+            owner_id="user_1",
+            read_users=["user_2", "user_3"],
+            public=False
+        )
+        
+        assert "_acl" in metadata
+        assert metadata["_acl"]["owner"] == "user_1"
+        
+    def test_check_permission_owner(self):
+        """Test owner has all permissions."""
+        from production.vector_db import ACLFilter, ACLPermission
+        
+        acl_filter = ACLFilter()
+        metadata = ACLFilter.create_acl_metadata(owner_id="user_1")
+        
+        assert acl_filter.check_permission("user_1", metadata, ACLPermission.READ)
+        assert acl_filter.check_permission("user_1", metadata, ACLPermission.WRITE)
+        assert acl_filter.check_permission("user_1", metadata, ACLPermission.ADMIN)
+        
+    def test_check_permission_read_user(self):
+        """Test read user permissions."""
+        from production.vector_db import ACLFilter, ACLPermission
+        
+        acl_filter = ACLFilter()
+        metadata = ACLFilter.create_acl_metadata(
+            owner_id="user_1",
+            read_users=["user_2"]
+        )
+        
+        assert acl_filter.check_permission("user_2", metadata, ACLPermission.READ)
+        assert not acl_filter.check_permission("user_2", metadata, ACLPermission.WRITE)
+        
+    def test_filter_search_results(self):
+        """Test search result filtering."""
+        from production.vector_db import ACLFilter, ACLPermission
+        
+        acl_filter = ACLFilter()
+        
+        results = [
+            ("v1", 0.9, ACLFilter.create_acl_metadata("user_1", read_users=["user_2"])),
+            ("v2", 0.8, ACLFilter.create_acl_metadata("user_3")),  # No access for user_2
+            ("v3", 0.7, ACLFilter.create_acl_metadata("user_2")),  # user_2 is owner
+        ]
+        
+        filtered = acl_filter.filter_search_results("user_2", results)
+        
+        # user_2 should see v1 (has read access) and v3 (is owner)
+        assert len(filtered) == 2
+        assert filtered[0][0] == "v1"
+        assert filtered[1][0] == "v3"
+
+
+# ============================================================
+# EMBEDDING DRIFT DETECTION TESTS
+# ============================================================
+
+class TestEmbeddingDriftDetector:
+    """Tests for EmbeddingDriftDetector."""
+    
+    def test_create_detector(self):
+        """Test detector creation."""
+        from production.vector_db import EmbeddingDriftDetector
+        
+        detector = EmbeddingDriftDetector(embedding_dim=64)
+        assert detector.embedding_dim == 64
+        
+    def test_set_reference(self):
+        """Test setting reference distribution."""
+        from production.vector_db import EmbeddingDriftDetector
+        
+        detector = EmbeddingDriftDetector(embedding_dim=64, window_size=100)
+        
+        reference = [np.random.randn(64) for _ in range(100)]
+        stats = detector.set_reference(reference)
+        
+        assert stats["reference_size"] == 100
+        assert "centroid_norm" in stats
+        
+    def test_detect_drift(self):
+        """Test drift detection."""
+        from production.vector_db import EmbeddingDriftDetector
+        
+        detector = EmbeddingDriftDetector(
+            embedding_dim=64,
+            window_size=100,
+            drift_threshold=0.1
+        )
+        
+        # Set reference distribution
+        reference = [np.random.randn(64) for _ in range(100)]
+        detector.set_reference(reference)
+        
+        # Add similar embeddings (should not drift)
+        for _ in range(60):
+            detector.add_embedding(np.random.randn(64))
+        
+        metrics = detector.compute_drift_metrics()
+        assert "cosine_distance" in metrics
+        
+    def test_get_embeddings_for_umap(self):
+        """Test UMAP data export."""
+        from production.vector_db import EmbeddingDriftDetector
+        
+        detector = EmbeddingDriftDetector(embedding_dim=64, window_size=50)
+        
+        reference = [np.random.randn(64) for _ in range(50)]
+        detector.set_reference(reference)
+        
+        for _ in range(50):
+            detector.add_embedding(np.random.randn(64))
+        
+        embeddings, labels = detector.get_embeddings_for_umap(sample_size=20)
+        
+        assert len(embeddings) <= 40  # 20 reference + 20 current
+        assert len(labels) == len(embeddings)
+
+
+# ============================================================
+# STREAMING FEATURE TESTS
+# ============================================================
+
+class TestGigascaleStreamingPipeline:
+    """Tests for GigascaleStreamingPipeline."""
+    
+    def test_create_pipeline(self):
+        """Test pipeline creation."""
+        from production.feature_store import (
+            GigascaleStreamingPipeline, FeatureRegistry, SerializationFormat
+        )
+        
+        registry = FeatureRegistry()
+        pipeline = GigascaleStreamingPipeline(
+            registry=registry,
+            serialization=SerializationFormat.MSGPACK
+        )
+        
+        assert pipeline.serialization == SerializationFormat.MSGPACK
+        
+    def test_enqueue_and_process_events(self):
+        """Test event processing."""
+        from production.feature_store import (
+            GigascaleStreamingPipeline, FeatureRegistry, SessionCountTransform,
+            StreamingFeatureConfig
+        )
+        
+        registry = FeatureRegistry()
+        pipeline = GigascaleStreamingPipeline(registry)
+        
+        # Register transform
+        transform = SessionCountTransform()
+        pipeline.register_streaming_feature(
+            transform,
+            StreamingFeatureConfig(
+                feature_name="user_session_count_7d",
+                window_seconds=300,
+                aggregation="count"
+            )
+        )
+        
+        # Enqueue events
+        for i in range(5):
+            pipeline.enqueue_event({
+                "entity_id": "user_1",
+                "sessions": [{"ts": f"2024-01-0{i+1}"}]
+            })
+        
+        # Process events
+        results = pipeline.process_events()
+        
+        assert len(results) == 5
+        
+    def test_freshness_tracking(self):
+        """Test feature freshness tracking."""
+        from production.feature_store import (
+            GigascaleStreamingPipeline, FeatureRegistry, SessionCountTransform
+        )
+        
+        registry = FeatureRegistry()
+        pipeline = GigascaleStreamingPipeline(registry)
+        
+        transform = SessionCountTransform()
+        pipeline.register_streaming_feature(transform)
+        
+        # Process an event
+        pipeline.enqueue_event({"entity_id": "user_1", "sessions": []})
+        pipeline.process_events()
+        
+        # Check freshness
+        is_fresh, staleness = pipeline.freshness_tracker.check_freshness(
+            "user_session_count_7d", "user_1", max_staleness_seconds=60
+        )
+        
+        assert is_fresh is True
+        assert staleness is not None
+
+
+class TestSecureVectorDB:
+    """Tests for SecureVectorDB."""
+    
+    def test_add_and_search_with_acl(self):
+        """Test adding and searching with ACL."""
+        from production.vector_db import SecureVectorDB
+        
+        db = SecureVectorDB(embedding_dim=64)
+        db.create_index("test", dim=64, index_type="linear")
+        
+        # Add vectors with different owners
+        db.add_with_acl(
+            "v1",
+            np.random.randn(64),
+            owner_id="user_1",
+            read_users=["user_2"],
+            index_name="test"
+        )
+        db.add_with_acl(
+            "v2",
+            np.random.randn(64),
+            owner_id="user_3",
+            index_name="test"
+        )
+        
+        # Search as user_2 (should only see v1)
+        results = db.search_with_acl("user_2", np.random.randn(64), k=10, index_name="test")
+        
+        # user_2 should only see vectors they have access to
+        assert all(r[0] == "v1" or r[2].get("_acl", {}).get("owner") == "user_2" 
+                   for r in results if "_acl" in r[2])
+
+
+# ============================================================
+# IMPORT ALL NEW MODULES TEST
+# ============================================================
+
+class TestNewModulesImport:
+    """Test imports for all new modules."""
+    
+    def test_import_edge_ai(self):
+        """Test Edge AI module imports."""
+        from production.edge_ai import (
+            EdgeDevice, DeviceStatus, ModelStatus,
+            QuantizationType, OptimizationType,
+            CompiledModel, InferenceResult, DeploymentRecord,
+            ModelCompiler, OTAUpdateManager, EdgeInferenceEngine,
+            EdgeFleetManager, create_sample_fleet
+        )
+        assert True
+        
+    def test_import_streaming_features(self):
+        """Test streaming feature imports."""
+        from production.feature_store import (
+            SerializationFormat, StreamingFeatureConfig,
+            FeatureFreshnessTracker, GigascaleStreamingPipeline
+        )
+        assert True
+        
+    def test_import_vector_db_security(self):
+        """Test vector DB security imports."""
+        from production.vector_db import (
+            ACLPermission, ACLEntry, ACLFilter,
+            EmbeddingDriftDetector, SecureVectorDB
+        )
+        assert True
+
+
+# ============================================================
 # RUN TESTS
 # ============================================================
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
