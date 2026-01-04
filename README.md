@@ -42,6 +42,13 @@
 
 **✅ PROJECT 100% COMPLETE** | 20 files | 12,000+ lines | Production-ready portfolio
 
+> [!IMPORTANT]
+> **🚀 Latest Achievements (Jan 2026)**:
+> - ✅ Completed all 5 system design documents (interview-ready)
+> - ✅ GitHub Issue Classifier capstone (87% accuracy, <10ms latency)
+> - ✅ 4 polished STAR behavioral stories with metrics
+> - ✅ Full documentation: [Capstone Demo Script](docs/CAPSTONE_DEMO_SCRIPT.md) | [Interview Tracker](INTERVIEW_TRACKER.md)
+
 ---
 
 ## 🧩 Module Deep Dive
@@ -183,37 +190,49 @@ docker run -p 8000:8000 issue-classifier
 
 ## 🏗️ System Design Solutions
 
-**5 production-scale designs ready for interviews:**
+**5 production-scale designs ready for technical interviews:**
 
-### 1. [RAG at Scale](docs/system_design_solutions/01_rag_at_scale.md)
+> [!NOTE]
+> Each design includes: requirements analysis, architecture diagrams, component deep dives, scaling strategies, cost estimates, and interview discussion points.
+
+### 1. [RAG at Scale](docs/system_design_solutions/01_rag_at_scale.md) ✅
 - **Scope**: 1M documents, 1000 QPS, <500ms p95 latency
-- **Architecture**: Hybrid search (dense + BM25), 3-tier caching, re-ranking
-- **Cost**: $5,850/month
-- **Highlights**: Elasticsearch, Qdrant, Redis multi-level cache
+- **Architecture**: Hybrid search (semantic + BM25), multi-tier caching, cross-encoder re-ranking
+- **Tech Stack**: Qdrant, Elasticsearch, Redis, FastAPI
+- **Cost**: ~$5,850/month
+- **Key Insight**: Hybrid retrieval 15-20% better than pure semantic
 
-### 2. [Recommendation System](docs/system_design_solutions/02_recommendation_system.md)
+### 2. [Recommendation System](docs/system_design_solutions/02_recommendation_system.md) ✅
 - **Scope**: 100M users, 10M products, <100ms p95 latency
-- **Architecture**: Multi-strategy (MF + Content + DNN two-tower)
-- **Cost**: $19,000/month
-- **Highlights**: Offline batch + online real-time, A/B testing
+- **Architecture**: Multi-strategy (Matrix Factorization + Content-based + DNN two-tower)
+- **Tech Stack**: Spark, Redis, TensorFlow Serving
+- **Cost**: ~$19,000/month
+- **Key Insight**: Offline batch + online real-time serving pattern
 
-### 3. [Fraud Detection Pipeline](docs/system_design_solutions/03_fraud_detection.md)
-- **Scope**: 1M transactions/day, <100ms latency, <0.1% false positives
-- **Architecture**: Multi-layer (rules + ML + anomaly detection)
-- **Cost**: $2,100/month
-- **Highlights**: XGBoost, Isolation Forest, SHAP explainability
+### 3. [Fraud Detection Pipeline](docs/system_design_solutions/03_fraud_detection.md) ✅
+- **Scope**: 1M transactions/day, <100ms p2p latency, <0.1% false positives
+- **Architecture**: Multi-layer defense (rule engine + ML + anomaly detection)
+- **Tech Stack**: XGBoost, Isolation Forest, Kafka, PostgreSQL
+- **Cost**: ~$2,100/month
+- **Key Insight**: Explainability (SHAP) critical for fraud analyst trust
 
-### 4. [ML Model Serving](docs/system_design_solutions/04_ml_model_serving.md)
+### 4. [ML Model Serving at Scale](docs/system_design_solutions/04_model_serving.md) ✅ *NEW*
 - **Scope**: 10,000 QPS, <50ms p95 latency
-- **Architecture**: NVIDIA Triton, dynamic batching, INT8 quantization
-- **Cost**: $30,000/month
-- **Highlights**: GPU optimization, canary deployments, auto-scaling
+- **Architecture**: Dynamic batching (21x throughput), blue-green + canary deployments
+- **Tech Stack**: Triton Inference Server, MLflow, Kubernetes HPA, Redis cache
+- **Cost**: ~$4,850/month (CPU) or ~$6,850/month (GPU)
+- **Key Insight**: Dynamic batching reduces per-request latency from 10ms → 0.47ms
 
-### 5. [A/B Testing Framework](docs/system_design_solutions/05_ab_testing_framework.md)
-- **Scope**: 10M daily active users, statistical rigor
-- **Architecture**: Consistent hashing, Kafka event streaming, Spark aggregation
-- **Cost**: $3,700/month
-- **Highlights**: Thompson Sampling (multi-armed bandit), automated guardrails
+### 5. [A/B Testing Platform](docs/system_design_solutions/05_ab_testing.md) ✅ *NEW*
+- **Scope**: 10M daily active users, multi-variant experiments, statistical rigor
+- **Architecture**: Consistent hashing assignment, Kafka event streaming, Spark analytics
+- **Tech Stack**: Kafka, Spark, PostgreSQL, Redis (config cache)
+- **Cost**: ~$2,000/month
+- **Key Insight**: Thompson Sampling (Bayesian MAB) for adaptive traffic allocation
+
+**Total System Design Coverage**: $33,800/month across all 5 designs | ~5,000 lines of technical documentation
+
+
 
 ---
 
@@ -254,33 +273,8 @@ docker run -p 8000:8000 issue-classifier
 
 ---
 
-## 🎓 Capstone Project: GitHub Issue Classifier
-
-**Production-ready ML application showcasing the complete lifecycle:**
-
-```bash
-# Train the model
-python scripts/capstone/train_issue_classifier.py
-
-# Start the API
-uvicorn src.production.issue_classifier_api:app --port 8000
-
-# Deploy with Docker
-docker build -f Dockerfile.capstone -t issue-classifier .
-docker run -p 8000:8000 issue-classifier
-``$
-
-**Achievements**:
-- ✅ **>85% Test Accuracy** on multi-class classification
-- ✅ **<10ms p95 Inference Latency** (production-ready)
-- ✅ **Full Observability** with Prometheus metrics
-- ✅ **Production Deployment** with Docker + FastAPI
-
-📖 [Full Documentation](docs/CAPSTONE_README.md)
-
----
-
 ## 🚀 Quick Start
+
 
 ### Installation
 
