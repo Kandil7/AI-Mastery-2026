@@ -250,35 +250,36 @@ if __name__ == "__main__":
         test.record_prediction(variant.name, prediction, actual, latency)
     
     # Analyze results
-    print("\\n" + "="*60)
+    print("\n" + "="*60)
     print("A/B TEST RESULTS")
     print("="*60)
     
     summary = test.get_summary()
-    print(f\"\\nTest: {summary['test_name']}\")
-    print(f\"Started: {summary['started_at']}\")
+    print(f"\nTest: {summary['test_name']}")
+    print(f"Started: {summary['started_at']}")
     
     results = test.analyze(metric="error")
     
-    print(f\"\\nControl: {results['control']['name']}\")
-    print(f\"  Mean Error: {results['control']['mean']:.4f} ± {results['control']['std']:.4f}\")
-    print(f\"  95% CI: [{results['control']['ci_95'][0]:.4f}, {results['control']['ci_95'][1]:.4f}]\")
-    print(f\"  Samples: {results['control']['n']}\")
+    print(f"\nControl: {results['control']['name']}")
+    print(f"  Mean Error: {results['control']['mean']:.4f} ± {results['control']['std']:.4f}")
+    print(f"  95% CI: [{results['control']['ci_95'][0]:.4f}, {results['control']['ci_95'][1]:.4f}]")
+    print(f"  Samples: {results['control']['n']}")
     
-    print(f\"\\nTreatment: {results['treatment']['name']}\")
-    print(f\"  Mean Error: {results['treatment']['mean']:.4f} ± {results['treatment']['std']:.4f}\")
-    print(f\"  95% CI: [{results['treatment']['ci_95'][0]:.4f}, {results['treatment']['ci_95'][1]:.4f}]\")
-    print(f\"  Samples: {results['treatment']['n']}\")
+    print(f"\nTreatment: {results['treatment']['name']}")
+    print(f"  Mean Error: {results['treatment']['mean']:.4f} ± {results['treatment']['std']:.4f}")
+    print(f"  95% CI: [{results['treatment']['ci_95'][0]:.4f}, {results['treatment']['ci_95'][1]:.4f}]")
+    print(f"  Samples: {results['treatment']['n']}")
     
-    print(f\"\\nStatistical Test:\")
-    print(f\"  P-value: {results['statistical_test']['p_value']:.6f}\")
-    print(f\"  Significant: {results['statistical_test']['is_significant']}\")
-    print(f\"  Effect Size (Cohen's d): {results['statistical_test']['cohens_d']:.4f} ({results['statistical_test']['effect_size']})\")
+    print(f"\nStatistical Test:")
+    print(f"  P-value: {results['statistical_test']['p_value']:.6f}")
+    print(f"  Significant: {results['statistical_test']['is_significant']}")
+    print(f"  Effect Size (Cohen's d): {results['statistical_test']['cohens_d']:.4f} ({results['statistical_test']['effect_size']})")
     
-    print(f\"\\nConclusion:\")
-    print(f\"  Winner: {results['conclusion']['winner']}\")
-    print(f\"  Improvement: {results['conclusion']['improvement_pct']:.2f}%\")
-    print(f\"  Recommendation: {results['conclusion']['recommendation']}\")
+    print(f"\nConclusion:")
+    print(f"  Winner: {results['conclusion']['winner']}")
+    print(f"  Improvement: {results['conclusion']['improvement_pct']:.2f}%")
+    print(f"  Recommendation: {results['conclusion']['recommendation']}")
     
-    print(\"\\n\" + \"=\"*60)
-    print(\"✅ A/B testing framework ready for production!\")
+    print("\n" + "="*60)
+    print("✅ A/B testing framework ready for production!")
+
