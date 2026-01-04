@@ -1,6 +1,16 @@
 {
     "annotations": {
-        "list": []
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": "-- Grafana --",
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
     },
     "editable": true,
     "gnetId": null,
@@ -15,6 +25,27 @@
                     "color": {
                         "mode": "palette-classic"
                     },
+                    "custom": {
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 10,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "tooltip": false,
+                            "viz": false,
+                            "legend": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "never",
+                        "spanNulls": true
+                    },
                     "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
@@ -22,94 +53,116 @@
                             {
                                 "color": "green",
                                 "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
                             }
                         ]
                     },
-                    "unit": "short"
-                }
+                    "unit": "reqps"
+                },
+                "overrides": []
             },
             "gridPos": {
                 "h": 8,
-                "w": 8,
+                "w": 12,
                 "x": 0,
                 "y": 0
             },
             "id": 1,
             "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
+                "legend": {
                     "calcs": [
+                        "mean",
                         "lastNotNull"
                     ],
-                    "fields": "",
-                    "values": false
+                    "displayMode": "table",
+                    "placement": "bottom"
                 },
-                "textMode": "auto"
+                "tooltip": {
+                    "mode": "single"
+                }
             },
-            "title": "Models Loaded",
-            "type": "stat",
+            "pluginVersion": "8.0.0",
             "targets": [
                 {
-                    "expr": "ml_api_models_loaded",
-                    "refId": "A"
+                    "expr": "rate(api_requests_total{endpoint=\"classify_image\"}[5m])",
+                    "refId": "A",
+                    "legendFormat": "Image Classification"
+                },
+                {
+                    "expr": "rate(api_requests_total{endpoint=\"classify\"}[5m])",
+                    "refId": "B",
+                    "legendFormat": "Issue Classification"
                 }
-            ]
+            ],
+            "title": "Request Rate by Endpoint",
+            "type": "timeseries"
         },
         {
             "datasource": "Prometheus",
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
                     "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "red",
-                                "value": 0
+                                "color": "green",
+                                "value": null
                             },
                             {
-                                "color": "green",
-                                "value": 1
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "red",
+                                "value": 200
                             }
                         ]
-                    }
-                }
+                    },
+                    "unit": "ms"
+                },
+                "overrides": []
             },
             "gridPos": {
                 "h": 8,
-                "w": 8,
-                "x": 8,
+                "w": 12,
+                "x": 12,
                 "y": 0
             },
             "id": 2,
             "options": {
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "horizontal",
+                "orientation": "auto",
                 "reduceOptions": {
+                    "values": false,
                     "calcs": [
                         "lastNotNull"
                     ],
-                    "fields": "",
-                    "values": false
+                    "fields": ""
                 },
-                "textMode": "auto"
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
             },
-            "title": "API Status",
-            "type": "stat",
+            "pluginVersion": "8.0.0",
             "targets": [
                 {
-                    "expr": "ml_api_status",
-                    "refId": "A"
+                    "expr": "histogram_quantile(0.95, rate(api_request_latency_seconds_bucket{endpoint=\"classify_image\"}[5m])) * 1000",
+                    "refId": "A",
+                    "legendFormat": "Image p95"
+                },
+                {
+                    "expr": "histogram_quantile(0.99, rate(api_request_latency_seconds_bucket{endpoint=\"classify_image\"}[5m])) * 1000",
+                    "refId": "B",
+                    "legendFormat": "Image p99"
                 }
-            ]
+            ],
+            "title": "P95/P99 Latency (ms)",
+            "type": "gauge"
         },
         {
             "datasource": "Prometheus",
@@ -126,25 +179,18 @@
                         "fillOpacity": 10,
                         "gradientMode": "none",
                         "hideFrom": {
-                            "legend": false,
                             "tooltip": false,
-                            "viz": false
+                            "viz": false,
+                            "legend": false
                         },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
                         "pointSize": 5,
                         "scaleDistribution": {
                             "type": "linear"
                         },
                         "showPoints": "never",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "none"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
+                        "spanNulls": true
                     },
                     "mappings": [],
                     "thresholds": {
@@ -156,12 +202,13 @@
                             }
                         ]
                     },
-                    "unit": "ms"
-                }
+                    "unit": "percentunit"
+                },
+                "overrides": []
             },
             "gridPos": {
                 "h": 8,
-                "w": 16,
+                "w": 12,
                 "x": 0,
                 "y": 8
             },
@@ -170,7 +217,7 @@
                 "legend": {
                     "calcs": [
                         "mean",
-                        "max"
+                        "last"
                     ],
                     "displayMode": "table",
                     "placement": "bottom"
@@ -179,138 +226,23 @@
                     "mode": "multi"
                 }
             },
-            "title": "API Response Time",
-            "type": "timeseries",
+            "pluginVersion": "8.0.0",
             "targets": [
                 {
-                    "expr": "histogram_quantile(0.5, rate(http_request_duration_seconds_bucket[5m])) * 1000",
-                    "legendFormat": "p50",
-                    "refId": "A"
-                },
-                {
-                    "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) * 1000",
-                    "legendFormat": "p95",
-                    "refId": "B"
-                },
-                {
-                    "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) * 1000",
-                    "legendFormat": "p99",
-                    "refId": "C"
+                    "expr": "rate(api_requests_total{status=\"error\"}[5m]) / rate(api_requests_total[5m])",
+                    "refId": "A",
+                    "legendFormat": "Error Rate"
                 }
-            ]
+            ],
+            "title": "Error Rate",
+            "type": "timeseries"
         },
         {
             "datasource": "Prometheus",
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "barAlignment": 0,
-                        "drawStyle": "bars",
-                        "fillOpacity": 50,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "viz": false
-                        },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
-                        "pointSize": 5,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "showPoints": "never",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "none"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    },
-                    "unit": "reqps"
-                }
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 16,
-                "x": 0,
-                "y": 16
-            },
-            "id": 4,
-            "options": {
-                "legend": {
-                    "calcs": [
-                        "mean",
-                        "sum"
-                    ],
-                    "displayMode": "table",
-                    "placement": "bottom"
-                },
-                "tooltip": {
-                    "mode": "multi"
-                }
-            },
-            "title": "Request Rate",
-            "type": "timeseries",
-            "targets": [
-                {
-                    "expr": "rate(http_requests_total[5m])",
-                    "legendFormat": "{{method}} {{endpoint}}",
-                    "refId": "A"
-                }
-            ]
-        },
-        {
-            "datasource": "Prometheus",
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "barAlignment": 0,
-                        "drawStyle": "line",
-                        "fillOpacity": 0,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "viz": false
-                        },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 2,
-                        "pointSize": 5,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "showPoints": "never",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "none"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
+                        "mode": "thresholds"
                     },
                     "mappings": [],
                     "thresholds": {
@@ -327,48 +259,187 @@
                         ]
                     },
                     "unit": "percentunit"
-                }
+                },
+                "overrides": []
             },
             "gridPos": {
                 "h": 8,
-                "w": 8,
-                "x": 16,
+                "w": 6,
+                "x": 12,
+                "y": 8
+            },
+            "id": 4,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true,
+                "text": {}
+            },
+            "pluginVersion": "8.0.0",
+            "targets": [
+                {
+                    "expr": "1 - (rate(api_requests_total{status=\"error\"}[5m]) / rate(api_requests_total[5m]))",
+                    "refId": "A"
+                }
+            ],
+            "title": "Availability (SLA)",
+            "type": "gauge"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
                 "y": 8
             },
             "id": 5,
             "options": {
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom"
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
                 },
-                "tooltip": {
-                    "mode": "single"
-                }
+                "text": {},
+                "textMode": "auto"
             },
-            "title": "Error Rate",
-            "type": "timeseries",
+            "pluginVersion": "8.0.0",
             "targets": [
                 {
-                    "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-                    "legendFormat": "5xx Error Rate",
+                    "expr": "ml_api_models_loaded",
                     "refId": "A"
+                }
+            ],
+            "title": "Models Loaded",
+            "type": "stat"
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "bars",
+                        "fillOpacity": 100,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "tooltip": false,
+                            "viz": false,
+                            "legend": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "never",
+                        "spanNulls": true
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "ms"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 16
+            },
+            "id": 6,
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "right"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "8.0.0",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.50, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+                    "refId": "A",
+                    "legendFormat": "p50"
                 },
                 {
-                    "expr": "sum(rate(http_requests_total{status=~\"4..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-                    "legendFormat": "4xx Error Rate",
-                    "refId": "B"
+                    "expr": "histogram_quantile(0.90, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+                    "refId": "B",
+                    "legendFormat": "p90"
+                },
+                {
+                    "expr": "histogram_quantile(0.95, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+                    "refId": "C",
+                    "legendFormat": "p95"
+                },
+                {
+                    "expr": "histogram_quantile(0.99, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+                    "refId": "D",
+                    "legendFormat": "p99"
                 }
-            ]
+            ],
+            "title": "Latency Percentiles",
+            "type": "timeseries"
         }
     ],
     "refresh": "10s",
-    "schemaVersion": 30,
+    "schemaVersion": 27,
     "style": "dark",
     "tags": [
         "ml",
         "api",
-        "ai-mastery"
+        "production"
     ],
     "templating": {
         "list": []
@@ -378,8 +449,8 @@
         "to": "now"
     },
     "timepicker": {},
-    "timezone": "browser",
-    "title": "AI-Mastery-2026 ML API Dashboard",
-    "uid": "ai-mastery-api",
+    "timezone": "",
+    "title": "ML API Production Dashboard",
+    "uid": "ml-api-prod",
     "version": 1
 }
