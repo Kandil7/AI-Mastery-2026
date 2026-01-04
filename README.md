@@ -77,15 +77,17 @@ All algorithms implemented **from first principles** to understand internal mech
 
 *   **Classical**: `classical.py` - Decision Trees, SVMs (SMO), Naive Bayes.
 *   **Deep Learning**: `deep_learning.py` - Autograd engine, Dense/Conv2D/LSTM layers.
-*   **Computer Vision**: `vision.py` - ResNet18, ResidualBlock, Conv2D with im2col, MaxPool2D. *NEW*
-*   **Graph Neural Networks**: `gnn_integration.py` - Message passing frameworks.
+*   **Computer Vision**: `vision.py` - ResNet18, ResidualBlock, Conv2D with im2col, MaxPool2D.
+*   **Graph Neural Networks**: `gnn_recommender.py` - GraphSAGE, Two-Tower, BPR/InfoNCE losses. *NEW*
 *   **Reinforcement Learning**: `rl_integration.py` - PPO, DQN, Policy Gradients.
 
 ### 3. LLM Engineering (`src/llm/`)
 *Transformer architectures and attention mechanisms from scratch.*
 
-*   **Transformers**: `transformer.py` - BERT, GPT-2, MultiHeadAttention, positional encodings. *NEW*
+*   **Transformers**: `transformer.py` - BERT, GPT-2, MultiHeadAttention, positional encodings.
 *   **Attention**: `attention.py` - Scaled dot-product, causal masking, RoPE.
+*   **Advanced RAG**: `advanced_rag.py` - Semantic chunking, hybrid retrieval, model routing. *NEW*
+*   **Support Agent**: `support_agent.py` - Guardrails, confidence scoring, CX analysis. *NEW*
 *   **Fine-tuning**: LoRA adapters, prompt engineering.
 
 ### 4. Production Engineering (`src/production/`)
@@ -93,6 +95,9 @@ All algorithms implemented **from first principles** to understand internal mech
 
 *   **RAG Pipeline**: `query_enhancement.py` (HyDE, Multi-Query), `data_pipeline.py`.
 *   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW).
+*   **Feature Store**: `feature_store.py` - Batch/streaming pipelines, online serving. *NEW*
+*   **Trust Layer**: `trust_layer.py` - PII masking, content safety, audit logging. *NEW*
+*   **Ranking Pipeline**: `ranking_pipeline.py` - Multi-stage candidate ranking. *NEW*
 *   **Observability**: `monitoring.py` (Prometheus/Grafana), `observability.py`.
 *   **Serving**: `api.py` (FastAPI), Docker containerization.
 
@@ -276,6 +281,16 @@ docker run -p 8000:8000 issue-classifier
 - **Tech**: Matrix factorization, BERT embeddings, <400ms latency for 8M users
 
 **Total Business Impact**: $22M+ across three case studies
+
+### Full Stack AI Case Studies *NEW*
+
+| # | Case Study | Industry Reference | Key Topic |
+|---|------------|-------------------|-----------|
+| 1 | [Uber Eats GNN Recommendations](case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md) | Uber | GraphSAGE, Two-Tower |
+| 2 | [Notion AI RAG Architecture](case_studies/full_stack_ai/02_notion_ai_rag_architecture.md) | Notion | Hybrid Retrieval, Model Routing |
+| 3 | [Intercom Fin Support Agent](case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
+| 4 | [Salesforce Trust Layer](case_studies/full_stack_ai/04_salesforce_trust_layer.md) | Salesforce | PII Masking, Audit |
+| 5 | [Pinterest Ranking Pipeline](case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
 
 ---
 
