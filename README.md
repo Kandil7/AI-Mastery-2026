@@ -94,8 +94,9 @@ All algorithms implemented **from first principles** to understand internal mech
 *Enterprise-grade infrastructure for real-world deployment.*
 
 *   **RAG Pipeline**: `query_enhancement.py` (HyDE, Multi-Query), `data_pipeline.py`.
-*   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW).
-*   **Feature Store**: `feature_store.py` - Batch/streaming pipelines, online serving. *NEW*
+*   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW, ACL filtering, drift detection).
+*   **Feature Store**: `feature_store.py` - Batch/streaming pipelines, freshness tracking (DoorDash Gigascale). *ENHANCED*
+*   **Edge AI**: `edge_ai.py` - Model compilation, OTA updates, fleet management (Siemens Industrial Edge). *NEW*
 *   **Trust Layer**: `trust_layer.py` - PII masking, content safety, audit logging. *NEW*
 *   **Ranking Pipeline**: `ranking_pipeline.py` - Multi-stage candidate ranking. *NEW*
 *   **Observability**: `monitoring.py` (Prometheus/Grafana), `observability.py`.
@@ -291,6 +292,8 @@ docker run -p 8000:8000 issue-classifier
 | 3 | [Intercom Fin Support Agent](case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
 | 4 | [Salesforce Trust Layer](case_studies/full_stack_ai/04_salesforce_trust_layer.md) | Salesforce | PII Masking, Audit |
 | 5 | [Pinterest Ranking Pipeline](case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
+| 6 | [DoorDash Feature Store](case_studies/full_stack_ai/06_doordash_feature_store.md) | DoorDash | Streaming Features, Freshness SLA |
+| 7 | [Siemens Edge AI](case_studies/full_stack_ai/07_siemens_edge_ai.md) | Siemens | Edge Deployment, OTA Updates |
 
 ---
 
