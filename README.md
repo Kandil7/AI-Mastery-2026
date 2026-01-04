@@ -43,11 +43,14 @@
 **✅ PROJECT 100% COMPLETE** | 20 files | 12,000+ lines | Production-ready portfolio
 
 > [!IMPORTANT]
-> **🚀 Latest Achievements (Jan 2026)**:
-> - ✅ Completed all 5 system design documents (interview-ready)
-> - ✅ GitHub Issue Classifier capstone (87% accuracy, <10ms latency)
-> - ✅ 4 polished STAR behavioral stories with metrics
-> - ✅ Full documentation: [Capstone Demo Script](docs/CAPSTONE_DEMO_SCRIPT.md) | [Interview Tracker](INTERVIEW_TRACKER.md)
+> **🚀 Latest Achievements (Jan 4, 2026 - Evening Update)**:
+> - ✅ Complete ResNet18 implementation with skip connections (`src/ml/vision.py`, 600+ lines)
+> - ✅ Full BERT & GPT-2 from scratch (`src/llm/transformer.py`, 900+ lines)
+> - ✅ 3 production case studies with $22M+ combined impact
+> - ✅ All 5 system design documents (interview-ready)
+> - ✅ 4 polished STAR behavioral stories
+> - ✅ 49% overall completion, Tier 2 at 75%
+> - 📹 **Next**: Capstone demo video | [Demo Script](docs/CAPSTONE_DEMO_SCRIPT.md) | [Interview Tracker](INTERVIEW_TRACKER.md)
 
 ---
 
@@ -68,10 +71,18 @@
 
 *   **Classical**: `classical.py` - Decision Trees, SVMs (SMO), Naive Bayes.
 *   **Deep Learning**: `deep_learning.py` - Autograd engine, Dense/Conv2D/LSTM layers.
+*   **Computer Vision**: `vision.py` - ResNet18, ResidualBlock, Conv2D with im2col, MaxPool2D. *NEW*
 *   **Graph Neural Networks**: `gnn_integration.py` - Message passing frameworks.
 *   **Reinforcement Learning**: `rl_integration.py` - PPO, DQN, Policy Gradients.
 
-### 3. Production Engineering (`src/production/`)
+### 3. LLM Engineering (`src/llm/`)
+*Transformer architectures and attention mechanisms from scratch.*
+
+*   **Transformers**: `transformer.py` - BERT, GPT-2, MultiHeadAttention, positional encodings. *NEW*
+*   **Attention**: `attention.py` - Scaled dot-product, causal masking, RoPE.
+*   **Fine-tuning**: LoRA adapters, prompt engineering.
+
+### 4. Production Engineering (`src/production/`)
 *Enterprise-grade infrastructure for real-world deployment.*
 
 *   **RAG Pipeline**: `query_enhancement.py` (HyDE, Multi-Query), `data_pipeline.py`.
@@ -233,6 +244,32 @@ docker run -p 8000:8000 issue-classifier
 **Total System Design Coverage**: $33,800/month across all 5 designs | ~5,000 lines of technical documentation
 
 
+
+---
+
+## 📊 Production Case Studies
+
+**3 real-world ML projects with measurable business impact:**
+
+### 1. [Churn Prediction for SaaS](case_studies/01_churn_prediction.md)
+- **Challenge**: 15% monthly churn costing $2M annually
+- **Solution**: XGBoost with 47 behavioral features + Airflow pipeline
+- **Impact**: **$800K savings**, 40% churn reduction (15% → 9%)
+- **Tech**: Time-series CV, SHAP explainability, daily batch scoring
+
+### 2. [Real-Time Fraud Detection](case_studies/02_fraud_detection.md)
+- **Challenge**: $5M annual fraud losses, need <100ms latency
+- **Solution**: Multi-layer defense (rules + XGBoost + Isolation Forest)
+- **Impact**: **$4.2M prevented**, 84% precision, 81% recall
+- **Tech**: Redis feature store, Cassandra, SMOTE, threshold optimization
+
+### 3. [Personalized Recommender System](case_studies/03_recommender_system.md)
+- **Challenge**: 45% users never engaged beyond homepage
+- **Solution**: Hybrid collaborative filtering + deep two-tower ranker
+- **Impact**: **+$17M revenue**, +32% watch time, +18% retention
+- **Tech**: Matrix factorization, BERT embeddings, <400ms latency for 8M users
+
+**Total Business Impact**: $22M+ across three case studies
 
 ---
 

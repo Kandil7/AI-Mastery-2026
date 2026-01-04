@@ -1,3 +1,4 @@
+```
 """
 API Module
 
@@ -5,8 +6,8 @@ This module implements a FastAPI application for serving ML models in production
 Supports real scikit-learn model loading and inference.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Union
 import numpy as np
 import time
@@ -17,6 +18,9 @@ from contextlib import asynccontextmanager
 import asyncio
 from enum import Enum
 from pathlib import Path
+import io
+from PIL import Image
+from datetime import datetime
 
 try:
     import joblib
@@ -24,6 +28,27 @@ try:
 except ImportError:
     JOBLIB_AVAILABLE = False
     import pickle
+
+# Prometheus metrics
+try:
+    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    from fastapi.responses import Response
+    PROMETHEUS_AVAILABLE = True
+    
+    # Metrics
+    request_count = Counter('api_requests_total', 'Total API requests', ['endpoint', 'status'])
+    request_latency = Histogram('api_request_latency_seconds', 'Request latency', ['endpoint'])
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
+# Import our models
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+
+try:
+    from ml.vision import ResNet18
+except ImportError:
+    ResNet18 = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
