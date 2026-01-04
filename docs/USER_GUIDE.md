@@ -23,7 +23,8 @@ This comprehensive guide covers everything you need to know to use the AI-Master
 11. [Docker Deployment](#11-docker-deployment)
 12. [Monitoring & Observability](#12-monitoring--observability)
 13. [Testing](#13-testing)
-14. [Interview Preparation](#14-interview-preparation) ⭐ NEW
+14. [Interview Preparation](#14-interview-preparation)
+15. [Edge AI SaaS](#15-edge-ai-saas) ⭐ NEW
 16. [Troubleshooting](#16-troubleshooting)
 17. [FAQ](#17-faq)
 
@@ -1760,6 +1761,164 @@ If `scripts/train_save_models.py` runs but CI fails on validation:
 
 ### 15.3 Import Errors (Legacy Modules)
 If you see `ImportError: cannot import name 'DataType'`, ensuring you are running from the project root. The `sys.path` is automatically adjusted in scripts, but manual execution might require `export PYTHONPATH=$PYTHONPATH:.`.
+
+---
+
+## 15. Edge AI SaaS
+
+Production-ready Edge AI implementations with **~3,600+ lines** of from-scratch code covering 4 production domains.
+
+### 15.1 Manufacturing Quality Control (`manufacturing_qc.py`)
+
+Real-time defect detection for high-speed manufacturing lines.
+
+```python
+from production.manufacturing_qc import (
+    DefectDetector, PLCInterface, QualityInspectionPipeline, DefectType
+)
+
+# Initialize components
+detector = DefectDetector(num_classes=8, quantized=True)  # INT8 for <20ms
+plc = PLCInterface(protocol=PLCProtocol.MODBUS_TCP)
+plc.connect()
+
+# Create pipeline
+pipeline = QualityInspectionPipeline(
+    detector=detector,
+    plc=plc,
+    confidence_threshold=0.85,
+    enable_shadow_mode=True  # Validate before actuation
+)
+
+# Inspect product
+result = pipeline.inspect(image)
+print(f"Defect: {result.defect_type}, Action: {result.action}")
+print(f"Latency: {result.latency_ms:.1f}ms")  # Target: <20ms
+```
+
+**Key Features:**
+- CNN with INT8 quantization (4x memory reduction)
+- PLC interface (Modbus TCP/OPC UA) for <5ms actuation
+- Shadow deployment for safe model validation
+- Active learning queue for edge cases
+
+### 15.2 Medical IoMT Devices (`medical_edge.py`)
+
+Privacy-first medical AI with hardware isolation and federated learning.
+
+```python
+from production.medical_edge import (
+    MedicalDevice, FederatedLearningClient, DifferentialPrivacy
+)
+
+# Create device with Neuro Core pattern (hardware isolation)
+device = create_fall_detection_device(
+    device_id="FALL_001",
+    patient_id="PT_ANON_123"
+)
+
+# Process sensor data - raw data NEVER leaves device
+event = device.process_sensor_data(accelerometer_data)
+
+# Federated learning with differential privacy
+client = FederatedLearningClient(client_id="hospital_001")
+client.add_local_data(X, y)
+weight_update = client.train_local(epochs=5, apply_dp=True)  # ε-DP guarantee
+```
+
+**Key Features:**
+- Neuro Core hardware isolation (raw data never leaves device)
+- Differential Privacy (Laplace/Gaussian mechanisms, ε-δ budget)
+- Federated Learning (DP-FedAvg, secure aggregation)
+- Personal Health Train framework
+
+### 15.3 Industrial IoT Predictive Maintenance (`industrial_iot.py`)
+
+Edge AI for predictive maintenance in oil & gas with DDIL tolerance.
+
+```python
+from production.industrial_iot import (
+    PredictiveMaintenanceEngine, AnomalyDetector, RULPredictor,
+    StoreAndForwardQueue, create_pump_monitoring_system
+)
+
+# Create complete system
+pdm = create_pump_monitoring_system("PUMP_001")
+
+# Train on normal data
+pdm.train_models(normal_sensor_data)
+
+# Analyze equipment
+pdm.collect_readings()
+alert = pdm.analyze()
+
+# Get health report with RUL prediction
+report = pdm.get_health_report()
+print(f"Health: {report['health_score']:.0f}%")
+print(f"RUL: {report['rul_hours']:.0f} hours")
+```
+
+**Key Features:**
+- Autoencoder + Isolation Forest ensemble (robust anomaly detection)
+- LSTM RUL predictor with uncertainty quantification
+- Store-and-Forward queue for DDIL environments
+- Multi-protocol sensors (Modbus, OPC UA, MQTT)
+
+### 15.4 Hybrid Edge-Cloud Inference (`hybrid_inference.py`)
+
+Dynamic workload distribution between edge and cloud.
+
+```python
+from production.hybrid_inference import (
+    create_hybrid_inference_system, InferenceRequest, PrivacySensitivity
+)
+
+# Create complete system
+orchestrator = create_hybrid_inference_system()
+
+# Process request with automatic routing
+request = InferenceRequest(
+    request_id="REQ_001",
+    input_data=image_data,
+    model_name="classifier",
+    task_type="classification",
+    privacy_level=PrivacySensitivity.CONFIDENTIAL,
+    latency_requirement_ms=50.0
+)
+
+result = orchestrator.infer(request)
+print(f"Decision: {result.execution_location.value}")
+print(f"Edge contribution: {result.edge_contribution:.0%}")
+print(f"Cost: ${result.cost:.6f}")
+```
+
+**Key Features:**
+- Multi-factor task routing (privacy, latency, cost, complexity)
+- Split model execution with activation compression
+- Confidence-based escalation to cloud
+- Model co-versioning management
+
+### 15.5 Case Studies
+
+| # | Case Study | Domain | Key Topic |
+|---|------------|--------|-----------|
+| 8 | [Manufacturing Quality Control](../case_studies/full_stack_ai/08_manufacturing_quality_control.md) | CV | CNN+INT8, PLC (<20ms) |
+| 9 | [Medical IoMT Devices](../case_studies/full_stack_ai/09_medical_iomt_devices.md) | Medical | Neuro Core, Federated Learning |
+| 10 | [Industrial IoT PdM](../case_studies/full_stack_ai/10_industrial_iot_pdm.md) | Oil & Gas | Autoencoder, RUL, DDIL |
+| 11 | [Hybrid Edge-Cloud](../case_studies/full_stack_ai/11_hybrid_edge_cloud.md) | Hybrid | Task Routing, Split Inference |
+
+### 15.6 Edge AI Engineer Roadmap
+
+See [docs/edge_ai_engineer_roadmap.md](edge_ai_engineer_roadmap.md) for a comprehensive skills roadmap covering:
+
+1. **Edge Computing** - C++, NVIDIA Jetson, Modbus, OPC UA
+2. **AI Engineering** - Quantization, pruning, TinyML
+3. **Backend & Cloud** - AWS IoT, Greengrass, time-series DBs
+4. **MLOps & DevOps** - CI/CD, OTA updates, monitoring
+
+---
+
+## 16. Troubleshooting
 
 ### Common Issues
 

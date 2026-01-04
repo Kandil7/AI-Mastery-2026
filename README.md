@@ -35,23 +35,39 @@
 | Phase | Weeks | Focus Area | Status | Deliverables |
 |:---|:---|:---|:---|:---|
 | **I. Foundations** | 1-2 | **Mathematics & Core ML** | ✅ **COMPLETE** | 38 notebooks |
-| **II. Theory** | 4-8 | **Neural Networks to Transformers** | ✅ **COMPLETE** | 5 notebooks + guides |
-| **III. Production** | Capstone | **End-to-End ML System** | ✅ **COMPLETE** | 6 production files |
+| **II. Advanced ML** | 5-12 | **Vision, Transformers, MLOps** | ✅ **77% COMPLETE** | ResNet18, BERT, GPT-2, LoRA |
+| **III. Production** | Capstone | **End-to-End ML System** | ✅ **COMPLETE** | Auth, Monitoring, A/B Testing |
 | **IV. System Design** | Advanced | **Scale & Architecture** | ✅ **COMPLETE** | 5 comprehensive designs |
-| **V. Interview Prep** | Professional | **Career Readiness** | ✅ **COMPLETE** | 4 STAR stories |
+| **V. Case Studies** | Real-World | **Production ML** | ✅ **COMPLETE** | $22M+ business impact |
+| **VI. Interview Prep** | Professional | **Career Readiness** | ✅ **88% COMPLETE** | 4 STAR stories |
 
-**✅ PROJECT 100% COMPLETE** | 20 files | 12,000+ lines | Production-ready portfolio
+**✅ PROJECT 77% COMPLETE** | 98/128 tasks | 15,000+ lines | Elite production portfolio
 
----
+> [!IMPORTANT]
+> **🚀 Latest Achievements (Jan 4, 2026 - Final Update)**:
+> - ✅ **Complete Computer Vision**: ResNet18 with CIFAR-10 notebook (600+ lines)
+> - ✅ **Complete Transformers**: BERT & GPT-2 from scratch (900+ lines)
+> - ✅ **MLOps Production**: Feature store, model registry, drift detection
+> - ✅ **LLM Fine-Tuning**: LoRA implementation (0.5% trainable params)
+> - ✅ **Production Infrastructure**: JWT auth, A/B testing, Grafana monitoring
+> - ✅ **Multi-Tenant Vector DB**: Quotas, backups, point-in-time recovery
+> - ✅ **Case Studies**: $22M+ combined business impact (3 production systems)
+> - 📹 **Remaining**: Demo video + optional## 🔧 From-Scratch Implementations
 
-## 🧩 Module Deep Dive
+All algorithms implemented **from first principles** to understand internal mechanics:
 
-### 1. The Core (`src/core/`)
-*The mathematical heart of the system. Implementations in Pure Python.*
+### Core Mathematics (`src/core/`)
+*Pure Python implementations with mathematical rigor.*
 
-*   **Linear Algebra**: `linear_algebra.py` - Matrix/Vector operations, Eigenvalues (Power Iteration).
-*   **Optimization**: `optimization_whitebox.py` - SGD, Adam, Finite Difference Gradients.
-*   **Probability**: `probability_whitebox.py` - Gaussian, Metropolis-Hastings MCMC.
+*   **Linear Algebra**: Matrix operations, decompositions (SVD, QR, Cholesky)
+*   **Calculus**: Numerical differentiation, integration (Newton-Cotes, Gaussian quadrature)
+*   **Optimization**: Gradient descent variants (SGD, Adam, RMSprop), constrained optimization
+*   **Statistics**: Distributions, hypothesis testing, Bayesian inference
+
+### Classical ML (`src/ml/classical.py`)
+*Foundational machine learning with detailed implementations.*
+
+*   Decision Trees (ID3, C4.5), Random Forests, Gradient Boosting-Hastings MCMC.
 *   **Causal Inference**: `causal_whitebox.py` - ATE, Inverse Probability Weighting (IPW).
 *   **Explainable AI**: `explainable_ai.py` - SHAP, Lime, Integrated Gradients from scratch.
 *   **Time Series**: `time_series.py` - Kalman Filters (Extended/Unscented), Particle Filters.
@@ -61,16 +77,41 @@
 
 *   **Classical**: `classical.py` - Decision Trees, SVMs (SMO), Naive Bayes.
 *   **Deep Learning**: `deep_learning.py` - Autograd engine, Dense/Conv2D/LSTM layers.
-*   **Graph Neural Networks**: `gnn_integration.py` - Message passing frameworks.
+*   **Computer Vision**: `vision.py` - ResNet18, ResidualBlock, Conv2D with im2col, MaxPool2D.
+*   **Graph Neural Networks**: `gnn_recommender.py` - GraphSAGE, Two-Tower, BPR/InfoNCE losses. *NEW*
 *   **Reinforcement Learning**: `rl_integration.py` - PPO, DQN, Policy Gradients.
 
-### 3. Production Engineering (`src/production/`)
+### 3. LLM Engineering (`src/llm/`)
+*Transformer architectures and attention mechanisms from scratch.*
+
+*   **Transformers**: `transformer.py` - BERT, GPT-2, MultiHeadAttention, positional encodings.
+*   **Attention**: `attention.py` - Scaled dot-product, causal masking, RoPE.
+*   **Advanced RAG**: `advanced_rag.py` - Semantic chunking, hybrid retrieval, model routing. *NEW*
+*   **Support Agent**: `support_agent.py` - Guardrails, confidence scoring, CX analysis. *NEW*
+*   **Fine-tuning**: LoRA adapters, prompt engineering.
+
+### 4. Production Engineering (`src/production/`)
 *Enterprise-grade infrastructure for real-world deployment.*
 
 *   **RAG Pipeline**: `query_enhancement.py` (HyDE, Multi-Query), `data_pipeline.py`.
-*   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW).
+*   **Performance**: `caching.py` (Semantic Cache with Redis), `vector_db.py` (HNSW, ACL filtering, drift detection).
+*   **Feature Store**: `feature_store.py` - Batch/streaming pipelines, freshness tracking (DoorDash Gigascale). *ENHANCED*
+*   **Edge AI**: `edge_ai.py` - Model compilation, OTA updates, fleet management (Siemens Industrial Edge).
+*   **Trust Layer**: `trust_layer.py` - PII masking, content safety, audit logging.
+*   **Ranking Pipeline**: `ranking_pipeline.py` - Multi-stage candidate ranking.
 *   **Observability**: `monitoring.py` (Prometheus/Grafana), `observability.py`.
 *   **Serving**: `api.py` (FastAPI), Docker containerization.
+
+#### Edge AI SaaS Modules *NEW* 🔥
+
+Production-ready edge AI implementations with **~3,600+ lines** of from-scratch code:
+
+| Module | Lines | Key Components | Domain |
+|--------|-------|----------------|--------|
+| `manufacturing_qc.py` | ~850 | DefectDetector (CNN+INT8), PLCInterface (Modbus/OPC-UA), QualityInspectionPipeline | Manufacturing CV |
+| `medical_edge.py` | ~900 | DifferentialPrivacy (ε-δ), FederatedLearningClient (DP-FedAvg), NeuroCoreProcessor | Medical IoMT |
+| `industrial_iot.py` | ~1000 | Autoencoder, IsolationForest, LSTMCell, RULPredictor, StoreAndForwardQueue | Industrial PdM |
+| `hybrid_inference.py` | ~900 | TaskRouter, SplitModelExecutor, EdgeCloudOrchestrator, ModelVersionManager | Hybrid Edge-Cloud |
 
 ---
 
@@ -183,37 +224,93 @@ docker run -p 8000:8000 issue-classifier
 
 ## 🏗️ System Design Solutions
 
-**5 production-scale designs ready for interviews:**
+**5 production-scale designs ready for technical interviews:**
 
-### 1. [RAG at Scale](docs/system_design_solutions/01_rag_at_scale.md)
+> [!NOTE]
+> Each design includes: requirements analysis, architecture diagrams, component deep dives, scaling strategies, cost estimates, and interview discussion points.
+
+### 1. [RAG at Scale](docs/system_design_solutions/01_rag_at_scale.md) ✅
 - **Scope**: 1M documents, 1000 QPS, <500ms p95 latency
-- **Architecture**: Hybrid search (dense + BM25), 3-tier caching, re-ranking
-- **Cost**: $5,850/month
-- **Highlights**: Elasticsearch, Qdrant, Redis multi-level cache
+- **Architecture**: Hybrid search (semantic + BM25), multi-tier caching, cross-encoder re-ranking
+- **Tech Stack**: Qdrant, Elasticsearch, Redis, FastAPI
+- **Cost**: ~$5,850/month
+- **Key Insight**: Hybrid retrieval 15-20% better than pure semantic
 
-### 2. [Recommendation System](docs/system_design_solutions/02_recommendation_system.md)
+### 2. [Recommendation System](docs/system_design_solutions/02_recommendation_system.md) ✅
 - **Scope**: 100M users, 10M products, <100ms p95 latency
-- **Architecture**: Multi-strategy (MF + Content + DNN two-tower)
-- **Cost**: $19,000/month
-- **Highlights**: Offline batch + online real-time, A/B testing
+- **Architecture**: Multi-strategy (Matrix Factorization + Content-based + DNN two-tower)
+- **Tech Stack**: Spark, Redis, TensorFlow Serving
+- **Cost**: ~$19,000/month
+- **Key Insight**: Offline batch + online real-time serving pattern
 
-### 3. [Fraud Detection Pipeline](docs/system_design_solutions/03_fraud_detection.md)
-- **Scope**: 1M transactions/day, <100ms latency, <0.1% false positives
-- **Architecture**: Multi-layer (rules + ML + anomaly detection)
-- **Cost**: $2,100/month
-- **Highlights**: XGBoost, Isolation Forest, SHAP explainability
+### 3. [Fraud Detection Pipeline](docs/system_design_solutions/03_fraud_detection.md) ✅
+- **Scope**: 1M transactions/day, <100ms p2p latency, <0.1% false positives
+- **Architecture**: Multi-layer defense (rule engine + ML + anomaly detection)
+- **Tech Stack**: XGBoost, Isolation Forest, Kafka, PostgreSQL
+- **Cost**: ~$2,100/month
+- **Key Insight**: Explainability (SHAP) critical for fraud analyst trust
 
-### 4. [ML Model Serving](docs/system_design_solutions/04_ml_model_serving.md)
+### 4. [ML Model Serving at Scale](docs/system_design_solutions/04_model_serving.md) ✅ *NEW*
 - **Scope**: 10,000 QPS, <50ms p95 latency
-- **Architecture**: NVIDIA Triton, dynamic batching, INT8 quantization
-- **Cost**: $30,000/month
-- **Highlights**: GPU optimization, canary deployments, auto-scaling
+- **Architecture**: Dynamic batching (21x throughput), blue-green + canary deployments
+- **Tech Stack**: Triton Inference Server, MLflow, Kubernetes HPA, Redis cache
+- **Cost**: ~$4,850/month (CPU) or ~$6,850/month (GPU)
+- **Key Insight**: Dynamic batching reduces per-request latency from 10ms → 0.47ms
 
-### 5. [A/B Testing Framework](docs/system_design_solutions/05_ab_testing_framework.md)
-- **Scope**: 10M daily active users, statistical rigor
-- **Architecture**: Consistent hashing, Kafka event streaming, Spark aggregation
-- **Cost**: $3,700/month
-- **Highlights**: Thompson Sampling (multi-armed bandit), automated guardrails
+### 5. [A/B Testing Platform](docs/system_design_solutions/05_ab_testing.md) ✅ *NEW*
+- **Scope**: 10M daily active users, multi-variant experiments, statistical rigor
+- **Architecture**: Consistent hashing assignment, Kafka event streaming, Spark analytics
+- **Tech Stack**: Kafka, Spark, PostgreSQL, Redis (config cache)
+- **Cost**: ~$2,000/month
+- **Key Insight**: Thompson Sampling (Bayesian MAB) for adaptive traffic allocation
+
+**Total System Design Coverage**: $33,800/month across all 5 designs | ~5,000 lines of technical documentation
+
+
+
+---
+
+## 📊 Production Case Studies
+
+**3 real-world ML projects with measurable business impact:**
+
+### 1. [Churn Prediction for SaaS](case_studies/01_churn_prediction.md)
+- **Challenge**: 15% monthly churn costing $2M annually
+- **Solution**: XGBoost with 47 behavioral features + Airflow pipeline
+- **Impact**: **$800K savings**, 40% churn reduction (15% → 9%)
+- **Tech**: Time-series CV, SHAP explainability, daily batch scoring
+
+### 2. [Real-Time Fraud Detection](case_studies/02_fraud_detection.md)
+- **Challenge**: $5M annual fraud losses, need <100ms latency
+- **Solution**: Multi-layer defense (rules + XGBoost + Isolation Forest)
+- **Impact**: **$4.2M prevented**, 84% precision, 81% recall
+- **Tech**: Redis feature store, Cassandra, SMOTE, threshold optimization
+
+### 3. [Personalized Recommender System](case_studies/03_recommender_system.md)
+- **Challenge**: 45% users never engaged beyond homepage
+- **Solution**: Hybrid collaborative filtering + deep two-tower ranker
+- **Impact**: **+$17M revenue**, +32% watch time, +18% retention
+- **Tech**: Matrix factorization, BERT embeddings, <400ms latency for 8M users
+
+**Total Business Impact**: $22M+ across three case studies
+
+### Full Stack AI Case Studies *ENHANCED*
+
+| # | Case Study | Industry Reference | Key Topic |
+|---|------------|-------------------|-----------| 
+| 1 | [Uber Eats GNN Recommendations](case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md) | Uber | GraphSAGE, Two-Tower |
+| 2 | [Notion AI RAG Architecture](case_studies/full_stack_ai/02_notion_ai_rag_architecture.md) | Notion | Hybrid Retrieval, Model Routing |
+| 3 | [Intercom Fin Support Agent](case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
+| 4 | [Salesforce Trust Layer](case_studies/full_stack_ai/04_salesforce_trust_layer.md) | Salesforce | PII Masking, Audit |
+| 5 | [Pinterest Ranking Pipeline](case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
+| 6 | [DoorDash Feature Store](case_studies/full_stack_ai/06_doordash_feature_store.md) | DoorDash | Streaming Features, Freshness SLA |
+| 7 | [Siemens Edge AI](case_studies/full_stack_ai/07_siemens_edge_ai.md) | Siemens | Edge Deployment, OTA Updates |
+| 8 | [Manufacturing Quality Control](case_studies/full_stack_ai/08_manufacturing_quality_control.md) | Darwin/Intrinsics | **CNN+INT8, PLC (<20ms)** |
+| 9 | [Medical IoMT Devices](case_studies/full_stack_ai/09_medical_iomt_devices.md) | Intrinsics | **Neuro Core, Federated Learning** |
+| 10 | [Industrial IoT PdM](case_studies/full_stack_ai/10_industrial_iot_pdm.md) | Barbara IoT | **Autoencoder, RUL, DDIL** |
+| 11 | [Hybrid Edge-Cloud](case_studies/full_stack_ai/11_hybrid_edge_cloud.md) | AWS Greengrass | **Task Routing, Split Inference** |
+
+**📚 Edge AI Engineer Roadmap**: [docs/edge_ai_engineer_roadmap.md](docs/edge_ai_engineer_roadmap.md)
 
 ---
 
@@ -254,33 +351,8 @@ docker run -p 8000:8000 issue-classifier
 
 ---
 
-## 🎓 Capstone Project: GitHub Issue Classifier
-
-**Production-ready ML application showcasing the complete lifecycle:**
-
-```bash
-# Train the model
-python scripts/capstone/train_issue_classifier.py
-
-# Start the API
-uvicorn src.production.issue_classifier_api:app --port 8000
-
-# Deploy with Docker
-docker build -f Dockerfile.capstone -t issue-classifier .
-docker run -p 8000:8000 issue-classifier
-``$
-
-**Achievements**:
-- ✅ **>85% Test Accuracy** on multi-class classification
-- ✅ **<10ms p95 Inference Latency** (production-ready)
-- ✅ **Full Observability** with Prometheus metrics
-- ✅ **Production Deployment** with Docker + FastAPI
-
-📖 [Full Documentation](docs/CAPSTONE_README.md)
-
----
-
 ## 🚀 Quick Start
+
 
 ### Installation
 

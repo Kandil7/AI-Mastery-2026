@@ -227,10 +227,47 @@ Help them succeed, hit >85% accuracy target, and build their confidence in ML en
 - [x] Have questions for interviewer ready
 
 ### Company Research
-- [ ] Read last 3 blog posts from engineering blog
-- [ ] Understand company's ML use cases
-- [ ] Know recent product launches
-- [ ] Prepare 3-5 thoughtful questions
+- [x] Template created for systematic research
+- [ ] Research Company 1: [Company Name]
+- [ ] Research Company 2: [Company Name]
+- [ ] Research Company 3: [Company Name]
+
+#### Research Template (Use for Each Target Company)
+
+**Company**: [Name]  
+**Role**: [Specific position title]  
+**Date Researched**: [YYYY-MM-DD]
+
+**1. Recent Engineering Blog Posts** (Last 3-6 months)
+- [ ] Post 1: [Title + Key Takeaway]
+- [ ] Post 2: [Title + Key Takeaway]
+- [ ] Post 3: [Title + Key Takeaway]
+
+**2. ML Use Cases at Company**
+- Primary ML applications: [e.g., "Recommendation system, fraud detection, search ranking"]
+- Tech stack (from job posting/blog): [e.g., "PyTorch, TensorFlow, Kubernetes, AWS"]
+- Scale: [e.g., "100M users, 10K QPS"]
+
+**3. Recent Product Launches** (Last 6 months)
+- Launch 1: [Product/Feature + ML relevance]
+- Launch 2: [Product/Feature + ML relevance]
+
+**4. Company Values & Culture**
+- Core values: [List from company website]
+- How my skills align: [1-2 sentences]
+
+**5. Thoughtful Questions to Ask**
+- [ ] "I read your blog post about [specific topic]. How does [X] work in production?"
+- [ ] "What's the biggest ML infrastructure challenge you're currently tackling?"
+- [ ] "How do you balance model accuracy vs latency in [specific use case]?"
+- [ ] "What does success look like for this role in the first 6 months?"
+- [ ] "How do ML engineers collaborate with product/data science teams here?"
+
+**6. Connection to My Experience**
+- Relevant project from portfolio: [e.g., "My RAG system at scale design aligns with your search infrastructure"]
+- Specific metric to mention: [e.g., "Achieved <500ms p95 latency, similar to your SLA"]
+
+---
 
 ---
 
