@@ -144,7 +144,7 @@ class TestAPI:
         data = response.json()
         
         assert "status" in data
-       assert data["status"] == "healthy"
+        assert data["status"] == "healthy"
     
     def test_classify_endpoint(self, client, monkeypatch):
         """Test /classify endpoint."""
