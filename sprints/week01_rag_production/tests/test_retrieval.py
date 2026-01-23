@@ -14,6 +14,26 @@ from unittest.mock import Mock, patch
 from src.retrieval import Document, DenseRetriever, SparseRetriever, HybridRetriever, RetrievalResult
 
 
+@pytest.fixture(autouse=True)
+def mock_sentence_transformer():
+    """Mock sentence transformer to avoid model downloads."""
+    with patch('sentence_transformers.SentenceTransformer') as mock_transformer_class:
+        mock_transformer_instance = Mock()
+        mock_transformer_instance.encode.return_value = np.random.rand(1, 384)
+        mock_transformer_class.return_value = mock_transformer_instance
+        yield mock_transformer_instance
+
+
+@pytest.fixture(autouse=True)
+def mock_chromadb():
+    """Mock ChromaDB client to avoid persistence in tests."""
+    with patch('chromadb.PersistentClient') as mock_chromadb:
+        mock_client = Mock()
+        mock_collection = Mock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_chromadb.return_value = mock_client
+        yield mock_collection
+
 class TestDocument:
     """Test cases for the Document class."""
     
