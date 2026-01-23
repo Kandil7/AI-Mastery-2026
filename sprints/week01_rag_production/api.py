@@ -41,7 +41,7 @@ import logging
 import time
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, UploadFile
 from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
@@ -59,8 +59,14 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 from src.pipeline import RAGPipeline, RAGConfig
+from src.config import settings, Environment
 from src.retrieval import Document
 from src.observability import ObservabilityManager, LogLevel
+from src.ingestion import initialize_ingestion_pipeline, ingestion_pipeline
+from src.ingestion.mongo_storage import initialize_mongo_storage, close_mongo_storage, mongo_storage
+from src.retrieval.query_processing import initialize_query_router, query_router
+from src.retrieval.vector_store import initialize_vector_manager, VectorConfig, VectorDBType, close_vector_manager
+from src.services.indexing import index_documents
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -195,14 +201,38 @@ async def lifespan(app: FastAPI):
     # Initialize RAG pipeline with production configuration
     rag_model = RAGPipeline(
         RAGConfig(
-            generator_model="gpt2",  # In production, use a more capable model
-            dense_model="all-MiniLM-L6-v2",
-            alpha=0.5,
-            fusion="rrf",
-            top_k=5,
-            max_new_tokens=300
+            generator_model=settings.models.generator_model,
+            dense_model=settings.models.dense_model,
+            alpha=settings.retrieval.alpha,
+            fusion=settings.retrieval.fusion_method,
+            top_k=settings.models.top_k,
+            max_new_tokens=settings.models.max_new_tokens,
         )
     )
+
+    # Initialize MongoDB storage
+    await initialize_mongo_storage()
+    logger.info("MongoDB storage initialized")
+
+    # Initialize vector storage
+    vector_db_type = VectorDBType.CHROMA if settings.environment == Environment.PRODUCTION else VectorDBType.IN_MEMORY
+    vector_config = VectorConfig(
+        db_type=vector_db_type,
+        collection_name="rag_vectors",
+        persist_directory="./data/vector_store",
+        dimension=384,  # Dimension of all-MiniLM-L6-v2 embeddings
+        metric="cosine",
+    )
+    await initialize_vector_manager(vector_config)
+    logger.info("Vector storage initialized")
+
+    # Initialize ingestion pipeline
+    initialize_ingestion_pipeline(rag_model)
+    logger.info("Ingestion pipeline initialized")
+
+    # Initialize query router
+    initialize_query_router(rag_model)
+    logger.info("Query router initialized")
 
     # Pre-index some sample data for immediate availability
     sample_docs = [
@@ -228,12 +258,18 @@ async def lifespan(app: FastAPI):
             metadata={"category": "techniques", "created_at": "2024-01-01"}
         )
     ]
-    rag_model.index(sample_docs)
+    await index_documents(rag_model, sample_docs)
     logger.info(f"Initialized with {len(sample_docs)} sample documents.")
 
     yield
 
     # Cleanup on shutdown
+    await close_vector_manager()
+    logger.info("Vector storage closed")
+
+    await close_mongo_storage()
+    logger.info("MongoDB storage closed")
+
     logger.info("Shutting down RAG API service...")
 
 
@@ -390,8 +426,8 @@ async def add_documents(docs: List[DocumentRequest]) -> Dict[str, Any]:
             )
             domain_docs.append(domain_doc)
 
-        # Add documents to the model
-        rag_model.index(domain_docs)
+        # Add documents to the model and persist to stores
+        await index_documents(rag_model, domain_docs)
 
         # Get updated document count
         total_docs = len(rag_model.retriever.dense_retriever.documents)
@@ -484,6 +520,205 @@ async def query_rag(request: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=500, detail=f"Internal error processing query: {str(e)}")
 
 
+@app.post("/advanced_query", response_model=QueryResponse)
+async def advanced_query_rag(request: QueryRequest) -> QueryResponse:
+    """
+    Query the RAG system using advanced query processing with classification and routing.
+
+    This endpoint processes a natural language query using advanced techniques
+    including query classification, expansion, and multi-step reasoning.
+
+    Args:
+        request: Query parameters including the question and retrieval settings
+
+    Returns:
+        QueryResponse: Generated answer with source documents and metadata
+
+    Raises:
+        HTTPException: If the model is not initialized or query fails
+    """
+    if not query_router:
+        raise HTTPException(status_code=503, detail="Query router not initialized")
+
+    start_time = time.time()
+
+    try:
+        # Process the query using the advanced query processor
+        result = await query_router.route_and_process(request.query, top_k=request.k)
+
+        # Calculate query time
+        query_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+
+        # Prepare source documents for response
+        sources = []
+        if request.include_sources:
+            sources = [
+                SourceDocument(
+                    id=source.document.id,
+                    content=source.document.content[:500] + "..." if len(source.document.content) > 500 else source.document.content,  # Truncate long content
+                    score=source.score,
+                    rank=source.rank,
+                    metadata=source.document.metadata
+                ) for source in result.sources
+            ]
+
+        # Get total document count
+        total_docs = len(rag_model.retriever.dense_retriever.documents)
+
+        logger.info(f"Advanced query processed successfully in {query_time:.2f}ms", extra={
+            "query_length": len(request.query),
+            "top_k": request.k,
+            "sources_returned": len(sources),
+            "query_type": result.query_type.value
+        })
+
+        return QueryResponse(
+            query=result.query,
+            response=result.response,
+            sources=sources,
+            query_time_ms=query_time,
+            total_documents_indexed=total_docs
+        )
+
+    except ValueError as ve:
+        logger.warning(f"Invalid query parameters: {str(ve)}")
+        raise HTTPException(status_code=422, detail=f"Invalid query parameters: {str(ve)}")
+    except TimeoutError:
+        logger.error(f"Query timed out after {request.timeout_seconds}s: {request.query[:50]}...")
+        raise HTTPException(status_code=408, detail="Query timed out")
+    except Exception as e:
+        logger.error(f"Error processing advanced query: {str(e)}", extra={"query": request.query})
+        raise HTTPException(status_code=500, detail=f"Internal error processing advanced query: {str(e)}")
+
+
+@app.post("/upload", response_model=Dict[str, Any])
+async def upload_document(
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
+    metadata: str = "{}"
+) -> Dict[str, Any]:
+    """
+    Upload a document for indexing in the RAG system.
+
+    This endpoint accepts file uploads and processes them for inclusion in the
+    knowledge base. It handles various document formats and performs automatic
+    chunking and indexing.
+
+    Args:
+        file: The document file to upload
+        background_tasks: Background tasks for processing
+        chunk_size: Size of text chunks for processing
+        chunk_overlap: Overlap between chunks
+        metadata: Additional metadata as JSON string
+
+    Returns:
+        Dict with upload result information
+    """
+    if not ingestion_pipeline:
+        raise HTTPException(status_code=503, detail="Ingestion pipeline not initialized")
+
+    try:
+        # Parse metadata from JSON string
+        import json
+        metadata_dict = json.loads(metadata) if metadata else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid metadata JSON format")
+
+    from src.ingestion import IngestionRequest
+
+    ingestion_request = IngestionRequest(
+        metadata=metadata_dict,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap
+    )
+
+    try:
+        result = await ingestion_pipeline.ingest_from_file(file, ingestion_request)
+
+        if not result.success:
+            raise HTTPException(status_code=400, detail="; ".join(result.errors))
+
+        return {
+            "message": result.message,
+            "processed_documents": result.processed_documents,
+            "indexed_documents": result.indexed_documents,
+            "processing_time_ms": result.processing_time_ms,
+            "warnings": result.warnings
+        }
+    except Exception as e:
+        logger.error(f"Error uploading document: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+
+
+@app.get("/documents", response_model=Dict[str, Any])
+async def list_documents(skip: int = 0, limit: int = 100) -> Dict[str, Any]:
+    """
+    List documents in the system.
+
+    Args:
+        skip: Number of documents to skip
+        limit: Maximum number of documents to return
+
+    Returns:
+        Dict with document list and metadata
+    """
+    try:
+        documents = await mongo_storage.get_all_documents(skip=skip, limit=limit)
+        return {
+            "documents": [
+                {
+                    "id": doc.id,
+                    "source": doc.source,
+                    "doc_type": doc.doc_type,
+                    "metadata": doc.metadata,
+                    "content_preview": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content
+                }
+                for doc in documents
+            ],
+            "total_count": await mongo_storage.get_document_count(),
+            "returned_count": len(documents),
+            "skip": skip,
+            "limit": limit
+        }
+    except Exception as e:
+        logger.error(f"Error listing documents: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving documents: {str(e)}")
+
+
+@app.get("/documents/{doc_id}", response_model=Dict[str, Any])
+async def get_document(doc_id: str) -> Dict[str, Any]:
+    """
+    Get a specific document by ID.
+
+    Args:
+        doc_id: ID of the document to retrieve
+
+    Returns:
+        Dict with document information
+    """
+    try:
+        document = await mongo_storage.retrieve_document(doc_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {
+            "id": document.id,
+            "content": document.content,
+            "source": document.source,
+            "doc_type": document.doc_type,
+            "metadata": document.metadata,
+            "created_at": document.created_at,
+            "updated_at": document.updated_at
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving document: {str(e)}")
+
+
 @app.get("/metrics")
 async def get_metrics():
     """
@@ -524,8 +759,8 @@ async def general_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     uvicorn.run(
         app,
-        host="0.0.0.0",
-        port=8000,
+        host=settings.api.host,
+        port=settings.api.port,
         log_level="info",
         timeout_keep_alive=30,
         workers=1  # Adjust based on your needs
