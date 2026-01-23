@@ -207,8 +207,14 @@ class RAGPipeline:
         prompt = f"Context:\n{context_text}\n\nQuestion: {query}\n\nAnswer:"
         generated = self.generator(prompt, max_new_tokens=self.config.max_new_tokens)
         full_text = generated[0]["generated_text"]
-        answer_start = full_text.find("Answer:") + len("Answer:")
-        return full_text[answer_start:].strip()
+        answer_start = full_text.find("Answer:")
+        if answer_start != -1:
+            # Found "Answer:", extract text after it
+            answer_start += len("Answer:")
+            return full_text[answer_start:].strip()
+        else:
+            # "Answer:" not found, return the full generated text
+            return full_text.strip()
 
     def query(self, query: str, top_k: int | None = None) -> Dict[str, object]:
         """
