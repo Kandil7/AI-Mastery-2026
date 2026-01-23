@@ -9,7 +9,7 @@ Author: AI-Mastery-2026
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
 import json
 import tarfile
 import logging

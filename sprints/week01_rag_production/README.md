@@ -42,6 +42,11 @@ Most RAG tutorials stop at "chat with your PDF." This sprint focuses on the **Pr
 - [x] **Day 3**: Wrap in FastAPI + Streamlit Dashboard - [Backend](api.py) | [Frontend](ui.py)
 - [x] **Day 4**: "Stress Test" - Index 100 complex docs and benchmark - [Benchmark Script](stress_test.py)
 
+## Production Implementation
+
+See `IMPLEMENTATION.md` for the notebook-to-production mapping, module layout,
+and the staged plan to reach a 2026-grade RAG system.
+
 ---
 
 ## 📊 Success Metrics
