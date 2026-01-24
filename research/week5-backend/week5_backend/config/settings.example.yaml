@@ -41,6 +41,8 @@ retrieval:
 reranker:
   enabled: true
   top_k: 8
+query_rewrite:
+  enabled: false
 answer:
   max_context_words: 1200
 verification:

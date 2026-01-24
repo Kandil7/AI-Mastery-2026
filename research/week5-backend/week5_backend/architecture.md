@@ -13,6 +13,7 @@
    - Steps: parsing -> cleaning -> structured chunking -> embedding -> indexing.
 2) Retrieval stack
    - Hybrid retrieval: BM25 + vector search fused with RRF.
+   - Optional query rewriting for better recall.
    - Reranking: cross-encoder or LLM reranker.
    - Filtering: tenant, ACL, recency, domain.
 3) Answering stack
