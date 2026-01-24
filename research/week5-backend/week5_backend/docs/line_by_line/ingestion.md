@@ -1,0 +1,74 @@
+# Line-by-line explanation: ingestion.py
+
+File: `research/week5-backend/week5_backend/rag/ingestion.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation.
+- L3: `import uuid` -> used to generate document IDs.
+- L4: `from pathlib import Path` -> file path handling.
+- L5: `from typing import Any, Callable, Dict, List, Optional` -> type hints.
+- L6: (blank) -> separation before third-party imports.
+- L7: `import requests` -> used to fetch web content.
+- L8: (blank) -> separation before local imports.
+- L9: `from core.factories import ...` -> embeddings/vector store factories.
+- L10: `from core.settings import load_settings` -> load configuration.
+- L11: `from rag.chunking import Chunk, simple_chunk` -> chunk model and default chunker.
+- L12: `from rag.embeddings import EmbeddingService` -> embeddings wrapper.
+- L13: `from storage.vectordb_base import VectorStore` -> vector store protocol type.
+- L14: (blank) -> spacing before functions.
+- L15: (blank) -> extra spacing.
+- L16: `def ingest_document(` -> public ingestion entry point.
+- L17: `tenant_id: str,` -> tenant identifier for metadata.
+- L18: `source_type: str,` -> source type indicator (web/file/pdf).
+- L19: `uri: str,` -> resource location.
+- L20: `metadata: Dict[str, Any],` -> user-supplied metadata.
+- L21: `) -> str:` -> returns new document ID.
+- L22: `settings = load_settings()` -> load settings for providers.
+- L23: `embedder = EmbeddingService(...)` -> embeddings provider wrapper.
+- L24: `store = create_vector_store(settings)` -> vector store instance.
+- L25: `doc_id = str(uuid.uuid4())` -> generate unique document ID.
+- L26: (blank) -> spacing before loading.
+- L27: `text = _load_source_text(...)` -> read content from the source.
+- L28: `index_text(` -> index the document into vector store.
+- L29: `doc_id=doc_id,` -> pass doc ID.
+- L30: `text=text,` -> pass text to indexer.
+- L31: `embedder=embedder,` -> pass embedding service.
+- L32: `vector_store=store,` -> pass vector store.
+- L33: `metadata={"tenant_id": tenant_id, **metadata},` -> include tenant metadata.
+- L34: `)` -> close index_text call.
+- L35: `return doc_id` -> return doc ID to caller.
+- L36: (blank) -> spacing.
+- L37: (blank) -> extra spacing.
+- L38: `def index_text(` -> helper that does chunking + embedding + upsert.
+- L39: `doc_id: str,` -> document ID.
+- L40: `text: str,` -> document text.
+- L41: `embedder: EmbeddingService,` -> embedding service.
+- L42: `vector_store: VectorStore,` -> vector store instance.
+- L43: `metadata: Dict[str, Any],` -> metadata to store with chunks.
+- L44: `chunks: Optional[List[Chunk]] = None,` -> optional precomputed chunks.
+- L45: `chunker: Optional[Callable[[str, str], List[Chunk]]] = None,` -> optional chunker.
+- L46: `) -> None:` -> no return value.
+- L47: `if chunks is not None:` -> if caller provided chunks.
+- L48: `resolved_chunks = chunks` -> use given chunks.
+- L49: `else:` -> otherwise compute chunks.
+- L50: `resolved_chunks = (chunker or simple_chunk)(...)` -> chunk text with chosen chunker.
+- L51: `embeddings = embedder.embed([...])` -> embed each chunk text.
+- L52: `vector_store.upsert(...)` -> store chunks + embeddings + metadata.
+- L53: (blank) -> spacing before loader helper.
+- L54: (blank) -> extra spacing.
+- L55: `def _load_source_text(...):` -> helper to load data by source type.
+- L56: `if source_type == "web":` -> web content path.
+- L57: `response = requests.get(..., timeout=20)` -> fetch via HTTP.
+- L58: `response.raise_for_status()` -> raise error on HTTP failure.
+- L59: `return response.text` -> return body text.
+- L60: `if source_type == "file":` -> local file path.
+- L61: `return Path(uri).read_text(...)` -> read file content.
+- L62: `if source_type == "pdf":` -> PDF path.
+- L63: `try:` -> attempt to import PDF reader.
+- L64: `from pypdf import PdfReader` -> PDF parser library.
+- L65: `except ImportError as exc:` -> handle missing dependency.
+- L66: `raise RuntimeError(...) from exc` -> clear error if not installed.
+- L67: (blank) -> spacing before PDF reading.
+- L68: `reader = PdfReader(uri)` -> load PDF file.
+- L69: `return "\n".join(...)` -> extract text from all pages.
+- L70: `raise ValueError(...)` -> error for unsupported source types.

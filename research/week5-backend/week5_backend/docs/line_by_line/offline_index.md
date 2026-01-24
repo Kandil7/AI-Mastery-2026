@@ -1,0 +1,71 @@
+# Line-by-line explanation: offline_index.py
+
+File: `research/week5-backend/week5_backend/pipelines/offline_index.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation between imports.
+- L3: `import argparse` -> CLI argument parsing.
+- L4: `import sys` -> system path manipulation for module imports.
+- L5: `from pathlib import Path` -> filesystem paths.
+- L6: (blank) -> separates stdlib from sys.path change.
+- L7: `sys.path.append(...)` -> allow importing project modules when run as script.
+- L8: (blank) -> spacing before local imports.
+- L9: `from core.factories import ...` -> factories for embeddings and vector store.
+- L10: `from core.settings import load_settings` -> load YAML settings.
+- L11: `from rag.chunking import build_chunker` -> choose chunking strategy.
+- L12: `from rag.embeddings import EmbeddingService` -> embeddings wrapper.
+- L13: `from rag.ingestion import index_text` -> shared indexing helper.
+- L14: `from rag.bm25_store import build_corpus, save_corpus` -> BM25 corpus builder and saver.
+- L15: (blank) -> separate imports from helpers.
+- L16: (blank) -> spacing before helper definitions.
+- L17: `def _read_text(path: Path) -> str:` -> helper to read text files.
+- L18: `return path.read_text(...)` -> read file as UTF-8.
+- L19: (blank) -> separation between helpers.
+- L20: (blank) -> extra spacing.
+- L21: `def _iter_sources(source: Path) -> list[Path]:` -> find files to index.
+- L22: `if source.is_dir():` -> directory case.
+- L23: `files: list[Path] = []` -> accumulator for file paths.
+- L24: `for ext in (".txt", ".md"):` -> only index text/markdown.
+- L25: `files.extend(source.rglob(...))` -> recursive glob per extension.
+- L26: `return files` -> return list of files.
+- L27: `return [source]` -> if not a directory, treat single file as source.
+- L28: (blank) -> spacing before main function.
+- L29: (blank) -> extra spacing.
+- L30: `def run_index(source: Path) -> None:` -> main offline indexing function.
+- L31: `settings = load_settings()` -> load config.
+- L32: `embedder = EmbeddingService(...)` -> build embedding service.
+- L33: `store = create_vector_store(settings)` -> vector store instance.
+- L34: `chunk_cfg = settings.raw.get("chunking") or {}` -> chunking config block.
+- L35: `chunk_mode = str(...)` -> select chunking mode.
+- L36: `max_tokens = int(...)` -> chunk size.
+- L37: `overlap = int(...)` -> overlap size.
+- L38: `chunker = build_chunker(...)` -> create chunker callable.
+- L39: `all_chunks = []` -> collect all chunks for BM25.
+- L40: `for path in _iter_sources(source):` -> iterate files.
+- L41: `text = _read_text(path)` -> load text.
+- L42: `chunks = chunker(...)` -> chunk current document.
+- L43: `all_chunks.extend(chunks)` -> add to BM25 corpus list.
+- L44: `index_text(` -> write chunks to vector store.
+- L45: `doc_id=path.stem,` -> use filename stem as doc ID.
+- L46: `text=text,` -> original document text.
+- L47: `embedder=embedder,` -> embedding service.
+- L48: `vector_store=store,` -> target vector store.
+- L49: `metadata={"path": str(path)},` -> store file path in metadata.
+- L50: `chunks=chunks,` -> pass precomputed chunks.
+- L51: `chunker=chunker,` -> pass chunker for consistency.
+- L52: `)` -> close index_text call.
+- L53: `bm25_path = Path(...)` -> determine BM25 index file path.
+- L54: `if not bm25_path.is_absolute():` -> handle relative path.
+- L55: `bm25_path = Path(__file__).resolve().parents[1] / bm25_path` -> make path absolute.
+- L56: `save_corpus(build_corpus(all_chunks), bm25_path)` -> save BM25 corpus JSONL.
+- L57: (blank) -> spacing before CLI main.
+- L58: (blank) -> extra spacing.
+- L59: `def main() -> None:` -> CLI entry.
+- L60: `parser = argparse.ArgumentParser()` -> create parser.
+- L61: `parser.add_argument("--source", required=True)` -> require source path.
+- L62: `args = parser.parse_args()` -> parse CLI args.
+- L63: `run_index(Path(args.source))` -> run indexing.
+- L64: (blank) -> spacing before script guard.
+- L65: (blank) -> extra spacing.
+- L66: `if __name__ == "__main__":` -> only run when executed as script.
+- L67: `main()` -> call CLI entry point.

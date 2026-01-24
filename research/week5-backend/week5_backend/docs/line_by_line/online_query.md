@@ -1,0 +1,129 @@
+# Line-by-line explanation: online_query.py
+
+File: `research/week5-backend/week5_backend/pipelines/online_query.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints for forward references.
+- L2: (blank) -> visual separation between imports.
+- L3: `import uuid` -> used to generate a unique trace ID per request.
+- L4: `from typing import Any, Dict` -> typing helpers for function signatures.
+- L5: (blank) -> separates stdlib from local imports.
+- L6: `from agents.executor import AgentExecutor` -> runs a planned sequence of tool calls in agentic mode.
+- L7: `from agents.planner import Planner` -> builds a plan of tools to use for a question.
+- L8: `from agents.tooling import build_rag_tool, build_sql_tool, build_web_tool` -> factories for tool instances.
+- L9: `from agents.tools import ToolRegistry` -> registry that holds tools for the agent.
+- L10: `from agents.verifier import Verifier` -> LLM-based answer verification helper.
+- L11: `from core.factories import (` -> start of factory imports grouped for readability.
+- L12: `create_bm25_index,` -> builds/loads BM25 index from disk.
+- L13: `create_embeddings_provider,` -> instantiates embeddings provider from settings.
+- L14: `create_llm_provider,` -> instantiates LLM provider from settings.
+- L15: `create_routing_policy,` -> chooses provider based on task type.
+- L16: `create_vector_store,` -> instantiates vector store from settings.
+- L17: `)` -> closes multi-line import list.
+- L18: `from core.settings import load_settings` -> loads YAML configuration into Settings object.
+- L19: `from rag.answer import generate_answer, generate_answer_strict` -> answer generation helpers.
+- L20: `from rag.citations import format_citations` -> formats chunk citations for output.
+- L21: `from rag.embeddings import EmbeddingService` -> wraps embeddings provider usage.
+- L22: `from rag.reranker import Reranker` -> reranks retrieved chunks.
+- L23: `from rag.query_rewrite import QueryRewriter` -> optional query rewrite step.
+- L24: `from rag.retriever import FusionConfig, HybridRetriever` -> hybrid retriever and fusion settings.
+- L25: (blank) -> separates imports from helpers.
+- L26: (blank) -> extra spacing before function definitions.
+- L27: `def _build_tools(settings) -> ToolRegistry:` -> helper to build the tools registry.
+- L28: `tools = ToolRegistry()` -> creates an empty registry.
+- L29: `tools.register(build_rag_tool())` -> always register the RAG tool.
+- L30: (blank) -> separation before config lookup.
+- L31: `tool_cfg = settings.raw.get("tools") or {}` -> read tools config section safely.
+- L32: `sql_cfg = tool_cfg.get("sql") or {}` -> extract SQL tool config block.
+- L33: `if sql_cfg.get("dsn"):` -> only enable SQL tool if DSN provided.
+- L34: `tools.register(build_sql_tool(...))` -> register SQL tool with DSN/template.
+- L35: (blank) -> separation between SQL and web config.
+- L36: `web_cfg = tool_cfg.get("web") or {}` -> extract web tool config block.
+- L37: `if web_cfg.get("base_url"):` -> only enable web tool if base URL provided.
+- L38: `tools.register(build_web_tool(...))` -> register web tool with base URL/headers.
+- L39: (blank) -> spacing before return.
+- L40: `return tools` -> return configured ToolRegistry.
+- L41: (blank) -> spacing between helper and pipeline function.
+- L42: (blank) -> extra spacing for readability.
+- L43: `def run_query_pipeline(` -> main online query pipeline entry.
+- L44: `tenant_id: str,` -> tenant identifier for access filtering.
+- L45: `question: str,` -> user question.
+- L46: `filters: Dict[str, Any],` -> metadata filters for retrieval.
+- L47: `top_k: int,` -> requested number of top results.
+- L48: `mode: str,` -> pipeline mode (e.g., agentic/hybrid/vector).
+- L49: `) -> Dict[str, Any]:` -> returns a dictionary response.
+- L50: `_ = (top_k,)` -> placeholder to avoid unused variable warnings in some contexts.
+- L51: `trace_id = str(uuid.uuid4())` -> unique ID for tracing the request.
+- L52: (blank) -> separation before settings load.
+- L53: `settings = load_settings()` -> load configuration.
+- L54: `filters = dict(filters or {})` -> normalize filters into a dict.
+- L55: `if tenant_id:` -> only enforce tenant filtering if provided.
+- L56: `filters.setdefault("tenant_id", tenant_id)` -> ensure tenant scoping in retrieval.
+- L57: (blank) -> separation before mode branching.
+- L58: `if mode == "agentic":` -> branch into agentic tool-using workflow.
+- L59: `tools = _build_tools(settings)` -> create tool registry for agent.
+- L60: `executor = AgentExecutor(Planner(), tools)` -> planner + executor for tool steps.
+- L61: `result = executor.run(question)` -> execute tool plan and collect outputs.
+- L62: (blank) -> spacing before synthesis.
+- L63: `provider_name = ...choose(task="agentic")` -> choose provider for agentic synthesis.
+- L64: `provider = create_llm_provider(...)` -> instantiate the chosen provider.
+- L65: `synthesis_prompt = (` -> build prompt for final synthesis.
+- L66: string line -> instruction to synthesize from tool outputs.
+- L67: `f"Question: {question}\n"` -> inject original question.
+- L68: `f"Tool outputs:\n{result.output}\n"` -> inject tool outputs.
+- L69: `"Answer:"` -> prompt tail to start answer.
+- L70: `)` -> close prompt construction.
+- L71: `answer = provider.generate(synthesis_prompt)` -> generate final answer.
+- L72: `citations = result.citations` -> carry citations from tools.
+- L73: `model = provider_name` -> record model name used.
+- L74: (blank) -> spacing before verification.
+- L75: `verifier = Verifier(provider)` -> create verifier using same provider.
+- L76: `if not verifier.verify(answer, citations):` -> verify support vs citations.
+- L77: `rag_tool = build_rag_tool()` -> fallback to RAG tool if verification fails.
+- L78: `fallback = rag_tool.handler(question)` -> run RAG tool handler.
+- L79: `answer = fallback.output` -> replace answer with fallback output.
+- L80: `citations = fallback.citations` -> replace citations with fallback citations.
+- L81: `else:` -> non-agentic pipeline branch.
+- L82: `retrieval_cfg = settings.raw.get("retrieval") or {}` -> retrieval config block.
+- L83: `fusion_cfg = retrieval_cfg.get("fusion") or {}` -> fusion settings sub-block.
+- L84: `fusion = FusionConfig(` -> build fusion config object.
+- L85: `use_rrf=...` -> enable/disable RRF fusion.
+- L86: `rrf_k=...` -> RRF constant controlling score decay.
+- L87: `vector_weight=...` -> weight for vector hits.
+- L88: `bm25_weight=...` -> weight for BM25 hits.
+- L89: `)` -> close FusionConfig initialization.
+- L90: `retrieval_top_k = int(... )` -> allow retrieval to fetch more than top_k.
+- L91: `if retrieval_top_k < top_k:` -> ensure retrieval >= requested output size.
+- L92: `retrieval_top_k = top_k` -> enforce minimum retrieval count.
+- L93: `provider_name = ...choose(task="qa")` -> provider choice for QA flow.
+- L94: `provider = create_llm_provider(...)` -> instantiate provider.
+- L95: `vector_store = create_vector_store(settings)` -> connect to vector DB.
+- L96: `embedder = EmbeddingService(...)` -> embeddings wrapper for query vector.
+- L97: `bm25 = create_bm25_index(...) if mode == "hybrid" else None` -> optional BM25.
+- L98: `retriever = HybridRetriever(..., fusion=fusion)` -> hybrid retriever with fusion.
+- L99: `rewrite_cfg = settings.raw.get("query_rewrite") or {}` -> query rewrite settings.
+- L100: `rewriter = QueryRewriter(...)` -> enable/disable rewrite by config.
+- L101: `retrieval_query = rewriter.rewrite(question)` -> use rewritten query for retrieval.
+- L102: `chunks = retriever.retrieve(...)` -> retrieve candidate chunks.
+- L103: `reranker_cfg = settings.raw.get("reranker") or {}` -> reranker settings.
+- L104: `reranker = Reranker(...)` -> optional reranker depending on config.
+- L105: `rerank_top_k = int(...)` -> final number of reranked results.
+- L106: `chunks = reranker.rerank(...)` -> reorder and trim chunks.
+- L107: `answer_cfg = settings.raw.get("answer") or {}` -> answer settings.
+- L108: `max_context_words = (` -> compute word budget.
+- L109: `int(answer_cfg["max_context_words"]) ...` -> optional limit.
+- L110: `)` -> close conditional expression.
+- L111: `answer = generate_answer(...)` -> generate answer from context.
+- L112: `citations = format_citations(chunks)` -> format citations from chunks.
+- L113: `model = provider_name` -> record model used.
+- L114: `verification_cfg = settings.raw.get("verification") or {}` -> verification settings.
+- L115: `if verification_cfg.get("enabled", True):` -> verify if enabled.
+- L116: `verifier = Verifier(provider)` -> instantiate verifier.
+- L117: `if not verifier.verify(answer, citations):` -> check answer support.
+- L118: `answer = generate_answer_strict(` -> regenerate with strict prompt.
+- L119: `question,` -> pass question.
+- L120: `chunks,` -> pass context chunks.
+- L121: `provider,` -> pass provider.
+- L122: `max_context_words=max_context_words,` -> keep same context budget.
+- L123: `)` -> close strict answer call.
+- L124: (blank) -> spacing before return.
+- L125: `return {...}` -> return response payload with answer, citations, trace ID, model.
