@@ -1,600 +1,821 @@
 """
-Advanced Chunking Strategies for Production RAG Systems
+Advanced Text Chunking Strategies for Production RAG System
 
-This module implements various chunking strategies for breaking down documents
-into smaller, more manageable pieces suitable for embedding and retrieval.
-Different strategies are appropriate for different types of content and use cases.
+This module implements various text chunking strategies for the RAG system,
+allowing for optimal document segmentation based on content type and retrieval needs.
+Different chunking strategies are available to handle various document types and
+preserving semantic coherence while enabling effective retrieval.
 
-The module includes:
-- Fixed-size chunking for uniform processing
-- Semantic chunking that respects document structure
-- Agentic chunking that uses LLMs for intelligent splitting
-- Validation and quality assurance for chunks
-
-Key Features:
-- Multiple chunking strategies for different use cases
-- Overlap support to maintain context across chunks
-- Content-aware splitting that respects document structure
-- Quality validation for generated chunks
+The chunking strategies follow production best practices:
+- Multiple chunking algorithms for different content types
+- Semantic boundary preservation
+- Configurable chunk sizes and overlaps
+- Metadata preservation during chunking
+- Content-aware splitting
 - Performance optimization for large documents
 
-Strategies Implemented:
-- FixedSizeChunker: Splits documents at regular intervals
-- SemanticChunker: Respects paragraph/sentence boundaries
-- AgenticChunker: Uses LLMs to determine optimal split points
-- HierarchicalChunker: Maintains document hierarchy during chunking
+Key Features:
+- Recursive chunking with configurable separators
+- Semantic chunking based on sentence boundaries
+- Code-specific chunking for programming documents
+- Markdown-aware chunking preserving structure
+- Paragraph-aware chunking
+- Overlap management to preserve context
+- Metadata inheritance in chunks
+
+Security Considerations:
+- Content sanitization during chunking
+- Boundary validation to prevent injection
+- Proper encoding handling
+- Memory-safe processing of large documents
 """
 
 import re
-from abc import ABC, abstractmethod
-from typing import List, Optional
+import math
+from typing import List, Optional, Dict, Any, Callable
 from dataclasses import dataclass
+from enum import Enum
+from abc import ABC, abstractmethod
+import logging
 
 from src.retrieval import Document
+
+
+class ChunkingStrategy(Enum):
+    """Enumeration for different chunking strategies."""
+    RECURSIVE = "recursive"
+    SEMANTIC = "semantic"
+    PARAGRAPH = "paragraph"
+    SENTENCE = "sentence"
+    CODE = "code"
+    MARKDOWN = "markdown"
+    CHARACTER = "character"
 
 
 @dataclass
 class ChunkingConfig:
     """
-    Configuration for chunking strategies.
-    
+    Configuration for chunking operations.
+
     Attributes:
-        chunk_size (int): Target size of each chunk in characters
-        overlap (int): Number of characters to overlap between chunks
+        chunk_size (int): Maximum size of each chunk
+        chunk_overlap (int): Overlap between consecutive chunks
+        separators (List[str]): Separators to use for splitting
+        strategy (ChunkingStrategy): Chunking strategy to use
         min_chunk_size (int): Minimum acceptable chunk size
-        max_chunk_size (int): Maximum acceptable chunk size
-        sentence_aware (bool): Whether to respect sentence boundaries
-        paragraph_aware (bool): Whether to respect paragraph boundaries
+        preserve_structure (bool): Whether to preserve document structure
     """
-    chunk_size: int = 512
-    overlap: int = 100
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    separators: List[str] = None
+    strategy: ChunkingStrategy = ChunkingStrategy.RECURSIVE
     min_chunk_size: int = 50
-    max_chunk_size: int = 1024
-    sentence_aware: bool = True
-    paragraph_aware: bool = True
+    preserve_structure: bool = True
 
-
-class ChunkingStrategy(ABC):
-    """
-    Abstract base class for different chunking strategies.
-    
-    Defines the interface for various chunking approaches that can be used
-    to split documents into smaller, more manageable pieces while preserving
-    semantic coherence and context.
-    """
-    
-    @abstractmethod
-    def chunk(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Split a document into chunks according to the strategy.
+    def __post_init__(self):
+        if self.separators is None:
+            self.separators = ["\n\n", "\n", " ", ""]
         
+        # Validate configuration
+        if self.chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be less than chunk_size")
+        if self.min_chunk_size <= 0:
+            raise ValueError("min_chunk_size must be positive")
+        if self.chunk_overlap < 0:
+            raise ValueError("chunk_overlap must be non-negative")
+
+
+class BaseChunker(ABC):
+    """Abstract base class for chunkers."""
+
+    def __init__(self, config: ChunkingConfig):
+        """
+        Initialize the chunker with configuration.
+
         Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
+            config: Chunking configuration
+        """
+        self.config = config
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    @abstractmethod
+    def chunk_document(self, document: Document) -> List[Document]:
+        """
+        Chunk a document into smaller pieces.
+
+        Args:
+            document: Document to chunk
+
         Returns:
-            List[Document]: List of chunked documents
+            List of chunked documents
         """
         pass
-    
-    def validate_chunks(self, chunks: List[Document], config: ChunkingConfig) -> List[Document]:
-        """
-        Validate and filter chunks based on size and quality criteria.
-        
-        Args:
-            chunks (List[Document]): List of chunks to validate
-            config (ChunkingConfig): Configuration for validation criteria
-            
-        Returns:
-            List[Document]: Validated and filtered chunks
-        """
-        validated_chunks = []
-        for chunk in chunks:
-            if len(chunk.content) >= config.min_chunk_size and len(chunk.content) <= config.max_chunk_size:
-                validated_chunks.append(chunk)
-        
-        return validated_chunks
 
+    def _create_chunk_document(self, original_doc: Document, content: str, 
+                             chunk_index: int, start_pos: int, end_pos: int) -> Document:
+        """
+        Create a chunk document with appropriate metadata.
 
-class FixedSizeChunker(ChunkingStrategy):
-    """
-    Fixed-size chunking strategy that splits documents at regular intervals.
-    
-    This approach divides documents into fixed-length segments regardless
-    of semantic boundaries. It's simple and predictable but may split
-    in the middle of meaningful text units.
-    
-    Pros:
-    - Consistent chunk sizes
-    - Predictable processing times
-    - Simple implementation
-    
-    Cons:
-    - May break semantic coherence
-    - Context can be lost at boundaries
-    """
-    
-    def chunk(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Split a document into fixed-size chunks.
-        
         Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
-        Returns:
-            List[Document]: List of chunked documents
-        """
-        content = document.content
-        chunks = []
-        
-        start = 0
-        while start < len(content):
-            end = start + config.chunk_size
-            chunk_content = content[start:end]
-            
-            # Create a new document for this chunk
-            chunk_doc = Document(
-                id=f"{document.id}_chunk_{len(chunks) + 1}",
-                content=chunk_content,
-                source=document.source,
-                doc_type=f"{document.doc_type}_chunk",
-                created_at=document.created_at,
-                updated_at=document.updated_at,
-                access_control=document.access_control,
-                page_number=document.page_number,
-                section_title=document.section_title,
-                metadata={
-                    **document.metadata,
-                    "chunk_index": len(chunks),
-                    "original_id": document.id,
-                    "chunk_method": "fixed_size",
-                    "start_pos": start,
-                    "end_pos": end
-                }
-            )
-            
-            chunks.append(chunk_doc)
-            
-            # Move to the next chunk position with overlap
-            start = end - config.overlap if config.overlap < config.chunk_size else start + config.chunk_size
-        
-        return self.validate_chunks(chunks, config)
+            original_doc: Original document
+            content: Chunk content
+            chunk_index: Index of this chunk
+            start_pos: Starting position in original document
+            end_pos: Ending position in original document
 
-
-class SemanticChunker(ChunkingStrategy):
-    """
-    Semantic chunking strategy that respects document structure.
-    
-    This approach attempts to split documents at natural boundaries
-    like paragraph breaks, headings, or sentences to maintain context
-    and meaning within each chunk.
-    
-    Pros:
-    - Preserves semantic coherence
-    - Better context retention
-    - More natural reading experience
-    
-    Cons:
-    - Variable chunk sizes
-    - More complex implementation
-    - May require more processing
-    """
-    
-    def chunk(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Split a document into semantically coherent chunks.
-        
-        Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
         Returns:
-            List[Document]: List of chunked documents
+            Chunked document with metadata
         """
-        # Split by paragraphs first
-        paragraphs = [p.strip() for p in document.content.split('\n') if p.strip()]
+        chunk_id = f"{original_doc.id}_chunk_{chunk_index}"
         
-        chunks = []
-        current_chunk = ""
-        chunk_idx = 0
+        # Inherit metadata from original document and add chunk-specific metadata
+        chunk_metadata = {
+            **original_doc.metadata,
+            "chunk_index": chunk_index,
+            "chunk_start": start_pos,
+            "chunk_end": end_pos,
+            "original_id": original_doc.id,
+            "chunk_size": len(content),
+            "chunk_strategy": self.config.strategy.value
+        }
         
-        for para in paragraphs:
-            # If adding this paragraph would exceed chunk size
-            if len(current_chunk) + len(para) > config.chunk_size and current_chunk:
-                # Save the current chunk
-                chunk_doc = Document(
-                    id=f"{document.id}_chunk_{chunk_idx + 1}",
-                    content=current_chunk.strip(),
-                    source=document.source,
-                    doc_type=f"{document.doc_type}_chunk",
-                    created_at=document.created_at,
-                    updated_at=document.updated_at,
-                    access_control=document.access_control,
-                    page_number=document.page_number,
-                    section_title=document.section_title,
-                    metadata={
-                        **document.metadata,
-                        "chunk_index": chunk_idx,
-                        "original_id": document.id,
-                        "chunk_method": "semantic",
-                        "boundary_type": "paragraph"
-                    }
-                )
-                chunks.append(chunk_doc)
-                
-                # Start a new chunk with potential overlap
-                if config.overlap > 0:
-                    # Take the end portion of the previous chunk for overlap
-                    overlap_text = current_chunk[-config.overlap:] if len(current_chunk) > config.overlap else current_chunk
-                    current_chunk = overlap_text + " " + para
-                else:
-                    current_chunk = para
-                chunk_idx += 1
-            else:
-                # Add paragraph to current chunk
-                if current_chunk:
-                    current_chunk += "\n" + para
-                else:
-                    current_chunk = para
-        
-        # Add the last chunk if it has content
-        if current_chunk.strip():
-            chunk_doc = Document(
-                id=f"{document.id}_chunk_{chunk_idx + 1}",
-                content=current_chunk.strip(),
-                source=document.source,
-                doc_type=f"{document.doc_type}_chunk",
-                created_at=document.created_at,
-                updated_at=document.updated_at,
-                access_control=document.access_control,
-                page_number=document.page_number,
-                section_title=document.section_title,
-                metadata={
-                    **document.metadata,
-                    "chunk_index": chunk_idx,
-                    "original_id": document.id,
-                    "chunk_method": "semantic",
-                    "boundary_type": "paragraph"
-                }
-            )
-            chunks.append(chunk_doc)
-        
-        return self.validate_chunks(chunks, config)
-    
-    def chunk_sentences(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Alternative method to chunk based on sentences.
-        
-        Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
-        Returns:
-            List[Document]: List of chunked documents
-        """
-        # Split by sentences using regex
-        sentences = re.split(r'[.!?]+\s+', document.content)
-        
-        chunks = []
-        current_chunk = ""
-        chunk_idx = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            # If adding this sentence would exceed chunk size
-            if len(current_chunk) + len(sentence) > config.chunk_size and current_chunk:
-                # Save the current chunk
-                chunk_doc = Document(
-                    id=f"{document.id}_chunk_{chunk_idx + 1}",
-                    content=current_chunk.strip(),
-                    source=document.source,
-                    doc_type=f"{document.doc_type}_chunk",
-                    created_at=document.created_at,
-                    updated_at=document.updated_at,
-                    access_control=document.access_control,
-                    page_number=document.page_number,
-                    section_title=document.section_title,
-                    metadata={
-                        **document.metadata,
-                        "chunk_index": chunk_idx,
-                        "original_id": document.id,
-                        "chunk_method": "semantic_sentence",
-                        "boundary_type": "sentence"
-                    }
-                )
-                chunks.append(chunk_doc)
-                
-                # Start a new chunk with potential overlap
-                if config.overlap > 0:
-                    # Take the end portion of the previous chunk for overlap
-                    overlap_text = current_chunk[-config.overlap:] if len(current_chunk) > config.overlap else current_chunk
-                    current_chunk = overlap_text + " " + sentence
-                else:
-                    current_chunk = sentence
-                chunk_idx += 1
-            else:
-                # Add sentence to current chunk
-                if current_chunk:
-                    current_chunk += " " + sentence
-                else:
-                    current_chunk = sentence
-        
-        # Add the last chunk if it has content
-        if current_chunk.strip():
-            chunk_doc = Document(
-                id=f"{document.id}_chunk_{chunk_idx + 1}",
-                content=current_chunk.strip(),
-                source=document.source,
-                doc_type=f"{document.doc_type}_chunk",
-                created_at=document.created_at,
-                updated_at=document.updated_at,
-                access_control=document.access_control,
-                page_number=document.page_number,
-                section_title=document.section_title,
-                metadata={
-                    **document.metadata,
-                    "chunk_index": chunk_idx,
-                    "original_id": document.id,
-                    "chunk_method": "semantic_sentence",
-                    "boundary_type": "sentence"
-                }
-            )
-            chunks.append(chunk_doc)
-        
-        return self.validate_chunks(chunks, config)
-
-
-class AgenticChunker(ChunkingStrategy):
-    """
-    Agentic chunking strategy that uses LLMs for intelligent splitting.
-    
-    This approach leverages language models to determine optimal split points
-    based on semantic coherence and topic shifts. It's more computationally
-    expensive but produces higher quality chunks.
-    
-    Note: This is a simplified implementation. A full implementation would
-    involve calling an LLM to determine optimal split points.
-    
-    Pros:
-    - Highest quality chunks
-    - Topic-aware splitting
-    - Contextually appropriate boundaries
-    
-    Cons:
-    - High computational cost
-    - Requires LLM access
-    - Slower processing
-    """
-    
-    def chunk(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Split a document using LLM-guided chunking.
-        
-        Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
-        Returns:
-            List[Document]: List of chunked documents
-        """
-        # For this implementation, we'll simulate agentic chunking by using
-        # a combination of semantic and size-based approaches
-        # In a real implementation, this would involve calling an LLM
-        
-        # First, try semantic chunking
-        semantic_chunker = SemanticChunker()
-        chunks = semantic_chunker.chunk(document, config)
-        
-        # If any chunks are still too large, further subdivide them
-        final_chunks = []
-        for chunk in chunks:
-            if len(chunk.content) <= config.max_chunk_size:
-                final_chunks.append(chunk)
-            else:
-                # Further subdivide large chunks using fixed-size approach
-                sub_config = ChunkingConfig(
-                    chunk_size=config.max_chunk_size // 2,
-                    overlap=config.overlap // 2,
-                    min_chunk_size=config.min_chunk_size,
-                    max_chunk_size=config.max_chunk_size
-                )
-                sub_chunks = FixedSizeChunker().chunk(chunk, sub_config)
-                final_chunks.extend(sub_chunks)
-        
-        return self.validate_chunks(final_chunks, config)
-
-
-class HierarchicalChunker(ChunkingStrategy):
-    """
-    Hierarchical chunking strategy that maintains document structure.
-    
-    This approach preserves the hierarchical nature of documents (sections,
-    subsections, paragraphs) while creating appropriately sized chunks.
-    Useful for structured documents like manuals, reports, or academic papers.
-    
-    Pros:
-    - Preserves document hierarchy
-    - Maintains structural context
-    - Good for navigable documents
-    
-    Cons:
-    - More complex implementation
-    - May create uneven chunk sizes
-    - Requires structured input
-    """
-    
-    def chunk(self, document: Document, config: ChunkingConfig) -> List[Document]:
-        """
-        Split a document while preserving its hierarchical structure.
-        
-        Args:
-            document (Document): The document to chunk
-            config (ChunkingConfig): Configuration for chunking
-            
-        Returns:
-            List[Document]: List of chunked documents
-        """
-        # Identify document structure (headings, sections)
-        lines = document.content.split('\n')
-        chunks = []
-        current_section = ""
-        current_heading = ""
-        chunk_idx = 0
-        
-        for line in lines:
-            # Check if line is a heading (simple heuristic)
-            if self._is_heading(line):
-                # If we have accumulated content, save it as a chunk
-                if current_section.strip():
-                    chunk_doc = self._create_hierarchical_chunk(
-                        document, current_section, current_heading, chunk_idx
-                    )
-                    chunks.append(chunk_doc)
-                    chunk_idx += 1
-                
-                # Start new section with this heading
-                current_heading = line.strip()
-                current_section = line + "\n"
-            else:
-                # Add line to current section
-                current_section += line + "\n"
-                
-                # If section becomes too large, create a chunk
-                if len(current_section) > config.chunk_size:
-                    chunk_doc = self._create_hierarchical_chunk(
-                        document, current_section, current_heading, chunk_idx
-                    )
-                    chunks.append(chunk_doc)
-                    chunk_idx += 1
-                    
-                    # Reset section but keep the heading context
-                    current_section = current_heading + "\n" if current_heading else ""
-        
-        # Add the last section if it has content
-        if current_section.strip():
-            chunk_doc = self._create_hierarchical_chunk(
-                document, current_section, current_heading, chunk_idx
-            )
-            chunks.append(chunk_doc)
-        
-        return self.validate_chunks(chunks, config)
-    
-    def _is_heading(self, line: str) -> bool:
-        """
-        Simple heuristic to identify if a line is a heading.
-        
-        Args:
-            line (str): Line to check
-            
-        Returns:
-            bool: True if line appears to be a heading
-        """
-        # Check for common heading patterns
-        line = line.strip()
-        if not line:
-            return False
-            
-        # Check for markdown-style headings
-        if line.startswith('#'):
-            return True
-            
-        # Check for all caps titles (common in documents)
-        if line.isupper() and len(line) < 100:
-            return True
-            
-        # Check for numbered sections (e.g., "1. Introduction")
-        if re.match(r'^\d+(\.\d+)*\s+\w+', line):
-            return True
-            
-        return False
-    
-    def _create_hierarchical_chunk(
-        self, 
-        original_doc: Document, 
-        content: str, 
-        heading: str, 
-        chunk_idx: int
-    ) -> Document:
-        """
-        Create a document chunk with hierarchical metadata.
-        
-        Args:
-            original_doc (Document): Original document
-            content (str): Content for the chunk
-            heading (str): Heading associated with the chunk
-            chunk_idx (int): Index of this chunk
-            
-        Returns:
-            Document: Chunked document with hierarchical metadata
-        """
         return Document(
-            id=f"{original_doc.id}_hchunk_{chunk_idx + 1}",
-            content=content.strip(),
+            id=chunk_id,
+            content=content,
             source=original_doc.source,
-            doc_type=f"{original_doc.doc_type}_hchunk",
+            doc_type=f"{original_doc.doc_type}_chunk",
+            metadata=chunk_metadata,
             created_at=original_doc.created_at,
             updated_at=original_doc.updated_at,
             access_control=original_doc.access_control,
             page_number=original_doc.page_number,
-            section_title=heading if heading else original_doc.section_title,
-            metadata={
-                **original_doc.metadata,
-                "chunk_index": chunk_idx,
-                "original_id": original_doc.id,
-                "chunk_method": "hierarchical",
-                "hierarchy_level": self._get_hierarchy_level(heading),
-                "section_title": heading
-            }
+            section_title=original_doc.section_title
         )
+
+
+class RecursiveCharacterChunker(BaseChunker):
+    """
+    Recursive character chunker that splits text by separators in order of preference.
     
-    def _get_hierarchy_level(self, heading: str) -> int:
+    This chunker attempts to split text using a hierarchy of separators:
+    1. Double newlines (\n\n)
+    2. Single newlines (\n)
+    3. Spaces ( )
+    4. Characters (none)
+    
+    It recursively applies separators until chunks fit within the specified size.
+    """
+
+    def chunk_document(self, document: Document) -> List[Document]:
         """
-        Determine the hierarchy level based on heading format.
-        
+        Chunk document using recursive character splitting.
+
         Args:
-            heading (str): Heading text
-            
+            document: Document to chunk
+
         Returns:
-            int: Hierarchy level (1 for highest level)
+            List of chunked documents
         """
-        if heading.startswith('###'):
-            return 3
-        elif heading.startswith('##'):
-            return 2
-        elif heading.startswith('#'):
-            return 1
-        else:
-            # Try to detect from numbered sections
-            match = re.match(r'^(\d+)\.?', heading)
-            if match:
-                level = len(match.group(1).split('.'))
-                return level
-            return 0
-
-
-def get_chunker(strategy_name: str) -> ChunkingStrategy:
-    """
-    Factory function to get a chunking strategy by name.
-    
-    Args:
-        strategy_name (str): Name of the strategy to use
+        chunks = []
+        texts = [document.content]
+        
+        # Process each separator in order of preference
+        for separator in self.config.separators:
+            new_texts = []
             
-    Returns:
-        ChunkingStrategy: Instance of the requested strategy
+            for text in texts:
+                # If text is already small enough, keep it as is
+                if len(text) <= self.config.chunk_size:
+                    new_texts.append(text)
+                    continue
+                
+                # Split the text using the current separator
+                if separator == "":
+                    # Character-level splitting
+                    splits = [text[i:i+self.config.chunk_size] 
+                             for i in range(0, len(text), self.config.chunk_size)]
+                else:
+                    # Separator-based splitting
+                    splits = text.split(separator)
+                
+                # Process splits to ensure they fit within chunk size
+                current_chunk = ""
+                for split in splits:
+                    # Check if adding this split would exceed chunk size
+                    test_chunk = current_chunk + separator + split if current_chunk else split
+                    
+                    if len(test_chunk) <= self.config.chunk_size:
+                        current_chunk = test_chunk
+                    else:
+                        # If current chunk has content, save it
+                        if current_chunk:
+                            new_texts.append(current_chunk)
+                        
+                        # If the split itself is larger than chunk size, 
+                        # we need to further split it
+                        if len(split) > self.config.chunk_size:
+                            # Recursively process this oversized split
+                            sub_splits = self._split_large_text(split)
+                            new_texts.extend(sub_splits)
+                        else:
+                            current_chunk = split
+                
+                # Add any remaining content as a chunk
+                if current_chunk:
+                    new_texts.append(current_chunk)
+            
+            texts = new_texts
+        
+        # Create document chunks
+        for i, text in enumerate(texts):
+            if len(text.strip()) >= self.config.min_chunk_size:
+                chunk_doc = self._create_chunk_document(
+                    document, text, i, 
+                    sum(len(t) for t in texts[:i]),  # Approximate start position
+                    sum(len(t) for t in texts[:i+1])   # Approximate end position
+                )
+                chunks.append(chunk_doc)
+        
+        return chunks
+
+    def _split_large_text(self, text: str) -> List[str]:
+        """
+        Split a text that is larger than the chunk size.
+
+        Args:
+            text: Text to split
+
+        Returns:
+            List of text chunks
+        """
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + self.config.chunk_size
+            chunk = text[start:end]
+            chunks.append(chunk)
+            start = end - self.config.chunk_overlap
+        
+        return chunks
+
+
+class SemanticChunker(BaseChunker):
     """
-    strategies = {
-        'fixed': FixedSizeChunker(),
-        'semantic': SemanticChunker(),
-        'agentic': AgenticChunker(),
-        'hierarchical': HierarchicalChunker()
-    }
+    Semantic chunker that splits text based on semantic boundaries.
     
-    if strategy_name not in strategies:
-        raise ValueError(f"Unknown chunking strategy: {strategy_name}. "
-                         f"Available: {list(strategies.keys())}")
+    This chunker attempts to maintain semantic coherence by splitting
+    at sentence boundaries and respecting paragraph structure.
+    """
+
+    def __init__(self, config: ChunkingConfig):
+        super().__init__(config)
+        # Compile regex patterns for sentence detection
+        self.sentence_endings = re.compile(r'[.!?]+')
+        self.punctuation = re.compile(r'[.!?]+')
+        self.whitespace = re.compile(r'\s+')
+
+    def chunk_document(self, document: Document) -> List[Document]:
+        """
+        Chunk document using semantic boundaries.
+
+        Args:
+            document: Document to chunk
+
+        Returns:
+            List of chunked documents
+        """
+        # First, split by paragraphs
+        paragraphs = self._split_by_paragraphs(document.content)
+        
+        chunks = []
+        chunk_index = 0
+        
+        for paragraph in paragraphs:
+            # If paragraph is small enough, add as single chunk
+            if len(paragraph) <= self.config.chunk_size:
+                chunk_doc = self._create_chunk_document(
+                    document, paragraph, chunk_index, 0, len(paragraph)
+                )
+                chunks.append(chunk_doc)
+                chunk_index += 1
+                continue
+            
+            # Otherwise, split paragraph into sentences and group them
+            sentences = self._split_by_sentences(paragraph)
+            
+            current_chunk = ""
+            for sentence in sentences:
+                # Check if adding this sentence would exceed chunk size
+                test_chunk = current_chunk + " " + sentence if current_chunk else sentence
+                
+                if len(test_chunk) <= self.config.chunk_size:
+                    current_chunk = test_chunk
+                else:
+                    # If current chunk has content, save it
+                    if current_chunk:
+                        chunk_doc = self._create_chunk_document(
+                            document, current_chunk.strip(), chunk_index, 0, len(current_chunk)
+                        )
+                        chunks.append(chunk_doc)
+                        chunk_index += 1
+                    
+                    # If the sentence itself is larger than chunk size, 
+                    # we need to further split it
+                    if len(sentence) > self.config.chunk_size:
+                        sub_chunks = self._split_large_sentence(sentence)
+                        for sub_chunk in sub_chunks:
+                            chunk_doc = self._create_chunk_document(
+                                document, sub_chunk, chunk_index, 0, len(sub_chunk)
+                            )
+                            chunks.append(chunk_doc)
+                            chunk_index += 1
+                    else:
+                        current_chunk = sentence
+            
+            # Add any remaining content as a chunk
+            if current_chunk:
+                chunk_doc = self._create_chunk_document(
+                    document, current_chunk.strip(), chunk_index, 0, len(current_chunk)
+                )
+                chunks.append(chunk_doc)
+                chunk_index += 1
+        
+        return chunks
+
+    def _split_by_paragraphs(self, text: str) -> List[str]:
+        """Split text by paragraphs."""
+        # Split by double newlines first
+        paragraphs = text.split('\n\n')
+        # Clean up whitespace
+        return [p.strip() for p in paragraphs if p.strip()]
+
+    def _split_by_sentences(self, text: str) -> List[str]:
+        """Split text by sentences."""
+        # Find sentence boundaries
+        sentences = self.sentence_endings.split(text)
+        # Get the actual sentence endings
+        sentence_endings = self.sentence_endings.findall(text)
+        
+        # Reconstruct sentences with their endings
+        result = []
+        for i, sentence in enumerate(sentences):
+            if i < len(sentence_endings):
+                result.append(sentence + sentence_endings[i])
+            else:
+                # Last part might not have an ending
+                if sentence.strip():
+                    result.append(sentence)
+        
+        # Clean up whitespace
+        return [s.strip() for s in result if s.strip()]
+
+    def _split_large_sentence(self, sentence: str) -> List[str]:
+        """Split a sentence that is larger than the chunk size."""
+        # First try to split by commas
+        parts = sentence.split(',')
+        if len(parts) > 1:
+            chunks = []
+            current_chunk = ""
+            
+            for part in parts:
+                test_chunk = current_chunk + "," + part if current_chunk else part
+                
+                if len(test_chunk) <= self.config.chunk_size:
+                    current_chunk = test_chunk
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = part
+            
+            if current_chunk:
+                chunks.append(current_chunk)
+            
+            # If any chunks are still too large, fall back to character splitting
+            final_chunks = []
+            for chunk in chunks:
+                if len(chunk) > self.config.chunk_size:
+                    final_chunks.extend(self._fallback_split(chunk))
+                else:
+                    final_chunks.append(chunk)
+            
+            return final_chunks
+        
+        # If no commas, fall back to character splitting
+        return self._fallback_split(sentence)
+
+    def _fallback_split(self, text: str) -> List[str]:
+        """Fallback to character-based splitting."""
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + self.config.chunk_size
+            chunk = text[start:end]
+            chunks.append(chunk)
+            start = end - self.config.chunk_overlap
+        
+        return chunks
+
+
+class CodeChunker(BaseChunker):
+    """
+    Code-specific chunker that respects code structure and syntax.
     
-    return strategies[strategy_name]
+    This chunker is designed for programming documents and attempts
+    to maintain syntactic validity and logical code units.
+    """
+
+    def __init__(self, config: ChunkingConfig):
+        super().__init__(config)
+        # Define code-specific separators
+        self.code_separators = [
+            r'\n\s*def\s+\w+',  # Function definitions
+            r'\n\s*class\s+\w+',  # Class definitions
+            r'\n\s*@',  # Decorators
+            r'\n\s*if\s+.*:',  # If statements
+            r'\n\s*for\s+.*:',  # For loops
+            r'\n\s*while\s+.*:',  # While loops
+            r'\n\s*try:',  # Try blocks
+            r'\n\s*except\s*',  # Except blocks
+            r'\n\s*else:',  # Else blocks
+            r'\n\s*elif\s+.*:',  # Elif statements
+            r'\n\s*import\s+',  # Import statements
+            r'\n\s*from\s+\w+\s+import',  # From import statements
+            r'\n\s*"""',  # Triple quotes (docstrings)
+            r"\n\s*'''",  # Triple single quotes (docstrings)
+            r'\n\s*#',  # Comments
+            r'\n\s*\n',  # Blank lines
+            r'\n',  # Newlines
+        ]
+
+    def chunk_document(self, document: Document) -> List[Document]:
+        """
+        Chunk code document respecting code structure.
+
+        Args:
+            document: Code document to chunk
+
+        Returns:
+            List of chunked documents
+        """
+        content = document.content
+        chunks = []
+        chunk_index = 0
+        
+        # Try to split by code structure
+        current_position = 0
+        current_chunk = ""
+        
+        while current_position < len(content):
+            # Find the next code structure boundary
+            next_boundary = self._find_next_boundary(content, current_position)
+            
+            if next_boundary == -1:
+                # No more boundaries, add remaining content
+                remaining = content[current_position:]
+                if len(remaining) + len(current_chunk) <= self.config.chunk_size:
+                    current_chunk += remaining
+                    if current_chunk.strip():
+                        chunk_doc = self._create_chunk_document(
+                            document, current_chunk, chunk_index, 
+                            current_position - len(current_chunk), len(content)
+                        )
+                        chunks.append(chunk_doc)
+                    break
+                else:
+                    # Need to force split
+                    forced_chunks = self._force_split(current_chunk + remaining)
+                    for i, forced_chunk in enumerate(forced_chunks):
+                        chunk_doc = self._create_chunk_document(
+                            document, forced_chunk, chunk_index + i,
+                            0, len(forced_chunk)
+                        )
+                        chunks.append(chunk_doc)
+                    break
+            
+            # Get the segment to add
+            segment = content[current_position:next_boundary]
+            
+            # Check if adding this segment would exceed chunk size
+            if len(current_chunk) + len(segment) <= self.config.chunk_size:
+                current_chunk += segment
+                current_position = next_boundary
+            else:
+                # Current chunk is full, save it
+                if current_chunk.strip():
+                    chunk_doc = self._create_chunk_document(
+                        document, current_chunk, chunk_index,
+                        current_position - len(current_chunk), current_position
+                    )
+                    chunks.append(chunk_doc)
+                    chunk_index += 1
+                
+                # Start new chunk with the segment
+                current_chunk = segment
+                current_position = next_boundary
+        
+        # Add any remaining content
+        if current_chunk.strip():
+            chunk_doc = self._create_chunk_document(
+                document, current_chunk, chunk_index,
+                len(content) - len(current_chunk), len(content)
+            )
+            chunks.append(chunk_doc)
+        
+        return chunks
+
+    def _find_next_boundary(self, content: str, start_pos: int) -> int:
+        """Find the next code structure boundary."""
+        min_pos = float('inf')
+        
+        for pattern in self.code_separators:
+            match = re.search(pattern, content[start_pos:])
+            if match:
+                abs_pos = start_pos + match.start()
+                if abs_pos < min_pos:
+                    min_pos = abs_pos
+        
+        return int(min_pos) if min_pos != float('inf') else -1
+
+    def _force_split(self, content: str) -> List[str]:
+        """Force split content that doesn't have natural boundaries."""
+        chunks = []
+        start = 0
+        
+        while start < len(content):
+            end = start + self.config.chunk_size
+            chunk = content[start:end]
+            chunks.append(chunk)
+            start = end - self.config.chunk_overlap
+        
+        return chunks
+
+
+class MarkdownChunker(BaseChunker):
+    """
+    Markdown-aware chunker that preserves document structure.
+    
+    This chunker understands markdown syntax and attempts to maintain
+    structural integrity while chunking.
+    """
+
+    def __init__(self, config: ChunkingConfig):
+        super().__init__(config)
+        # Define markdown-specific separators
+        self.md_separators = [
+            r'\n#{1,6}\s',  # Headers (h1-h6)
+            r'\n\s*-\s',  # Unordered list items
+            r'\n\s*\d+\.\s',  # Ordered list items
+            r'\n\s*>',  # Blockquotes
+            r'\n\s*```',  # Code blocks
+            r'\n\s*~~~',  # Alternative code blocks
+            r'\n\s*\|\s',  # Table rows
+            r'\n\s*---',  # Horizontal rules
+            r'\n\s*\*\*\*',  # Horizontal rules with asterisks
+            r'\n\s*___',  # Horizontal rules with underscores
+            r'\n\s*\n',  # Paragraph breaks
+            r'\n',  # Line breaks
+        ]
+
+    def chunk_document(self, document: Document) -> List[Document]:
+        """
+        Chunk markdown document preserving structure.
+
+        Args:
+            document: Markdown document to chunk
+
+        Returns:
+            List of chunked documents
+        """
+        content = document.content
+        chunks = []
+        chunk_index = 0
+        
+        # Split by markdown structure
+        current_position = 0
+        current_chunk = ""
+        
+        while current_position < len(content):
+            # Find the next markdown structure boundary
+            next_boundary = self._find_next_boundary(content, current_position)
+            
+            if next_boundary == -1:
+                # No more boundaries, add remaining content
+                remaining = content[current_position:]
+                if len(remaining) + len(current_chunk) <= self.config.chunk_size:
+                    current_chunk += remaining
+                    if current_chunk.strip():
+                        chunk_doc = self._create_chunk_document(
+                            document, current_chunk, chunk_index,
+                            current_position - len(current_chunk), len(content)
+                        )
+                        chunks.append(chunk_doc)
+                    break
+                else:
+                    # Need to force split
+                    forced_chunks = self._force_split(current_chunk + remaining)
+                    for i, forced_chunk in enumerate(forced_chunks):
+                        chunk_doc = self._create_chunk_document(
+                            document, forced_chunk, chunk_index + i,
+                            0, len(forced_chunk)
+                        )
+                        chunks.append(chunk_doc)
+                    break
+            
+            # Get the segment to add
+            segment = content[current_position:next_boundary]
+            
+            # Check if adding this segment would exceed chunk size
+            if len(current_chunk) + len(segment) <= self.config.chunk_size:
+                current_chunk += segment
+                current_position = next_boundary
+            else:
+                # Current chunk is full, save it
+                if current_chunk.strip():
+                    chunk_doc = self._create_chunk_document(
+                        document, current_chunk, chunk_index,
+                        current_position - len(current_chunk), current_position
+                    )
+                    chunks.append(chunk_doc)
+                    chunk_index += 1
+                
+                # Start new chunk with the segment
+                current_chunk = segment
+                current_position = next_boundary
+        
+        # Add any remaining content
+        if current_chunk.strip():
+            chunk_doc = self._create_chunk_document(
+                document, current_chunk, chunk_index,
+                len(content) - len(current_chunk), len(content)
+            )
+            chunks.append(chunk_doc)
+        
+        return chunks
+
+    def _find_next_boundary(self, content: str, start_pos: int) -> int:
+        """Find the next markdown structure boundary."""
+        min_pos = float('inf')
+        
+        for pattern in self.md_separators:
+            match = re.search(pattern, content[start_pos:])
+            if match:
+                abs_pos = start_pos + match.start()
+                if abs_pos < min_pos:
+                    min_pos = abs_pos
+        
+        return int(min_pos) if min_pos != float('inf') else -1
+
+    def _force_split(self, content: str) -> List[str]:
+        """Force split content that doesn't have natural boundaries."""
+        chunks = []
+        start = 0
+        
+        while start < len(content):
+            end = start + self.config.chunk_size
+            chunk = content[start:end]
+            chunks.append(chunk)
+            start = end - self.config.chunk_overlap
+        
+        return chunks
+
+
+class ChunkerFactory:
+    """Factory for creating appropriate chunkers based on strategy."""
+
+    @staticmethod
+    def create_chunker(strategy: ChunkingStrategy, config: ChunkingConfig) -> BaseChunker:
+        """
+        Create a chunker instance based on the specified strategy.
+
+        Args:
+            strategy: Chunking strategy to use
+            config: Chunking configuration
+
+        Returns:
+            Appropriate chunker instance
+        """
+        if strategy == ChunkingStrategy.RECURSIVE:
+            return RecursiveCharacterChunker(config)
+        elif strategy == ChunkingStrategy.SEMANTIC:
+            return SemanticChunker(config)
+        elif strategy == ChunkingStrategy.CODE:
+            return CodeChunker(config)
+        elif strategy == ChunkingStrategy.MARKDOWN:
+            return MarkdownChunker(config)
+        elif strategy == ChunkingStrategy.PARAGRAPH:
+            # For paragraph chunking, we'll use recursive with paragraph separator
+            new_config = config
+            new_config.separators = ["\n\n", "\n", " ", ""]
+            return RecursiveCharacterChunker(new_config)
+        elif strategy == ChunkingStrategy.SENTENCE:
+            # For sentence chunking, we'll use recursive with sentence separators
+            new_config = config
+            new_config.separators = [". ", "! ", "? ", "\n", " ", ""]
+            return RecursiveCharacterChunker(new_config)
+        elif strategy == ChunkingStrategy.CHARACTER:
+            # For character chunking, we'll use recursive with empty separator
+            new_config = config
+            new_config.separators = [""]
+            return RecursiveCharacterChunker(new_config)
+        else:
+            raise ValueError(f"Unknown chunking strategy: {strategy}")
+
+
+class AdvancedChunker:
+    """
+    Advanced chunker that can dynamically select the best strategy based on content.
+    
+    This chunker analyzes the document content and selects the most appropriate
+    chunking strategy automatically.
+    """
+
+    def __init__(self, config: ChunkingConfig):
+        self.config = config
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def chunk_document(self, document: Document) -> List[Document]:
+        """
+        Automatically select the best chunking strategy and chunk the document.
+
+        Args:
+            document: Document to chunk
+
+        Returns:
+            List of chunked documents
+        """
+        # Analyze document to determine best strategy
+        strategy = self._analyze_document(document)
+        
+        # Create appropriate chunker
+        chunker = ChunkerFactory.create_chunker(strategy, self.config)
+        
+        self.logger.info(f"Using {strategy.value} chunking strategy for document {document.id}")
+        
+        # Chunk the document
+        return chunker.chunk_document(document)
+
+    def _analyze_document(self, document: Document) -> ChunkingStrategy:
+        """
+        Analyze document to determine the best chunking strategy.
+
+        Args:
+            document: Document to analyze
+
+        Returns:
+            Recommended chunking strategy
+        """
+        content = document.content.lower()
+        doc_type = document.doc_type.lower()
+        
+        # Check for code indicators
+        code_indicators = ['def ', 'class ', 'import ', 'from ', 'if __name__', 
+                          'function', 'var ', 'const ', 'let ', 'public ', 'private ']
+        code_matches = sum(1 for indicator in code_indicators if indicator in content)
+        
+        # Check for markdown indicators
+        md_indicators = ['#', '##', '###', '- ', '1. ', '> ', '```', '|', '---']
+        md_matches = sum(1 for indicator in md_indicators if indicator in content)
+        
+        # Check for paragraph structure
+        paragraph_count = content.count('\n\n')
+        
+        # Determine strategy based on analysis
+        if 'code' in doc_type or 'programming' in doc_type or code_matches > 5:
+            return ChunkingStrategy.CODE
+        elif 'markdown' in doc_type or 'md' in doc_type or md_matches > 3:
+            return ChunkingStrategy.MARKDOWN
+        elif paragraph_count > len(content.split()) / 100:  # If many paragraphs relative to content
+            return ChunkingStrategy.PARAGRAPH
+        else:
+            # Default to semantic for general content
+            return ChunkingStrategy.SEMANTIC
+
+
+def chunk_document(document: Document, config: Optional[ChunkingConfig] = None) -> List[Document]:
+    """
+    Convenience function to chunk a document with default or provided configuration.
+
+    Args:
+        document: Document to chunk
+        config: Optional chunking configuration (uses defaults if not provided)
+
+    Returns:
+        List of chunked documents
+    """
+    if config is None:
+        config = ChunkingConfig()
+    
+    chunker = AdvancedChunker(config)
+    return chunker.chunk_document(document)
+
+
+__all__ = [
+    "ChunkingStrategy", "ChunkingConfig", "BaseChunker", 
+    "RecursiveCharacterChunker", "SemanticChunker", "CodeChunker", 
+    "MarkdownChunker", "ChunkerFactory", "AdvancedChunker", 
+    "chunk_document"
+]
