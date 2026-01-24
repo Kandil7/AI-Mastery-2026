@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -42,8 +42,12 @@ def index_text(
     vector_store: VectorStore,
     metadata: Dict[str, Any],
     chunks: Optional[List[Chunk]] = None,
+    chunker: Optional[Callable[[str, str], List[Chunk]]] = None,
 ) -> None:
-    resolved_chunks = chunks or simple_chunk(text=text, doc_id=doc_id)
+    if chunks is not None:
+        resolved_chunks = chunks
+    else:
+        resolved_chunks = (chunker or simple_chunk)(text, doc_id)
     embeddings = embedder.embed([chunk.text for chunk in resolved_chunks])
     vector_store.upsert(resolved_chunks, embeddings, metadata=metadata)
 
