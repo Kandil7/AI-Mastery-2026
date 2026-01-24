@@ -10,13 +10,14 @@
 ## High-level components
 1) Ingestion pipeline
    - Sources: docs, tickets, PDFs, code repos, wikis, databases.
-   - Steps: parsing -> cleaning -> chunking -> embedding -> indexing.
+   - Steps: parsing -> cleaning -> structured chunking -> embedding -> indexing.
 2) Retrieval stack
-   - Hybrid retrieval: BM25 + vector search.
+   - Hybrid retrieval: BM25 + vector search fused with RRF.
    - Reranking: cross-encoder or LLM reranker.
    - Filtering: tenant, ACL, recency, domain.
 3) Answering stack
    - Prompt assembly with retrieved context.
+   - Strict fallback when verification fails.
    - Provider selection: cost/latency/quality policies.
    - Citation formatting and hallucination checks.
 4) Agentic RAG
