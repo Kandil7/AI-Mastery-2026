@@ -1,0 +1,4 @@
+store: pgvector
+dsn: postgresql://localhost/rag
+table: rag_chunks
+embedding_dim: 1536

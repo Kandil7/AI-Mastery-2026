@@ -1,0 +1,3 @@
+store: weaviate
+endpoint: http://localhost:8080
+index_name: RagChunk
