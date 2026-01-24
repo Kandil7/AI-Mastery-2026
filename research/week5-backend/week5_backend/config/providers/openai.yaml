@@ -1,0 +1,6 @@
+provider: openai
+model: gpt-4o-mini
+embeddings_model: text-embedding-3-large
+timeout_s: 30
+base_url:
+api_key:

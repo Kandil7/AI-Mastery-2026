@@ -1,0 +1,28 @@
+app_version: "0.1.0"
+default_provider: "openai"
+default_vector_store: "pgvector"
+providers:
+  openai:
+    model: "gpt-4o-mini"
+    embeddings_model: "text-embedding-3-large"
+    base_url: null
+  anthropic:
+    model: "claude-3-5-sonnet"
+  local_vllm:
+    model: "meta-llama/Llama-3-8B-Instruct"
+    base_url: "http://localhost:8000/v1"
+    embeddings_model: "bge-small-en"
+vectorstores:
+  pgvector:
+    dsn: "postgresql://localhost/rag"
+    table: "rag_chunks"
+    embedding_dim: 1536
+  qdrant:
+    endpoint: "http://localhost:6333"
+    collection: "rag_chunks"
+  weaviate:
+    endpoint: "http://localhost:8080"
+    index_name: "RagChunk"
+routing:
+  default_provider: "openai"
+  fallback_provider: "anthropic"
