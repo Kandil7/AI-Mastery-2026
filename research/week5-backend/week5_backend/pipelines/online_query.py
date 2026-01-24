@@ -20,6 +20,7 @@ from rag.answer import generate_answer, generate_answer_strict
 from rag.citations import format_citations
 from rag.embeddings import EmbeddingService
 from rag.reranker import Reranker
+from rag.query_rewrite import QueryRewriter
 from rag.retriever import FusionConfig, HybridRetriever
 
 
@@ -89,13 +90,16 @@ def run_query_pipeline(
         retrieval_top_k = int(retrieval_cfg.get("top_k", top_k))
         if retrieval_top_k < top_k:
             retrieval_top_k = top_k
+        provider_name = create_routing_policy(settings).choose(task="qa")
+        provider = create_llm_provider(settings, provider_name)
         vector_store = create_vector_store(settings)
         embedder = EmbeddingService(create_embeddings_provider(settings))
         bm25 = create_bm25_index(settings) if mode == "hybrid" else None
         retriever = HybridRetriever(vector_store, embedder, bm25_index=bm25, fusion=fusion)
-        chunks = retriever.retrieve(query=question, top_k=retrieval_top_k, filters=filters)
-        provider_name = create_routing_policy(settings).choose(task="qa")
-        provider = create_llm_provider(settings, provider_name)
+        rewrite_cfg = settings.raw.get("query_rewrite") or {}
+        rewriter = QueryRewriter(provider if rewrite_cfg.get("enabled", False) else None)
+        retrieval_query = rewriter.rewrite(question)
+        chunks = retriever.retrieve(query=retrieval_query, top_k=retrieval_top_k, filters=filters)
         reranker_cfg = settings.raw.get("reranker") or {}
         reranker = Reranker(provider if reranker_cfg.get("enabled", True) else None)
         rerank_top_k = int(reranker_cfg.get("top_k", top_k))
