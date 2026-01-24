@@ -1,0 +1,3 @@
+store: qdrant
+endpoint: http://localhost:6333
+collection: rag_chunks

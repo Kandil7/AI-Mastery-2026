@@ -13,7 +13,8 @@ project_root = os.path.abspath(os.path.join(current_dir, "../.."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.llm.rag import RAGModel, RetrievalStrategy, Document
+from src.pipeline import RAGPipeline, RAGConfig
+from src.retrieval import Document
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -45,27 +46,30 @@ def run_stress_test():
     print("="*60)
     print("🚀 WEEK 1 DAY 4: RAG STRESS TEST BENCHMARK")
     print("="*60)
-    
+
     # 1. Setup
-    model = RAGModel(
-        retriever_strategy=RetrievalStrategy.HYBRID,
+    config = RAGConfig(
         generator_model="gpt2", # Small model for benchmark speed
-        dense_weight=0.7,
-        sparse_weight=0.3
+        dense_model="all-MiniLM-L6-v2",
+        alpha=0.5,
+        fusion="rrf",
+        top_k=5,
+        max_new_tokens=300
     )
+    model = RAGPipeline(config)
     
     # 2. Indexing Benchmark
     docs = generate_synthetic_docs(n=100)
-    
+
     start_time = time.time()
-    model.add_documents(docs)
+    model.index(docs)
     end_time = time.time()
-    
+
     indexing_time = end_time - start_time
     print(f"\n[Indexing] 100 Documents")
     print(f"Total Time: {indexing_time:.4f}s")
     print(f"Avg Time/Doc: {indexing_time/100:.4f}s")
-    
+
     # 3. Retrieval Latency Benchmark
     queries = [
         "How do I configure Docker?",
@@ -74,14 +78,14 @@ def run_stress_test():
         "System ID 4059 error", # Specific ID lookup test
         "Machine learning model training"
     ]
-    
+
     latencies = []
     print(f"\n[Retrieval] Running {len(queries)} queries...")
-    
+
     for q in queries:
         t0 = time.time()
         # k=5 retrieval
-        _ = model.retrieve(q, k=5)
+        _ = model.retrieve(q, top_k=5)
         dt = time.time() - t0
         latencies.append(dt)
         print(f"  - Query: '{q[:20]}...' -> {dt:.4f}s")

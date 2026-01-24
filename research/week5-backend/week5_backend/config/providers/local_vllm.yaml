@@ -1,0 +1,5 @@
+provider: local_vllm
+model: meta-llama/Llama-3-8B-Instruct
+base_url: http://localhost:8000/v1
+timeout_s: 30
+api_key:
