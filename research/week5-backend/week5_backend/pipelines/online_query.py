@@ -5,8 +5,11 @@ from typing import Any, Dict
 
 from agents.executor import AgentExecutor
 from agents.planner import Planner
-from agents.tools import Tool, ToolRegistry
+from agents.tooling import build_rag_tool, build_sql_tool, build_web_tool
+from agents.tools import ToolRegistry
+from agents.verifier import Verifier
 from core.factories import (
+    create_bm25_index,
     create_embeddings_provider,
     create_llm_provider,
     create_routing_policy,
@@ -20,17 +23,20 @@ from rag.reranker import Reranker
 from rag.retriever import HybridRetriever
 
 
-def _rag_tool(question: str) -> str:
-    settings = load_settings()
-    vector_store = create_vector_store(settings)
-    embedder = EmbeddingService(create_embeddings_provider(settings))
-    retriever = HybridRetriever(vector_store, embedder)
-    chunks = retriever.retrieve(query=question, top_k=8, filters={})
-    reranker = Reranker()
-    chunks = reranker.rerank(question, chunks)
-    provider_name = create_routing_policy(settings).choose(task="qa")
-    provider = create_llm_provider(settings, provider_name)
-    return generate_answer(question, chunks, provider)
+def _build_tools(settings) -> ToolRegistry:
+    tools = ToolRegistry()
+    tools.register(build_rag_tool())
+
+    tool_cfg = settings.raw.get("tools") or {}
+    sql_cfg = tool_cfg.get("sql") or {}
+    if sql_cfg.get("dsn"):
+        tools.register(build_sql_tool(sql_cfg["dsn"], sql_cfg.get("query_template")))
+
+    web_cfg = tool_cfg.get("web") or {}
+    if web_cfg.get("base_url"):
+        tools.register(build_web_tool(web_cfg["base_url"], web_cfg.get("headers")))
+
+    return tools
 
 
 def run_query_pipeline(
@@ -46,21 +52,38 @@ def run_query_pipeline(
     settings = load_settings()
 
     if mode == "agentic":
-        tools = ToolRegistry()
-        tools.register(Tool(name="rag", handler=_rag_tool))
+        tools = _build_tools(settings)
         executor = AgentExecutor(Planner(), tools)
-        answer = executor.run(question)
-        citations = []
-        model = "agentic"
+        result = executor.run(question)
+
+        provider_name = create_routing_policy(settings).choose(task="agentic")
+        provider = create_llm_provider(settings, provider_name)
+        synthesis_prompt = (
+            "Synthesize a final answer from the tool outputs.\n"
+            f"Question: {question}\n"
+            f"Tool outputs:\n{result.output}\n"
+            "Answer:"
+        )
+        answer = provider.generate(synthesis_prompt)
+        citations = result.citations
+        model = provider_name
+
+        verifier = Verifier(provider)
+        if not verifier.verify(answer, citations):
+            rag_tool = build_rag_tool()
+            fallback = rag_tool.handler(question)
+            answer = fallback.output
+            citations = fallback.citations
     else:
         vector_store = create_vector_store(settings)
         embedder = EmbeddingService(create_embeddings_provider(settings))
-        retriever = HybridRetriever(vector_store, embedder)
+        bm25 = create_bm25_index(settings) if mode == "hybrid" else None
+        retriever = HybridRetriever(vector_store, embedder, bm25_index=bm25)
         chunks = retriever.retrieve(query=question, top_k=top_k, filters=filters)
-        reranker = Reranker()
-        chunks = reranker.rerank(question, chunks)
         provider_name = create_routing_policy(settings).choose(task="qa")
         provider = create_llm_provider(settings, provider_name)
+        reranker = Reranker(provider)
+        chunks = reranker.rerank(question, chunks)
         answer = generate_answer(question, chunks, provider)
         citations = format_citations(chunks)
         model = provider_name

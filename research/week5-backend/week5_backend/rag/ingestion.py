@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import requests
 
 from core.factories import create_embeddings_provider, create_vector_store
 from core.settings import load_settings
-from rag.chunking import simple_chunk
+from rag.chunking import Chunk, simple_chunk
 from rag.embeddings import EmbeddingService
 from storage.vectordb_base import VectorStore
 
@@ -41,10 +41,11 @@ def index_text(
     embedder: EmbeddingService,
     vector_store: VectorStore,
     metadata: Dict[str, Any],
+    chunks: Optional[List[Chunk]] = None,
 ) -> None:
-    chunks = simple_chunk(text=text, doc_id=doc_id)
-    embeddings = embedder.embed([chunk.text for chunk in chunks])
-    vector_store.upsert(chunks, embeddings, metadata=metadata)
+    resolved_chunks = chunks or simple_chunk(text=text, doc_id=doc_id)
+    embeddings = embedder.embed([chunk.text for chunk in resolved_chunks])
+    vector_store.upsert(resolved_chunks, embeddings, metadata=metadata)
 
 
 def _load_source_text(source_type: str, uri: str) -> str:

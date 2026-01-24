@@ -26,3 +26,10 @@ vectorstores:
 routing:
   default_provider: "openai"
   fallback_provider: "anthropic"
+bm25_index_path: "data/bm25_index.jsonl"
+tools:
+  sql:
+    dsn: ""
+    query_template: ""
+  web:
+    base_url: ""
