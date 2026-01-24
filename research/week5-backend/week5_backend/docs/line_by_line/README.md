@@ -14,3 +14,5 @@ This folder contains line-by-line explanations of key files updated in the RAG p
 - `architecture.md` -> System architecture overview
 - `QUICK_START.md` -> Fast setup guide
 - `OPERATION_GUIDE.md` -> Operational guidance
+- `EXAMPLE_RUN.md` -> Example usage scenarios
+- `PROD_CHECKLIST.md` -> Production readiness checklist
