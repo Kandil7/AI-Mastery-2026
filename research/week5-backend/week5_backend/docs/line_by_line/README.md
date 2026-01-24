@@ -12,3 +12,5 @@ This folder contains line-by-line explanations of key files updated in the RAG p
 - `query_rewrite.md` -> Optional query rewriting
 - `settings.example.md` -> Configuration reference
 - `architecture.md` -> System architecture overview
+- `QUICK_START.md` -> Fast setup guide
+- `OPERATION_GUIDE.md` -> Operational guidance
