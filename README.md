@@ -393,6 +393,7 @@ docker-compose up -d --build
 *   **[User Guide](docs/USER_GUIDE.md)**: The bible of this project. Steps, params, and usage.
 *   **[Math Notes](docs/math_notes.md)**: Handwritten derivations of key algorithms.
 *   **[Interview Prep](docs/INTERVIEW_PREP.md)**: "How would you design a recommendation system?"
+*   **[Repo Documentation](docs/REPO_DOCUMENTATION.md)**: Full repository map and entry points.
 
 ---
 
