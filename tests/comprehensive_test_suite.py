@@ -5,7 +5,12 @@ This file includes tests for all major components of the project.
 
 import pytest
 import numpy as np
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
+    TORCH_AVAILABLE = False
 from unittest.mock import Mock
 import sys
 import os
@@ -220,6 +225,8 @@ class TestAttention:
 
     def test_scaled_dot_product_attention(self):
         """Test scaled dot product attention."""
+        if not TORCH_AVAILABLE:
+            pytest.skip("PyTorch not available")
         Q = torch.randn(2, 10, 64)
         K = torch.randn(2, 15, 64)
         V = torch.randn(2, 15, 64)
@@ -231,6 +238,8 @@ class TestAttention:
 
     def test_multi_head_attention(self):
         """Test MultiHeadAttention."""
+        if not TORCH_AVAILABLE:
+            pytest.skip("PyTorch not available")
         mha = MultiHeadAttention(d_model=512, num_heads=8)
         X = torch.randn(4, 20, 512)
         output = mha(X, X, X)
@@ -238,6 +247,8 @@ class TestAttention:
 
     def test_transformer_block(self):
         """Test TransformerBlock."""
+        if not TORCH_AVAILABLE:
+            pytest.skip("PyTorch not available")
         block = TransformerBlock(d_model=256, num_heads=8, d_ff=512)
         X = torch.randn(2, 15, 256)
         output = block(X)
