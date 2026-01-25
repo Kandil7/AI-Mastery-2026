@@ -10,13 +10,15 @@
 ## High-level components
 1) Ingestion pipeline
    - Sources: docs, tickets, PDFs, code repos, wikis, databases.
-   - Steps: parsing -> cleaning -> chunking -> embedding -> indexing.
+   - Steps: parsing -> cleaning -> structured chunking -> embedding -> indexing.
 2) Retrieval stack
-   - Hybrid retrieval: BM25 + vector search.
+   - Hybrid retrieval: BM25 + vector search fused with RRF.
+   - Optional query rewriting for better recall.
    - Reranking: cross-encoder or LLM reranker.
    - Filtering: tenant, ACL, recency, domain.
 3) Answering stack
    - Prompt assembly with retrieved context.
+   - Strict fallback when verification fails.
    - Provider selection: cost/latency/quality policies.
    - Citation formatting and hallucination checks.
 4) Agentic RAG
@@ -29,8 +31,46 @@
 ## Data flow (online)
 Client -> API (query) -> planner -> retriever -> reranker -> answer -> verifier -> response
 
+```mermaid
+flowchart LR
+    A[Client] --> B[API: /query]
+    B --> C[Planner]
+    C --> D[Retriever]
+    D --> E[Reranker]
+    E --> F[Answer Generator]
+    F --> G[Verifier]
+    G --> H[Response + Citations]
+```
+
 ## Data flow (offline)
 Source -> parser -> chunker -> embeddings -> vector store -> metadata store -> eval dataset
+
+```mermaid
+flowchart LR
+    S[Source Docs] --> P[Parser]
+    P --> C[Chunker]
+    C --> E[Embeddings]
+    E --> V[Vector Store]
+    E --> B[BM25 Corpus]
+    V --> M[Metadata Store]
+    M --> D[Eval Dataset]
+```
+
+## Agentic RAG flow
+```mermaid
+flowchart LR
+    Q[Question] --> P[Planner]
+    P --> T[Tool Registry]
+    T --> R1[RAG Tool]
+    T --> R2[SQL Tool]
+    T --> R3[Web Tool]
+    R1 --> S[Tool Outputs]
+    R2 --> S
+    R3 --> S
+    S --> A[Synthesis Answer]
+    A --> V[Verifier]
+    V --> O[Final Response]
+```
 
 ## Scaling patterns
 - Separate ingestion workers from query service.

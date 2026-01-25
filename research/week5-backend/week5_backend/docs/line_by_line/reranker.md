@@ -1,0 +1,75 @@
+# Line-by-line explanation: reranker.py
+
+File: `research/week5-backend/week5_backend/rag/reranker.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation.
+- L3: `from typing import List, Optional` -> typing helpers.
+- L4: `import json` -> parse JSON from model output.
+- L5: (blank) -> spacing before local imports.
+- L6: `from providers.llm_base import LLMProvider` -> LLM provider interface.
+- L7: `from rag.retriever import RetrievedChunk` -> chunk type used in reranking.
+- L8: (blank) -> spacing before class.
+- L9: (blank) -> extra spacing.
+- L10: `class Reranker:` -> reranker wrapper class.
+- L11: `def __init__(...)` -> constructor.
+- L12: `self._provider = provider` -> store provider or None.
+- L13: (blank) -> spacing before method.
+- L14: `def rerank(` -> main reranking method.
+- L15: `self,` -> instance.
+- L16: `query: str,` -> original user question.
+- L17: `chunks: List[RetrievedChunk],` -> retrieved chunks to reorder.
+- L18: `top_k: Optional[int] = None,` -> optional trimming size.
+- L19: `) -> List[RetrievedChunk]:` -> returns reordered chunks.
+- L20: `if not self._provider or not chunks:` -> no provider or empty list.
+- L21: `return chunks` -> return unchanged list.
+- L22: (blank) -> spacing before prompt creation.
+- L23: `prompt = (` -> start prompt text.
+- L24: string line -> instruct model to return JSON with ordering.
+- L25: string line -> continue prompt and enforce JSON-only.
+- L26: `)` -> close base prompt.
+- L27: `prompt += f"Question: {query}\n"` -> include the query.
+- L28: `for idx, chunk in enumerate(chunks):` -> enumerate chunks with indices.
+- L29: `prompt += f"[{idx}] {_compress_text(chunk.text)}\n"` -> add each chunk text (compressed).
+- L30: `response = self._provider.generate(prompt)` -> call LLM for ordering.
+- L31: `order = _parse_order(response, len(chunks))` -> parse order from response.
+- L32: `if not order:` -> fallback if parsing fails.
+- L33: `return chunks` -> keep original order.
+- L34: `ranked = [chunks[i] for i in order ...]` -> reorder chunks by indices.
+- L35: `if top_k is not None:` -> apply trimming if requested.
+- L36: `return ranked[:top_k]` -> return top-k ranked chunks.
+- L37: `return ranked` -> otherwise return full ranked list.
+- L38: (blank) -> spacing before helper.
+- L39: (blank) -> extra spacing.
+- L40: `def _parse_order(...):` -> parse LLM output into index list.
+- L41: `response = response.strip()` -> trim whitespace.
+- L42: `if response.startswith("{"):` -> JSON path.
+- L43: `try:` -> attempt JSON parse.
+- L44: `payload = json.loads(response)` -> decode JSON.
+- L45: `order = payload.get("order", [])` -> extract order list.
+- L46: `if isinstance(order, list):` -> ensure list type.
+- L47: `cleaned = [int(idx) for idx in order ...]` -> convert to ints.
+- L48: `return _unique_in_range(cleaned, count)` -> keep valid unique indices.
+- L49: `except json.JSONDecodeError:` -> fallback if JSON invalid.
+- L50: `pass` -> continue to non-JSON parsing.
+- L51: `digits = [int(tok) for tok in ...]` -> simple digit parsing fallback.
+- L52: `if digits:` -> if any indices found.
+- L53: `return _unique_in_range(digits, count)` -> filter to valid indices.
+- L54: `return []` -> no valid order.
+- L55: (blank) -> spacing before helper.
+- L56: (blank) -> extra spacing.
+- L57: `def _unique_in_range(...):` -> filter duplicate/invalid indices.
+- L58: `seen = set()` -> track seen indices.
+- L59: `ordered: List[int] = []` -> output list.
+- L60: `for idx in indices:` -> iterate parsed indices.
+- L61: `if 0 <= idx < count and idx not in seen:` -> keep valid/unique indices.
+- L62: `ordered.append(idx)` -> add index.
+- L63: `seen.add(idx)` -> mark as seen.
+- L64: `return ordered` -> return filtered list.
+- L65: (blank) -> spacing before helper.
+- L66: (blank) -> extra spacing.
+- L67: `def _compress_text(...):` -> reduce chunk text length for prompt.
+- L68: `cleaned = " ".join(text.split())` -> normalize whitespace.
+- L69: `if len(cleaned) <= limit:` -> if within limit.
+- L70: `return cleaned` -> return full text.
+- L71: `return cleaned[:limit].rstrip() + "..."` -> truncate and add ellipsis.

@@ -1,0 +1,50 @@
+# Line-by-line explanation: architecture.md
+
+File: `research/week5-backend/week5_backend/architecture.md`
+
+- L1: `# Architecture` -> document title.
+- L2: (blank) -> spacing.
+- L3: `## Goals` -> section heading for system goals.
+- L4: `- Low-latency retrieval and generation with explicit citations.` -> target latency and citation requirement.
+- L5: `- Multi-model routing by task (QA, summarization, extraction).` -> route tasks to best model.
+- L6: `- Multi-tenant isolation and governance controls.` -> enforce tenant separation and policy.
+- L7: `- Scale ingestion and indexing independently of online query.` -> decouple batch and online workloads.
+- L8: `- Observability: traceability, cost attribution, and evaluation hooks.` -> trace, measure cost, and evaluate quality.
+- L9: (blank) -> spacing.
+- L10: `## High-level components` -> section heading.
+- L11: `1) Ingestion pipeline` -> component 1 label.
+- L12: `- Sources: ...` -> kinds of source documents.
+- L13: `- Steps: parsing -> cleaning -> structured chunking -> embedding -> indexing.` -> ingestion pipeline steps.
+- L14: `2) Retrieval stack` -> component 2 label.
+- L15: `- Hybrid retrieval: BM25 + vector search fused with RRF.` -> retrieval strategy with fusion.
+- L16: `- Optional query rewriting for better recall.` -> optional rewrite step.
+- L17: `- Reranking: cross-encoder or LLM reranker.` -> reranking layer.
+- L18: `- Filtering: tenant, ACL, recency, domain.` -> filter controls.
+- L19: `3) Answering stack` -> component 3 label.
+- L20: `- Prompt assembly with retrieved context.` -> prompt construction step.
+- L21: `- Strict fallback when verification fails.` -> verification-driven fallback.
+- L22: `- Provider selection: cost/latency/quality policies.` -> provider routing policy.
+- L23: `- Citation formatting and hallucination checks.` -> citation and safety layer.
+- L24: `4) Agentic RAG` -> component 4 label.
+- L25: `- Planner -> tools -> verifier loop.` -> agentic control flow.
+- L26: `- Tools: RAG, SQL, web, calculators, internal APIs.` -> tool examples.
+- L27: `5) Evaluation and feedback` -> component 5 label.
+- L28: `- Offline datasets + online feedback signals.` -> evaluation inputs.
+- L29: `- Regression detection and A/B testing.` -> evaluation practices.
+- L30: (blank) -> spacing.
+- L31: `## Data flow (online)` -> section heading for online flow.
+- L32: `Client -> API (query) -> planner -> retriever -> reranker -> answer -> verifier -> response` -> online request path.
+- L33: (blank) -> spacing.
+- L34: `## Data flow (offline)` -> section heading for offline flow.
+- L35: `Source -> parser -> chunker -> embeddings -> vector store -> metadata store -> eval dataset` -> offline indexing path.
+- L36: (blank) -> spacing.
+- L37: `## Scaling patterns` -> scaling practices section.
+- L38: `- Separate ingestion workers from query service.` -> decouple compute.
+- L39: `- Use async tasks for IO (vector DB, model calls).` -> reduce latency via async.
+- L40: `- Cache embeddings and retrieval results by content hash.` -> caching strategy.
+- L41: `- Shard vector indexes by tenant or domain.` -> scale by partitioning.
+- L42: (blank) -> spacing.
+- L43: `## Failure modes and mitigations` -> section for reliability considerations.
+- L44: `- Provider outage: automatic failover to backup model.` -> failover strategy.
+- L45: `- Vector store latency: fall back to BM25 and cached answers.` -> degrade gracefully.
+- L46: `- Cost spikes: enforce per-tenant budgets and rate limits.` -> cost control policy.

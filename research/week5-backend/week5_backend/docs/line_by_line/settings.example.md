@@ -1,0 +1,59 @@
+# Line-by-line explanation: settings.example.yaml
+
+File: `research/week5-backend/week5_backend/config/settings.example.yaml`
+
+- L1: `app_version: "0.1.0"` -> application version string.
+- L2: `default_provider: "openai"` -> default LLM provider name.
+- L3: `default_vector_store: "pgvector"` -> default vector DB.
+- L4: `providers:` -> section for LLM/embedding providers.
+- L5: `openai:` -> OpenAI provider config block.
+- L6: `model: "gpt-4o-mini"` -> default OpenAI chat model.
+- L7: `embeddings_model: "text-embedding-3-large"` -> OpenAI embeddings model.
+- L8: `base_url: null` -> optional custom OpenAI base URL.
+- L9: `anthropic:` -> Anthropic provider config block.
+- L10: `model: "claude-3-5-sonnet"` -> default Anthropic model.
+- L11: `local_vllm:` -> local vLLM provider config.
+- L12: `model: "meta-llama/Llama-3-8B-Instruct"` -> local model name.
+- L13: `base_url: "http://localhost:8000/v1"` -> local endpoint.
+- L14: `embeddings_model: "bge-small-en"` -> local embeddings model.
+- L15: `vectorstores:` -> vector store configuration section.
+- L16: `pgvector:` -> pgvector store settings.
+- L17: `dsn: "postgresql://localhost/rag"` -> Postgres DSN.
+- L18: `table: "rag_chunks"` -> pgvector table name.
+- L19: `embedding_dim: 1536` -> embedding vector dimension.
+- L20: `qdrant:` -> Qdrant store settings.
+- L21: `endpoint: "http://localhost:6333"` -> Qdrant endpoint.
+- L22: `collection: "rag_chunks"` -> Qdrant collection name.
+- L23: `weaviate:` -> Weaviate store settings.
+- L24: `endpoint: "http://localhost:8080"` -> Weaviate endpoint.
+- L25: `index_name: "RagChunk"` -> Weaviate index name.
+- L26: `routing:` -> routing policy section.
+- L27: `default_provider: "openai"` -> default provider for tasks.
+- L28: `fallback_provider: "anthropic"` -> fallback provider on failure.
+- L29: `bm25_index_path: "data/bm25_index.jsonl"` -> BM25 corpus path.
+- L30: `chunking:` -> chunking settings.
+- L31: `mode: "structured"` -> chunking mode (structured or simple).
+- L32: `max_tokens: 400` -> chunk size in words (approx).
+- L33: `overlap: 40` -> overlap between chunks.
+- L34: `retrieval:` -> retrieval settings.
+- L35: `top_k: 12` -> number of retrieved candidates.
+- L36: `fusion:` -> fusion settings for hybrid retrieval.
+- L37: `use_rrf: true` -> enable Reciprocal Rank Fusion.
+- L38: `rrf_k: 60` -> RRF parameter controlling decay.
+- L39: `vector_weight: 1.0` -> weight for vector hits.
+- L40: `bm25_weight: 1.0` -> weight for BM25 hits.
+- L41: `reranker:` -> reranker settings.
+- L42: `enabled: true` -> enable or disable reranking.
+- L43: `top_k: 8` -> final number of reranked results.
+- L44: `query_rewrite:` -> query rewrite settings.
+- L45: `enabled: false` -> enable or disable query rewriting.
+- L46: `answer:` -> answer generation settings.
+- L47: `max_context_words: 1200` -> word budget for context passed to LLM.
+- L48: `verification:` -> verification settings.
+- L49: `enabled: true` -> enable LLM-based verification.
+- L50: `tools:` -> tool config section.
+- L51: `sql:` -> SQL tool settings.
+- L52: `dsn: ""` -> SQL DSN (empty disables tool).
+- L53: `query_template: ""` -> optional SQL template.
+- L54: `web:` -> web tool settings.
+- L55: `base_url: ""` -> web tool base URL (empty disables tool).

@@ -1,0 +1,94 @@
+# Line-by-line explanation: chunking.py
+
+File: `research/week5-backend/week5_backend/rag/chunking.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation.
+- L3: `from dataclasses import dataclass` -> used to define a small data container.
+- L4: `from typing import Callable, Iterable, List, Tuple` -> typing for functions and collections.
+- L5: (blank) -> separation before class.
+- L6: (blank) -> extra spacing.
+- L7: `@dataclass(frozen=True)` -> immutable dataclass for chunks.
+- L8: `class Chunk:` -> represents a text chunk.
+- L9: `chunk_id: str` -> unique identifier for the chunk.
+- L10: `doc_id: str` -> document identifier.
+- L11: `text: str` -> chunk text content.
+- L12: (blank) -> spacing between class and functions.
+- L13: (blank) -> extra spacing.
+- L14: `def simple_chunk(...):` -> basic word-based chunking.
+- L15: comment -> explains naive teaching-purpose chunking.
+- L16: `words = text.split()` -> split on whitespace into tokens.
+- L17: `chunks: List[Chunk] = []` -> accumulator for chunks.
+- L18: `start = 0` -> start index for windowing.
+- L19: `chunk_index = 0` -> counter for chunk IDs.
+- L20: `while start < len(words):` -> iterate until all words used.
+- L21: `end = min(...)` -> clamp window size to max_tokens.
+- L22: `chunk_text = " ".join(...)` -> join words into chunk text.
+- L23: `chunk_id = f"{doc_id}:{chunk_index}"` -> build chunk ID.
+- L24: `chunks.append(...)` -> store new chunk.
+- L25: `chunk_index += 1` -> increment counter.
+- L26: `start = end` -> advance window.
+- L27: `return chunks` -> output list of chunks.
+- L28: (blank) -> spacing before structured chunker.
+- L29: (blank) -> extra spacing.
+- L30: `def structured_chunk(` -> chunker that respects headings.
+- L31: `text: str,` -> text input.
+- L32: `doc_id: str,` -> document ID.
+- L33: `max_tokens: int = 400,` -> chunk size.
+- L34: `overlap: int = 40,` -> overlap between chunks.
+- L35: `) -> List[Chunk]:` -> returns list of chunks.
+- L36: comment -> explains heading-based chunking.
+- L37: `sections = _split_sections(text)` -> split by headings.
+- L38: `chunks: List[Chunk] = []` -> accumulator.
+- L39: `chunk_index = 0` -> chunk ID counter.
+- L40: `safe_overlap = max(0, min(...))` -> clamp overlap to valid range.
+- L41: `for heading, body in sections:` -> iterate sections.
+- L42: `words = body.split()` -> tokenize section body.
+- L43: `start = 0` -> start index for section.
+- L44: `while start < len(words):` -> chunk inside section.
+- L45: `end = min(...)` -> compute end index.
+- L46: `payload = " ".join(...)` -> build chunk text.
+- L47: `if heading:` -> if section has a heading.
+- L48: `payload = f"{heading}\n{payload}"` -> prepend heading to chunk.
+- L49: `chunk_id = f"{doc_id}:{chunk_index}"` -> build chunk ID.
+- L50: `chunks.append(...)` -> store chunk.
+- L51: `chunk_index += 1` -> increment counter.
+- L52: `if end == len(words):` -> break if section complete.
+- L53: `break` -> exit section loop.
+- L54: `start = max(0, end - safe_overlap)` -> overlap step forward.
+- L55: `return chunks` -> output chunk list.
+- L56: (blank) -> spacing before factory.
+- L57: (blank) -> extra spacing.
+- L58: `def build_chunker(` -> factory to choose chunker by mode.
+- L59: `mode: str,` -> mode name.
+- L60: `max_tokens: int = 400,` -> default size.
+- L61: `overlap: int = 40,` -> default overlap.
+- L62: `) -> Callable[[str, str], List[Chunk]]:` -> returns a function.
+- L63: `mode_lower = mode.lower()` -> normalize mode for comparison.
+- L64: `if mode_lower == "structured":` -> check for structured mode.
+- L65: `return lambda text, doc_id: structured_chunk(...)` -> return configured structured chunker.
+- L66: `text=text,` -> forward text parameter.
+- L67: `doc_id=doc_id,` -> forward doc ID.
+- L68: `max_tokens=max_tokens,` -> forward max tokens.
+- L69: `overlap=overlap,` -> forward overlap.
+- L70: `)` -> close structured chunker factory.
+- L71: `return lambda text, doc_id: simple_chunk(...)` -> fallback to simple chunker.
+- L72: (blank) -> spacing before helper.
+- L73: (blank) -> extra spacing.
+- L74: `def _split_sections(text: str) -> List[Tuple[str, str]]:` -> split text by headings.
+- L75: `lines = text.splitlines()` -> split into lines.
+- L76: `sections: List[Tuple[str, List[str]]] = []` -> list of (heading, lines).
+- L77: `current_heading = ""` -> current heading text.
+- L78: `current_lines: List[str] = []` -> buffer for section lines.
+- L79: `for line in lines:` -> iterate each line.
+- L80: `stripped = line.strip()` -> trim whitespace.
+- L81: `if stripped.startswith("#"):` -> heading detection (Markdown style).
+- L82: `if current_lines:` -> if we have collected content.
+- L83: `sections.append((current_heading, current_lines))` -> save previous section.
+- L84: `current_heading = stripped` -> update heading.
+- L85: `current_lines = []` -> reset buffer.
+- L86: `continue` -> skip adding heading line to content.
+- L87: `current_lines.append(line)` -> append content line.
+- L88: `if current_lines:` -> after loop, flush last section.
+- L89: `sections.append((current_heading, current_lines))` -> store last section.
+- L90: `return [(heading, "\n".join(lines)) ...]` -> join section lines into strings.

@@ -22,7 +22,8 @@
   - `question: str`
   - `filters: dict` (optional)
   - `top_k: int` (optional)
-  - `mode: str` (rag|agentic|hybrid)
+- `mode: str` (rag|agentic|hybrid)
+- Note: `hybrid` uses BM25 + vector retrieval (requires BM25 index file).
 - Response:
   - `answer: str`
   - `citations: list`

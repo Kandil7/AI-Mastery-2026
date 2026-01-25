@@ -26,3 +26,30 @@ vectorstores:
 routing:
   default_provider: "openai"
   fallback_provider: "anthropic"
+bm25_index_path: "data/bm25_index.jsonl"
+chunking:
+  mode: "structured"
+  max_tokens: 400
+  overlap: 40
+retrieval:
+  top_k: 12
+  fusion:
+    use_rrf: true
+    rrf_k: 60
+    vector_weight: 1.0
+    bm25_weight: 1.0
+reranker:
+  enabled: true
+  top_k: 8
+query_rewrite:
+  enabled: false
+answer:
+  max_context_words: 1200
+verification:
+  enabled: true
+tools:
+  sql:
+    dsn: ""
+    query_template: ""
+  web:
+    base_url: ""

@@ -37,6 +37,7 @@ the code is minimal but realistic, and the docs describe real-world tradeoffs, o
 
 4) Ingest and index:
    - `python research/week5-backend/week5_backend/pipelines/offline_index.py --source ./data`
+   - builds BM25 corpus at `research/week5-backend/week5_backend/data/bm25_index.jsonl`
 
 5) Run eval on sample dataset:
    - `POST /eval/run` with `dataset_id: "sample_dataset"`

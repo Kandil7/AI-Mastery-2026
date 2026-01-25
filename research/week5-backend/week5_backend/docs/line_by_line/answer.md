@@ -1,0 +1,55 @@
+# Line-by-line explanation: answer.py
+
+File: `research/week5-backend/week5_backend/rag/answer.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation.
+- L3: `from typing import List, Optional` -> typing helpers.
+- L4: (blank) -> spacing before local imports.
+- L5: `from providers.llm_base import LLMProvider` -> LLM provider interface.
+- L6: `from rag.retriever import RetrievedChunk` -> chunk type for context.
+- L7: (blank) -> spacing before functions.
+- L8: (blank) -> extra spacing.
+- L9: `def generate_answer(` -> primary answer generator.
+- L10: `question: str,` -> user question.
+- L11: `chunks: List[RetrievedChunk],` -> retrieved context chunks.
+- L12: `provider: LLMProvider,` -> LLM provider instance.
+- L13: `max_context_words: Optional[int] = None,` -> optional context size limit.
+- L14: `) -> str:` -> returns answer string.
+- L15: `context = _build_context(...)` -> build context string with optional limit.
+- L16: `prompt = f"Answer the question using the context..."` -> prompt that allows using context.
+- L17: `return provider.generate(prompt)` -> generate answer with LLM.
+- L18: (blank) -> spacing before strict variant.
+- L19: (blank) -> extra spacing.
+- L20: `def generate_answer_strict(` -> strict answer generator.
+- L21: `question: str,` -> user question.
+- L22: `chunks: List[RetrievedChunk],` -> retrieved context chunks.
+- L23: `provider: LLMProvider,` -> LLM provider.
+- L24: `max_context_words: Optional[int] = None,` -> optional context size limit.
+- L25: `) -> str:` -> returns answer string.
+- L26: `context = _build_context(...)` -> build context string.
+- L27: `prompt = (` -> strict prompt that forbids extra knowledge.
+- L28: string line -> instructs to only use context.
+- L29: string line -> tells model to admit insufficient info.
+- L30: f-string line -> inject context and question.
+- L31: `)` -> close prompt.
+- L32: `return provider.generate(prompt)` -> generate strict answer.
+- L33: (blank) -> spacing before helper.
+- L34: (blank) -> extra spacing.
+- L35: `def _build_context(...):` -> builds context string with optional word budget.
+- L36: `if not max_context_words:` -> no limit provided.
+- L37: `return "\n\n".join(...)` -> join chunk texts with spacing.
+- L38: `words_used = 0` -> track word budget usage.
+- L39: `parts: List[str] = []` -> context pieces accumulator.
+- L40: `for chunk in chunks:` -> iterate chunks in order.
+- L41: `chunk_words = chunk.text.split()` -> split chunk into words.
+- L42: `if words_used + len(chunk_words) > max_context_words:` -> if adding would exceed budget.
+- L43: `remaining = max_context_words - words_used` -> remaining budget.
+- L44: `if remaining <= 0:` -> no budget left.
+- L45: `break` -> stop adding chunks.
+- L46: `parts.append(" ".join(chunk_words[:remaining]))` -> add partial chunk.
+- L47: `words_used = max_context_words` -> mark budget as full.
+- L48: `break` -> stop after partial chunk.
+- L49: `parts.append(chunk.text)` -> add whole chunk.
+- L50: `words_used += len(chunk_words)` -> update budget usage.
+- L51: `return "\n\n".join(parts)` -> final context string.

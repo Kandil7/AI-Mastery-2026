@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from agents.policies import RoutingPolicy
@@ -16,6 +17,7 @@ from storage.pgvector_store import PgVectorStore
 from storage.qdrant_store import QdrantStore
 from storage.vectordb_base import VectorStore
 from storage.weaviate_store import WeaviateStore
+from rag.bm25_store import load_bm25_index
 
 
 def _provider_config(settings: Settings, name: str) -> Dict[str, Any]:
@@ -90,6 +92,14 @@ def create_vector_store(settings: Settings, name: str | None = None) -> VectorSt
             index_name=str(config.get("index_name", "RagChunk")),
         )
     raise ValueError(f"Unsupported vector store: {store_name}")
+
+
+def create_bm25_index(settings: Settings):
+    path = settings.raw.get("bm25_index_path", "data/bm25_index.jsonl")
+    bm25_path = Path(path)
+    if not bm25_path.is_absolute():
+        bm25_path = Path(__file__).resolve().parents[1] / bm25_path
+    return load_bm25_index(bm25_path)
 
 
 def create_routing_policy(settings: Settings) -> RoutingPolicy:

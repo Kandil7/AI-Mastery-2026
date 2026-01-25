@@ -1,0 +1,120 @@
+# Line-by-line explanation: retriever.py
+
+File: `research/week5-backend/week5_backend/rag/retriever.py`
+
+- L1: `from __future__ import annotations` -> defers evaluation of type hints.
+- L2: (blank) -> visual separation.
+- L3: `from dataclasses import dataclass` -> dataclass support.
+- L4: `from typing import Any, Dict, List, Tuple` -> typing helpers.
+- L5: (blank) -> separation before local imports.
+- L6: `from rag.bm25 import BM25Index, BM25Result` -> BM25 index and result types.
+- L7: `from rag.embeddings import EmbeddingService` -> embeddings wrapper.
+- L8: `from storage.vectordb_base import VectorStore` -> vector store protocol.
+- L9: (blank) -> spacing before data classes.
+- L10: (blank) -> extra spacing.
+- L11: `@dataclass(frozen=True)` -> immutable chunk record.
+- L12: `class RetrievedChunk:` -> represents a retrieved chunk with score.
+- L13: `chunk_id: str` -> unique chunk identifier.
+- L14: `doc_id: str` -> document identifier.
+- L15: `text: str` -> chunk text.
+- L16: `score: float` -> relevance score.
+- L17: `metadata: Dict[str, Any]` -> metadata for filtering or display.
+- L18: (blank) -> spacing.
+- L19: (blank) -> extra spacing.
+- L20: `@dataclass(frozen=True)` -> immutable fusion config.
+- L21: `class FusionConfig:` -> holds RRF fusion parameters.
+- L22: `use_rrf: bool = True` -> toggle RRF fusion.
+- L23: `rrf_k: int = 60` -> RRF constant controlling decay.
+- L24: `vector_weight: float = 1.0` -> weight for vector results.
+- L25: `bm25_weight: float = 1.0` -> weight for BM25 results.
+- L26: (blank) -> spacing.
+- L27: (blank) -> extra spacing.
+- L28: `class HybridRetriever:` -> hybrid retriever using vector + optional BM25.
+- L29: `def __init__(` -> constructor.
+- L30: `self,` -> instance.
+- L31: `vector_store: VectorStore,` -> vector store dependency.
+- L32: `embedder: EmbeddingService,` -> embeddings dependency.
+- L33: `bm25_index: BM25Index | None = None,` -> optional BM25 index.
+- L34: `fusion: FusionConfig | None = None,` -> optional fusion config.
+- L35: `) -> None:` -> no return value.
+- L36: `self._vector_store = vector_store` -> store dependency.
+- L37: `self._embedder = embedder` -> store dependency.
+- L38: `self._bm25 = bm25_index` -> store optional BM25 index.
+- L39: `self._fusion = fusion or FusionConfig()` -> default fusion config if none.
+- L40: (blank) -> spacing.
+- L41: `def retrieve(...):` -> main retrieval method.
+- L42: `vector = self._embedder.embed([query])[0]` -> embed query text.
+- L43: `vector_hits = ...query_by_vector(...)` -> retrieve top vector matches.
+- L44: `if not self._bm25:` -> if no BM25 index.
+- L45: `return vector_hits` -> return vector-only results.
+- L46: (blank) -> spacing before BM25.
+- L47: `bm25_hits = self._bm25.query(...)` -> retrieve BM25 results.
+- L48: `if self._fusion.use_rrf:` -> use RRF if enabled.
+- L49: `fused = _rrf_fuse(` -> call fusion function.
+- L50: `vector_hits,` -> pass vector results.
+- L51: `bm25_hits,` -> pass BM25 results.
+- L52: `rrf_k=self._fusion.rrf_k,` -> pass RRF k.
+- L53: `vector_weight=self._fusion.vector_weight,` -> pass vector weight.
+- L54: `bm25_weight=self._fusion.bm25_weight,` -> pass BM25 weight.
+- L55: `)` -> close fusion call.
+- L56: `return fused[:top_k]` -> cap to top_k.
+- L57: (blank) -> spacing before legacy merge.
+- L58: `merged: Dict[str, RetrievedChunk] = ...` -> merge map by chunk_id.
+- L59: `for bm in bm25_hits:` -> iterate BM25 results.
+- L60: `if bm.chunk_id in merged:` -> if already in vector hits.
+- L61: `existing = merged[bm.chunk_id]` -> read existing hit.
+- L62: `merged[bm.chunk_id] = RetrievedChunk(` -> build combined score record.
+- L63: `chunk_id=existing.chunk_id,` -> preserve ID.
+- L64: `doc_id=existing.doc_id,` -> preserve doc.
+- L65: `text=existing.text,` -> preserve text.
+- L66: `score=existing.score + bm.score,` -> add scores.
+- L67: `metadata=existing.metadata,` -> preserve metadata.
+- L68: `)` -> close merged record.
+- L69: `else:` -> BM25-only hit.
+- L70: `merged[bm.chunk_id] = RetrievedChunk(` -> create new record from BM25.
+- L71: `chunk_id=bm.chunk_id,` -> ID from BM25.
+- L72: `doc_id=bm.doc_id,` -> doc from BM25.
+- L73: `text=bm.text,` -> text from BM25.
+- L74: `score=bm.score,` -> score from BM25.
+- L75: `metadata={},` -> no metadata available for BM25-only hit.
+- L76: `)` -> close record.
+- L77: `return sorted(... )[:top_k]` -> sort by score and cap to top_k.
+- L78: (blank) -> spacing before helper.
+- L79: (blank) -> extra spacing.
+- L80: `def _rrf_fuse(` -> helper that performs Reciprocal Rank Fusion.
+- L81: `vector_hits: List[RetrievedChunk],` -> vector results.
+- L82: `bm25_hits: List[BM25Result],` -> BM25 results.
+- L83: `rrf_k: int,` -> RRF constant.
+- L84: `vector_weight: float,` -> weight for vector results.
+- L85: `bm25_weight: float,` -> weight for BM25 results.
+- L86: `) -> List[RetrievedChunk]:` -> returns fused results.
+- L87: `fused: Dict[str, Tuple[RetrievedChunk, float]] = {}` -> map chunk_id to (chunk, score).
+- L88: `for rank, hit in enumerate(...):` -> loop over vector hits with rank.
+- L89: `score = vector_weight / (rrf_k + rank)` -> RRF score contribution.
+- L90: `fused[hit.chunk_id] = (hit, score)` -> store initial fused score.
+- L91: `for rank, hit in enumerate(bm25_hits, start=1):` -> loop BM25 hits.
+- L92: `score = bm25_weight / (rrf_k + rank)` -> BM25 score contribution.
+- L93: `if hit.chunk_id in fused:` -> if chunk already exists.
+- L94: `existing, existing_score = fused[hit.chunk_id]` -> read current record.
+- L95: `fused[hit.chunk_id] = (` -> update record with combined score.
+- L96: `RetrievedChunk(` -> new chunk with summed score.
+- L97: `chunk_id=existing.chunk_id,` -> preserve ID.
+- L98: `doc_id=existing.doc_id,` -> preserve doc.
+- L99: `text=existing.text,` -> preserve text.
+- L100: `score=existing_score + score,` -> sum scores.
+- L101: `metadata=existing.metadata,` -> preserve metadata.
+- L102: `),` -> close chunk and tuple.
+- L103: `existing_score + score,` -> store combined score.
+- L104: `)` -> close tuple.
+- L105: `else:` -> if BM25-only chunk.
+- L106: `fused[hit.chunk_id] = (` -> create new record.
+- L107: `RetrievedChunk(` -> chunk object.
+- L108: `chunk_id=hit.chunk_id,` -> BM25 ID.
+- L109: `doc_id=hit.doc_id,` -> BM25 doc ID.
+- L110: `text=hit.text,` -> BM25 text.
+- L111: `score=score,` -> RRF score for BM25 hit.
+- L112: `metadata={},` -> empty metadata for BM25-only.
+- L113: `),` -> close chunk.
+- L114: `score,` -> store score in tuple.
+- L115: `)` -> close tuple.
+- L116: `return [entry[0] for entry in sorted(...)]` -> sort by score and return chunks.
