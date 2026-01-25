@@ -56,6 +56,22 @@ flowchart LR
     M --> D[Eval Dataset]
 ```
 
+## Agentic RAG flow
+```mermaid
+flowchart LR
+    Q[Question] --> P[Planner]
+    P --> T[Tool Registry]
+    T --> R1[RAG Tool]
+    T --> R2[SQL Tool]
+    T --> R3[Web Tool]
+    R1 --> S[Tool Outputs]
+    R2 --> S
+    R3 --> S
+    S --> A[Synthesis Answer]
+    A --> V[Verifier]
+    V --> O[Final Response]
+```
+
 ## Scaling patterns
 - Separate ingestion workers from query service.
 - Use async tasks for IO (vector DB, model calls).
