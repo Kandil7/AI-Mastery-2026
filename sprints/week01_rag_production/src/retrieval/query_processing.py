@@ -106,7 +106,7 @@ class QueryClassifier:
             self.logger.debug(f"Classified query as {result.query_type.value} with confidence {result.confidence}")
             return result
         except Exception as e:
-            self.logger.error(f"Error classifying query: {e}")
+            self.logger.error(f"Error classifying query: {e}", exc_info=True)
             # Return uncertain classification as fallback
             return QueryClassificationResult(QueryType.UNCERTAIN, 0.0, [], [], "uncertain")
 
@@ -144,7 +144,7 @@ class QueryRewriter:
             self.logger.debug(f"Rewrote query: '{query}' -> '{rewritten_query}'")
             return rewritten_query
         except Exception as e:
-            self.logger.error(f"Error rewriting query: {e}")
+            self.logger.error(f"Error rewriting query: {e}", exc_info=True)
             # Return original query as fallback
             return query
 
@@ -171,7 +171,7 @@ class CitationBuilder:
             self.logger.debug(f"Built {len(citations)} citations")
             return citations
         except Exception as e:
-            self.logger.error(f"Error building citations: {e}")
+            self.logger.error(f"Error building citations: {e}", exc_info=True)
             return []
 
 
@@ -187,7 +187,7 @@ def _confidence(results: List[RetrievalResult], cls_conf: float) -> float:
         confidence = max(0.0, min(1.0, c))
         return confidence
     except Exception as e:
-        logging.error(f"Error calculating confidence: {e}")
+        logging.error(f"Error calculating confidence: {e}", exc_info=True)
         return 0.1  # Default low confidence on error
 
 
@@ -205,11 +205,18 @@ class ResponseSynthesizer:
             if not ctx.strip():
                 self.logger.warning("Insufficient context to generate response")
                 return "Insufficient context retrieved to answer reliably."
+
+            # Implement token budgeting to prevent overly long contexts
+            max_context_length = 4000  # Adjust based on model limits
+            if len(ctx) > max_context_length:
+                ctx = ctx[:max_context_length]
+                self.logger.warning(f"Context truncated to {max_context_length} characters")
+
             response = f"Answer based on retrieved context:\n\n{ctx}\n\n(Question: {query})"
             self.logger.debug(f"Generated response for query: {query[:50]}...")
             return response
         except Exception as e:
-            self.logger.error(f"Error synthesizing response: {e}")
+            self.logger.error(f"Error synthesizing response: {e}", exc_info=True)
             return f"Error generating response: {str(e)}"
 
 
@@ -274,6 +281,7 @@ class RAGQueryProcessor:
                 "retrieval_count": len(results),
                 "processing_time_ms": dt,
                 "hit_sources": [r.source for r in results],
+                "query_hash": hash(query),  # For monitoring without exposing raw query
             }
 
             result = QueryProcessingResult(query, response, results, cls.query_type, dt, conf, cits, meta)
@@ -290,6 +298,7 @@ class RAGQueryProcessor:
                 "retrieval_count": 0,
                 "processing_time_ms": dt,
                 "error": str(e),
+                "query_hash": hash(query),  # For monitoring without exposing raw query
             }
             return QueryProcessingResult(
                 query=query,

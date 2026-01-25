@@ -14,6 +14,7 @@ The architecture follows the 2026 RAG production standards with emphasis on:
 - Comprehensive error handling and performance optimization
 - Caching for query embeddings and results
 - Deduplication and reranking capabilities
+- Multi-tenant and ACL enforcement
 
 References:
 - RRF (Reciprocal Rank Fusion): https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf
@@ -27,6 +28,7 @@ import hashlib
 import logging
 import math
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
@@ -34,7 +36,7 @@ from functools import lru_cache
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from .vector_store import VectorConfig, VectorRecord, VectorStoreFactory
+from .vector_store import VectorConfig, VectorRecord, VectorStoreFactory, LRUCache
 
 
 @dataclass(frozen=True)
@@ -69,7 +71,9 @@ class QueryOptions:
     filters: Dict[str, Any] = field(default_factory=dict)
     allowed_doc_ids: Optional[set[str]] = None
     rerank: bool = True  # Whether to apply reranking
+    rerank_k: int = 50  # Max candidates to rerank
     deduplicate: bool = True  # Whether to deduplicate results
+    dedup_threshold: float = 0.9  # Threshold for deduplication
 
 
 def _doc_allowed(doc: Document, opts: QueryOptions) -> bool:
@@ -97,9 +101,18 @@ def _deduplicate_results(results: List[RetrievalResult], threshold: float = 0.9)
     if not results:
         return results
 
-    unique_results = [results[0]]  # Always keep the first result
+    # Stage 1: deduplicate by document ID (cheapest)
+    seen_doc_ids = set()
+    unique_by_id = []
+    for result in results:
+        if result.document.id not in seen_doc_ids:
+            seen_doc_ids.add(result.document.id)
+            unique_by_id.append(result)
 
-    for result in results[1:]:
+    # Stage 2: deduplicate by content similarity (more expensive)
+    unique_results = [unique_by_id[0]] if unique_by_id else []  # Always keep the first result
+
+    for result in unique_by_id[1:]:
         is_duplicate = False
         for unique_result in unique_results:
             # Simple similarity check based on content overlap
@@ -139,7 +152,7 @@ def _jaccard_similarity(text1: str, text2: str, n: int = 3) -> float:
     return intersection / union if union != 0 else 0.0
 
 
-def _rerank_results(query: str, results: List[RetrievalResult], top_k: int = None) -> List[RetrievalResult]:
+def _rerank_results(query: str, results: List[RetrievalResult], top_k: int = None, rerank_k: int = 50) -> List[RetrievalResult]:
     """
     Rerank results using cross-encoder or other reranking method.
 
@@ -147,6 +160,7 @@ def _rerank_results(query: str, results: List[RetrievalResult], top_k: int = Non
         query: Original query
         results: List of retrieval results to rerank
         top_k: Number of top results to return after reranking
+        rerank_k: Max number of candidates to rerank
 
     Returns:
         Reranked list of results
@@ -154,10 +168,13 @@ def _rerank_results(query: str, results: List[RetrievalResult], top_k: int = Non
     if not results:
         return results
 
+    # Limit the number of candidates to rerank for performance
+    candidates = results[:rerank_k]
+
     # For now, implement a simple reranking based on content-query similarity
     # In production, this would use a cross-encoder model
     reranked_results = []
-    for result in results:
+    for result in candidates:
         # Calculate a simple relevance score based on keyword overlap
         query_words = set(query.lower().split())
         content_words = set(result.document.content.lower().split())
@@ -208,6 +225,7 @@ class SparseRetriever:
         self._idf: Dict[str, float] = {}
         self._avgdl: float = 0.0
         self._doc_by_id: Dict[str, int] = {}
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def index(self, docs: List[Document]) -> None:
         for d in docs:
@@ -234,48 +252,55 @@ class SparseRetriever:
         self._idf = {t: math.log(1.0 + (N - df + 0.5) / (df + 0.5)) for t, df in self._df.items()}
 
     def retrieve(self, query: str, opts: QueryOptions) -> List[RetrievalResult]:
-        if not self._docs:
-            return []
-        q = _tok(query)
-        if not q:
-            return []
+        start_time = time.time()
+        try:
+            if not self._docs:
+                return []
+            q = _tok(query)
+            if not q:
+                return []
 
-        candidates = [i for i, d in enumerate(self._docs) if _doc_allowed(d, opts)]
-        if not candidates:
-            return []
+            candidates = [i for i, d in enumerate(self._docs) if _doc_allowed(d, opts)]
+            if not candidates:
+                return []
 
-        scores = np.zeros(len(candidates), dtype=np.float32)
-        uq = set(q)
-        for term in uq:
-            idf = self._idf.get(term)
-            if idf is None:
-                continue
-            for pos, idx in enumerate(candidates):
-                tf = self._tf[idx].get(term, 0)
-                if tf == 0:
+            scores = np.zeros(len(candidates), dtype=np.float32)
+            uq = set(q)
+            for term in uq:
+                idf = self._idf.get(term)
+                if idf is None:
                     continue
-                dl = self._dl[idx]
-                denom = tf + self.k1 * (1 - self.b + self.b * (dl / max(1e-9, self._avgdl)))
-                scores[pos] += idf * (tf * (self.k1 + 1) / denom)
+                for pos, idx in enumerate(candidates):
+                    tf = self._tf[idx].get(term, 0)
+                    if tf == 0:
+                        continue
+                    dl = self._dl[idx]
+                    denom = tf + self.k1 * (1 - self.b + self.b * (dl / max(1e-9, self._avgdl)))
+                    scores[pos] += idf * (tf * (self.k1 + 1) / denom)
 
-        k = min(opts.top_k, len(candidates))
-        top = np.argpartition(scores, -k)[-k:]
-        top = top[np.argsort(scores[top])[::-1]]
+            k = min(opts.top_k, len(candidates))
+            top = np.argpartition(scores, -k)[-k:]
+            top = top[np.argsort(scores[top])[::-1]]
 
-        out = []
-        for rank, p in enumerate(top, start=1):
-            di = candidates[int(p)]
-            out.append(RetrievalResult(self._docs[di], float(scores[int(p)]), rank, "sparse"))
+            out = []
+            for rank, p in enumerate(top, start=1):
+                di = candidates[int(p)]
+                out.append(RetrievalResult(self._docs[di], float(scores[int(p)]), rank, "sparse"))
 
-        # Apply deduplication if enabled
-        if opts.deduplicate:
-            out = _deduplicate_results(out)
+            # Apply deduplication if enabled
+            if opts.deduplicate:
+                out = _deduplicate_results(out, opts.dedup_threshold)
 
-        # Apply reranking if enabled
-        if opts.rerank:
-            out = _rerank_results(query, out, opts.top_k)
+            # Apply reranking if enabled
+            if opts.rerank:
+                out = _rerank_results(query, out, opts.top_k, opts.rerank_k)
 
-        return out
+            retrieval_time = time.time() - start_time
+            self.logger.debug(f"Sparse retrieval took {retrieval_time:.3f}s, returned {len(out)} results")
+            return out
+        except Exception as e:
+            self.logger.error(f"Error in sparse retrieval: {e}", exc_info=True)
+            return []
 
 
 class DenseRetriever:
@@ -289,9 +314,8 @@ class DenseRetriever:
         self.store = VectorStoreFactory.create(vector_config)
         self._doc_by_id: Dict[str, Document] = {}
 
-        # Cache for query embeddings
-        self._query_embedding_cache: Dict[str, np.ndarray] = {}
-        self._cache_max_size = 1000  # Max cache size
+        # Cache for query embeddings - now using the proper LRUCache
+        self._query_embedding_cache = LRUCache(maxsize=1000, ttl=300)  # 1000 items, 5 min TTL
 
     async def initialize(self):
         await self.store.initialize()
@@ -309,62 +333,66 @@ class DenseRetriever:
                 "source": d.source,
                 "doc_type": d.doc_type,
                 "access_level": d.access_control.get("level", "public"),
+                "tenant_id": d.metadata.get("tenant_id", "default"),  # For multi-tenant support
             }
             recs.append(VectorRecord(id=d.id, vector=e.tolist(), metadata=md, document_id=d.id, text_content=None))
         await self.store.upsert(recs)
 
-    def _get_cached_embedding(self, query: str) -> Optional[np.ndarray]:
+    def _get_cached_embedding(self, query: str, model_name: str) -> Optional[np.ndarray]:
         """Get cached embedding for a query if available."""
-        query_hash = hashlib.md5(query.encode()).hexdigest()
-        return self._query_embedding_cache.get(query_hash)
+        cache_key = f"{model_name}:{hashlib.md5(query.encode()).hexdigest()}"
+        return self._query_embedding_cache.get(cache_key)
 
-    def _cache_embedding(self, query: str, embedding: np.ndarray):
+    def _cache_embedding(self, query: str, model_name: str, embedding: np.ndarray):
         """Cache an embedding for a query."""
-        if len(self._query_embedding_cache) >= self._cache_max_size:
-            # Remove oldest entry (simple FIFO)
-            oldest_key = next(iter(self._query_embedding_cache))
-            del self._query_embedding_cache[oldest_key]
-
-        query_hash = hashlib.md5(query.encode()).hexdigest()
-        self._query_embedding_cache[query_hash] = embedding
+        cache_key = f"{model_name}:{hashlib.md5(query.encode()).hexdigest()}"
+        self._query_embedding_cache.put(cache_key, embedding)
 
     async def retrieve(self, query: str, opts: QueryOptions) -> List[RetrievalResult]:
-        if not self._doc_by_id:
+        start_time = time.time()
+        try:
+            if not self._doc_by_id:
+                return []
+
+            # Check cache first for query embedding
+            model_name = getattr(self.encoder, 'model_card_data', {}).get("name_or_path", "unknown")
+            query_embedding = self._get_cached_embedding(query, model_name)
+            if query_embedding is None:
+                query_embedding = self.encoder.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
+                self._cache_embedding(query, model_name, query_embedding)
+
+            where = {}
+            # Push down filters where possible (metadata only)
+            for k, v in (opts.filters or {}).items():
+                where[k] = v
+            sims = await self.store.search(query_embedding.tolist(), k=opts.prefilter_k, where=where or None)
+
+            # Post-filter ACL + allowed ids (enforce after retrieval too)
+            docs = []
+            for doc_id, sim in sims:
+                d = self._doc_by_id.get(doc_id)
+                if d and _doc_allowed(d, opts):
+                    docs.append((d, sim))
+
+            docs.sort(key=lambda x: x[1], reverse=True)
+            out = []
+            for i, (d, s) in enumerate(docs[: opts.top_k], start=1):
+                out.append(RetrievalResult(d, float(s), i, "dense"))
+
+            # Apply deduplication if enabled
+            if opts.deduplicate:
+                out = _deduplicate_results(out, opts.dedup_threshold)
+
+            # Apply reranking if enabled
+            if opts.rerank:
+                out = _rerank_results(query, out, opts.top_k, opts.rerank_k)
+
+            retrieval_time = time.time() - start_time
+            self.logger.debug(f"Dense retrieval took {retrieval_time:.3f}s, returned {len(out)} results")
+            return out
+        except Exception as e:
+            self.logger.error(f"Error in dense retrieval: {e}", exc_info=True)
             return []
-
-        # Check cache first for query embedding
-        query_embedding = self._get_cached_embedding(query)
-        if query_embedding is None:
-            query_embedding = self.encoder.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
-            self._cache_embedding(query, query_embedding)
-
-        where = {}
-        # Push down filters where possible (metadata only)
-        for k, v in (opts.filters or {}).items():
-            where[k] = v
-        sims = await self.store.search(query_embedding.tolist(), k=opts.prefilter_k, where=where or None)
-
-        # Post-filter ACL + allowed ids
-        docs = []
-        for doc_id, sim in sims:
-            d = self._doc_by_id.get(doc_id)
-            if d and _doc_allowed(d, opts):
-                docs.append((d, sim))
-
-        docs.sort(key=lambda x: x[1], reverse=True)
-        out = []
-        for i, (d, s) in enumerate(docs[: opts.top_k], start=1):
-            out.append(RetrievalResult(d, float(s), i, "dense"))
-
-        # Apply deduplication if enabled
-        if opts.deduplicate:
-            out = _deduplicate_results(out)
-
-        # Apply reranking if enabled
-        if opts.rerank:
-            out = _rerank_results(query, out, opts.top_k)
-
-        return out
 
 
 def _rrf(dense: List[RetrievalResult], sparse: List[RetrievalResult], k: int = 60) -> Dict[str, float]:
@@ -400,6 +428,7 @@ class HybridRetriever:
         self.fusion = fusion.lower()
         self.alpha = float(alpha)
         self.rrf_k = int(rrf_k)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def index_sparse(self, docs: List[Document]) -> None:
         self.sparse.index(docs)
@@ -408,83 +437,100 @@ class HybridRetriever:
         await self.dense.index(docs)
 
     async def retrieve(self, query: str, opts: QueryOptions) -> List[RetrievalResult]:
-        pre_k = max(opts.prefilter_k, opts.top_k * 5)
-        d_opts = QueryOptions(
-            top_k=min(pre_k, 200),
-            prefilter_k=min(pre_k, 200),
-            user_permissions=opts.user_permissions,
-            filters=opts.filters,
-            allowed_doc_ids=opts.allowed_doc_ids,
-            rerank=False,  # Don't rerank individual results, rerank after fusion
-            deduplicate=False,  # Don't deduplicate individual results, deduplicate after fusion
-        )
-        s_opts = QueryOptions(
-            top_k=min(pre_k, 200),
-            prefilter_k=min(pre_k, 200),
-            user_permissions=opts.user_permissions,
-            filters=opts.filters,
-            allowed_doc_ids=opts.allowed_doc_ids,
-            rerank=False,  # Don't rerank individual results, rerank after fusion
-            deduplicate=False,  # Don't deduplicate individual results, deduplicate after fusion
-        )
+        start_time = time.time()
+        try:
+            pre_k = max(opts.prefilter_k, opts.top_k * 5)
+            d_opts = QueryOptions(
+                top_k=min(pre_k, 200),
+                prefilter_k=min(pre_k, 200),
+                user_permissions=opts.user_permissions,
+                filters=opts.filters,
+                allowed_doc_ids=opts.allowed_doc_ids,
+                rerank=False,  # Don't rerank individual results, rerank after fusion
+                deduplicate=False,  # Don't deduplicate individual results, deduplicate after fusion
+                dedup_threshold=opts.dedup_threshold,
+                rerank_k=opts.rerank_k,
+            )
+            s_opts = QueryOptions(
+                top_k=min(pre_k, 200),
+                prefilter_k=min(pre_k, 200),
+                user_permissions=opts.user_permissions,
+                filters=opts.filters,
+                allowed_doc_ids=opts.allowed_doc_ids,
+                rerank=False,  # Don't rerank individual results, rerank after fusion
+                deduplicate=False,  # Don't deduplicate individual results, deduplicate after fusion
+                dedup_threshold=opts.dedup_threshold,
+                rerank_k=opts.rerank_k,
+            )
 
-        dense_res = await self.dense.retrieve(query, d_opts)
-        sparse_res = self.sparse.retrieve(query, s_opts)
+            dense_res = await self.dense.retrieve(query, d_opts)
+            sparse_res = self.sparse.retrieve(query, s_opts)
 
-        doc_map: Dict[str, Document] = {}
-        for r in dense_res:
-            doc_map[r.document.id] = r.document
-        for r in sparse_res:
-            doc_map.setdefault(r.document.id, r.document)
+            doc_map: Dict[str, Document] = {}
+            for r in dense_res:
+                doc_map[r.document.id] = r.document
+            for r in sparse_res:
+                doc_map.setdefault(r.document.id, r.document)
 
-        if self.fusion == "rrf":
-            fused = _rrf(dense_res, sparse_res, k=self.rrf_k)
-        elif self.fusion == "weighted":
-            d = _minmax({r.document.id: r.score for r in dense_res})
-            s = _minmax({r.document.id: r.score for r in sparse_res})
-            fused = {}
-            for doc_id, v in d.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + self.alpha * v
-            for doc_id, v in s.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + (1 - self.alpha) * v
-        elif self.fusion == "combsum":
-            d = _minmax({r.document.id: r.score for r in dense_res})
-            s = _minmax({r.document.id: r.score for r in sparse_res})
-            fused = {}
-            for doc_id, v in d.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + v
-            for doc_id, v in s.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + v
-        elif self.fusion == "combmnz":
-            d = _minmax({r.document.id: r.score for r in dense_res})
-            s = _minmax({r.document.id: r.score for r in sparse_res})
-            fused = {}
-            cnt = {}
-            for doc_id, v in d.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + v
-                cnt[doc_id] = cnt.get(doc_id, 0) + 1
-            for doc_id, v in s.items():
-                fused[doc_id] = fused.get(doc_id, 0.0) + v
-                cnt[doc_id] = cnt.get(doc_id, 0) + 1
-            for doc_id in list(fused.keys()):
-                fused[doc_id] *= cnt.get(doc_id, 1)
-        else:
-            fused = _rrf(dense_res, sparse_res, k=self.rrf_k)
+            if self.fusion == "rrf":
+                fused = _rrf(dense_res, sparse_res, k=self.rrf_k)
+            elif self.fusion == "weighted":
+                d = _minmax({r.document.id: r.score for r in dense_res})
+                s = _minmax({r.document.id: r.score for r in sparse_res})
+                fused = {}
+                for doc_id, v in d.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + self.alpha * v
+                for doc_id, v in s.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + (1 - self.alpha) * v
+            elif self.fusion == "combsum":
+                d = _minmax({r.document.id: r.score for r in dense_res})
+                s = _minmax({r.document.id: r.score for r in sparse_res})
+                fused = {}
+                for doc_id, v in d.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + v
+                for doc_id, v in s.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + v
+            elif self.fusion == "combmnz":
+                d = _minmax({r.document.id: r.score for r in dense_res})
+                s = _minmax({r.document.id: r.score for r in sparse_res})
+                fused = {}
+                cnt = {}
+                for doc_id, v in d.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + v
+                    cnt[doc_id] = cnt.get(doc_id, 0) + 1
+                for doc_id, v in s.items():
+                    fused[doc_id] = fused.get(doc_id, 0.0) + v
+                    cnt[doc_id] = cnt.get(doc_id, 0) + 1
+                for doc_id in list(fused.keys()):
+                    fused[doc_id] *= cnt.get(doc_id, 1)
+            else:
+                fused = _rrf(dense_res, sparse_res, k=self.rrf_k)
 
-        ranked = sorted(fused.items(), key=lambda x: (-x[1], x[0]))[: opts.top_k]
-        out = []
-        for i, (doc_id, score) in enumerate(ranked, start=1):
-            d = doc_map.get(doc_id)
-            if d is None:
-                continue
-            out.append(RetrievalResult(d, float(score), i, "hybrid"))
+            ranked = sorted(fused.items(), key=lambda x: (-x[1], x[0]))[: opts.top_k]
+            out = []
+            for i, (doc_id, score) in enumerate(ranked, start=1):
+                d = doc_map.get(doc_id)
+                if d is None:
+                    continue
+                out.append(RetrievalResult(d, float(score), i, "hybrid"))
 
-        # Apply deduplication if enabled
-        if opts.deduplicate:
-            out = _deduplicate_results(out)
+            # Apply deduplication if enabled
+            if opts.deduplicate:
+                out = _deduplicate_results(out, opts.dedup_threshold)
 
-        # Apply reranking if enabled
-        if opts.rerank:
-            out = _rerank_results(query, out, opts.top_k)
+            # Apply reranking if enabled
+            if opts.rerank:
+                out = _rerank_results(query, out, opts.top_k, opts.rerank_k)
 
-        return out
+            # Final ACL enforcement after fusion/reranking
+            final_results = []
+            for result in out:
+                if _doc_allowed(result.document, opts):
+                    final_results.append(result)
+
+            retrieval_time = time.time() - start_time
+            self.logger.debug(f"Hybrid retrieval took {retrieval_time:.3f}s, returned {len(final_results)} results")
+            return final_results
+        except Exception as e:
+            self.logger.error(f"Error in hybrid retrieval: {e}", exc_info=True)
+            return []
