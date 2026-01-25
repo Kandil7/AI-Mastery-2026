@@ -18,6 +18,21 @@ evaluation, and operational considerations.
 3) Embed and index with `tenant_id` + `plan_tier` filters.
 4) Online query uses `tenant_id` filter, reranker on top 50, and strict citations.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[Tickets + Help Docs] --> B[Ingestion]
+    B --> C[Structured Chunking]
+    C --> D[Embeddings + Vector Store]
+    C --> E[BM25 Corpus]
+    Q[User Question] --> R[Hybrid Retrieval]
+    D --> R
+    E --> R
+    R --> K[Reranker]
+    K --> L[Answer + Verification]
+    L --> O[Answer + Citations]
+```
+
 ### Suggested config
 ```yaml
 chunking:
@@ -43,6 +58,13 @@ verification:
 Answer includes citations:
 - chunk_id, doc_id, snippet, score.
 
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| retrieval.top_k | higher recall | higher | 15-25 |
+| reranker.top_k | higher precision | medium | 6-10 |
+| answer.max_context_words | more context | higher | 800-1200 |
+
 ### Evaluation
 - Use an offline dataset of resolved tickets to measure answer accuracy.
 - Track citation coverage % and "no-answer" rate for ambiguous questions.
@@ -65,6 +87,19 @@ Answer includes citations:
 3) Rerank with a legal domain model.
 4) Verifier checks citations and rejects unsupported claims.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[PDF Policies] --> B[OCR + Parse]
+    B --> C[Structured Chunking]
+    C --> D[Embeddings + Vector Store]
+    Q[User Question] --> R[Vector Retrieval]
+    D --> R
+    R --> K[Reranker]
+    K --> V[Verification]
+    V --> O[Answer + Citations]
+```
+
 ### Agentic pattern
 - Planner chooses: RAG -> verifier
 - Verifier forces re-query if missing citations
@@ -85,6 +120,13 @@ answer:
 verification:
   enabled: true
 ```
+
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| reranker.top_k | higher precision | medium | 4-6 |
+| verification.enabled | much safer | higher | true |
+| answer.max_context_words | tighter grounding | lower | 700-900 |
 
 ### Evaluation
 - Use a panel of legal SMEs to validate a small gold set.
@@ -107,6 +149,20 @@ verification:
 3) Use hybrid retrieval (BM25 + vector).
 4) Rerank for exact API usage.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[Code + RFCs] --> B[Parse + Split]
+    B --> C[Chunk by Module]
+    C --> D[Embeddings + Vector Store]
+    C --> E[BM25 Corpus]
+    Q[Engineer Question] --> R[Hybrid Retrieval]
+    D --> R
+    E --> R
+    R --> K[Reranker]
+    K --> O[Answer + Citations]
+```
+
 ### Agentic extensions
 - Tool: SQL for build metrics
 - Tool: RAG for docs
@@ -128,6 +184,13 @@ reranker:
 query_rewrite:
   enabled: true
 ```
+
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| query_rewrite.enabled | better recall | higher | true |
+| retrieval.top_k | higher recall | higher | 20-30 |
+| reranker.top_k | better precision | medium | 8-12 |
 
 ### Evaluation
 - Track exact-match correctness for API signatures.
@@ -152,6 +215,18 @@ query_rewrite:
 3) Retrieve using account ID + segment filters.
 4) Answer with concise, action-focused responses.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[CRM Notes + Playbooks] --> B[Ingestion]
+    B --> C[Structured Chunking]
+    C --> D[Embeddings + Vector Store]
+    Q[Seller Question] --> R[Vector Retrieval]
+    D --> R
+    R --> K[Reranker]
+    K --> O[Concise Answer]
+```
+
 ### Suggested config
 ```yaml
 retrieval:
@@ -162,6 +237,12 @@ reranker:
 answer:
   max_context_words: 700
 ```
+
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| answer.max_context_words | clearer answers | lower | 500-800 |
+| reranker.top_k | better focus | medium | 4-6 |
 
 ### Evaluation
 - Measure seller satisfaction and outcome-based conversions.
@@ -184,6 +265,20 @@ answer:
 3) Hybrid retrieval with high recall.
 4) Generate short, procedural answers.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[Runbooks + Postmortems] --> B[Ingestion]
+    B --> C[Structured Chunking]
+    C --> D[Embeddings + Vector Store]
+    C --> E[BM25 Corpus]
+    Q[On-call Question] --> R[Hybrid Retrieval]
+    D --> R
+    E --> R
+    R --> K[Reranker]
+    K --> O[Procedural Answer]
+```
+
 ### Suggested config
 ```yaml
 retrieval:
@@ -196,6 +291,13 @@ answer:
 verification:
   enabled: true
 ```
+
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| retrieval.top_k | higher recall | higher | 18-25 |
+| reranker.top_k | better precision | medium | 6-8 |
+| answer.max_context_words | short answers | lower | 500-700 |
 
 ### Evaluation
 - Time-to-resolution improvement.
@@ -218,6 +320,19 @@ verification:
 2) Chunk by section headers with overlap.
 3) Enable verification to reduce hallucinations.
 
+### Mermaid flow
+```mermaid
+flowchart LR
+    A[HR Policies] --> B[Ingestion]
+    B --> C[Structured Chunking]
+    C --> D[Embeddings + Vector Store]
+    Q[Employee Question] --> R[Vector Retrieval]
+    D --> R
+    R --> K[Reranker]
+    K --> V[Verification]
+    V --> O[Answer + Citations]
+```
+
 ### Suggested config
 ```yaml
 chunking:
@@ -232,6 +347,12 @@ reranker:
 verification:
   enabled: true
 ```
+
+### Cost/latency tuning
+| Setting | Quality impact | Latency impact | Recommendation |
+| --- | --- | --- | --- |
+| verification.enabled | safer answers | higher | true |
+| answer.max_context_words | avoid rambling | lower | 700-900 |
 
 ### Evaluation
 - Track citation coverage % and policy accuracy.
