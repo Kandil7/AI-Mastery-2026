@@ -31,8 +31,30 @@
 ## Data flow (online)
 Client -> API (query) -> planner -> retriever -> reranker -> answer -> verifier -> response
 
+```mermaid
+flowchart LR
+    A[Client] --> B[API: /query]
+    B --> C[Planner]
+    C --> D[Retriever]
+    D --> E[Reranker]
+    E --> F[Answer Generator]
+    F --> G[Verifier]
+    G --> H[Response + Citations]
+```
+
 ## Data flow (offline)
 Source -> parser -> chunker -> embeddings -> vector store -> metadata store -> eval dataset
+
+```mermaid
+flowchart LR
+    S[Source Docs] --> P[Parser]
+    P --> C[Chunker]
+    C --> E[Embeddings]
+    E --> V[Vector Store]
+    E --> B[BM25 Corpus]
+    V --> M[Metadata Store]
+    M --> D[Eval Dataset]
+```
 
 ## Scaling patterns
 - Separate ingestion workers from query service.
