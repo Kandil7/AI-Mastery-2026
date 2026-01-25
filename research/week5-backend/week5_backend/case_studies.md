@@ -65,6 +65,13 @@ Answer includes citations:
 | reranker.top_k | higher precision | medium | 6-10 |
 | answer.max_context_words | more context | higher | 800-1200 |
 
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | verification.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 10 | 4 | true | 700 |
+| Balanced | 16 | 6 | true | 900 |
+| High-Recall | 24 | 8 | true | 1200 |
+
 ### Evaluation
 - Use an offline dataset of resolved tickets to measure answer accuracy.
 - Track citation coverage % and "no-answer" rate for ambiguous questions.
@@ -127,6 +134,13 @@ verification:
 | reranker.top_k | higher precision | medium | 4-6 |
 | verification.enabled | much safer | higher | true |
 | answer.max_context_words | tighter grounding | lower | 700-900 |
+
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | verification.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 8 | 3 | true | 700 |
+| Balanced | 14 | 5 | true | 800 |
+| High-Recall | 20 | 6 | true | 900 |
 
 ### Evaluation
 - Use a panel of legal SMEs to validate a small gold set.
@@ -192,6 +206,13 @@ query_rewrite:
 | retrieval.top_k | higher recall | higher | 20-30 |
 | reranker.top_k | better precision | medium | 8-12 |
 
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | query_rewrite.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 12 | 6 | false | 900 |
+| Balanced | 20 | 8 | true | 1100 |
+| High-Recall | 28 | 10 | true | 1400 |
+
 ### Evaluation
 - Track exact-match correctness for API signatures.
 - Use developer feedback from IDE integration.
@@ -243,6 +264,13 @@ answer:
 | --- | --- | --- | --- |
 | answer.max_context_words | clearer answers | lower | 500-800 |
 | reranker.top_k | better focus | medium | 4-6 |
+
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | verification.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 8 | 3 | true | 500 |
+| Balanced | 12 | 5 | true | 650 |
+| High-Recall | 16 | 6 | true | 800 |
 
 ### Evaluation
 - Measure seller satisfaction and outcome-based conversions.
@@ -299,6 +327,13 @@ verification:
 | reranker.top_k | better precision | medium | 6-8 |
 | answer.max_context_words | short answers | lower | 500-700 |
 
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | verification.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 10 | 4 | true | 500 |
+| Balanced | 16 | 6 | true | 600 |
+| High-Recall | 22 | 8 | true | 700 |
+
 ### Evaluation
 - Time-to-resolution improvement.
 - Rate of correct first-response actions.
@@ -353,6 +388,13 @@ verification:
 | --- | --- | --- | --- |
 | verification.enabled | safer answers | higher | true |
 | answer.max_context_words | avoid rambling | lower | 700-900 |
+
+### Config tuning matrix
+| Profile | retrieval.top_k | reranker.top_k | verification.enabled | answer.max_context_words |
+| --- | --- | --- | --- | --- |
+| Fast | 8 | 4 | true | 700 |
+| Balanced | 12 | 6 | true | 800 |
+| High-Recall | 18 | 8 | true | 900 |
 
 ### Evaluation
 - Track citation coverage % and policy accuracy.
