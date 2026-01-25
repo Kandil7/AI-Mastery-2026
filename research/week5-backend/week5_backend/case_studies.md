@@ -411,3 +411,20 @@ verification:
 - Retrieval: `rag/retriever.py` with optional RRF fusion
 - Reranking: `rag/reranker.py`
 - Answering + verification: `pipelines/online_query.py` + `rag/answer.py`
+
+## How to pick a profile (Fast vs Balanced vs High-Recall)
+
+Use this quick guide when choosing a tuning profile for any case:
+
+- **Fast**: Lowest latency, suitable for interactive UI or tight SLAs.
+  - Lower `retrieval.top_k`, lower `reranker.top_k`, smaller `answer.max_context_words`.
+  - Expect slightly lower recall.
+- **Balanced**: Default for most production workloads.
+  - Mid-range `top_k` values and moderate context budget.
+  - Best trade-off between cost and accuracy.
+- **High-Recall**: Use when missing relevant context is more costly than latency.
+  - Higher `retrieval.top_k` and `reranker.top_k`.
+  - Larger `answer.max_context_words`.
+  - Expect higher cost and response time.
+
+If you are unsure, start with **Balanced**, then measure and adjust by workload.
