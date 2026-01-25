@@ -10,7 +10,11 @@ This module tests:
 
 import numpy as np
 import pytest
-import torch
+try:
+    import torch
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
+    pytest.skip("PyTorch not available", allow_module_level=True)
 
 from src.core.advanced_integration import (
     # Neural ODEs
