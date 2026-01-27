@@ -402,6 +402,20 @@ class SemanticCache:
 - 5× API pods, each ~200 QPS.
 - Vector DB cluster: 3 shards, 2 replicas.
 - Elasticsearch: 3 nodes (~333 QPS each).
+```
+Load Balancer
+      │
+      ├─► API Pod 1 ────┐
+      ├─► API Pod 2 ────┤
+      ├─► API Pod 3 ────┼──► Vector DB Cluster (3 shards, 2 replicas)
+      ├─► API Pod 4 ────┤
+      └─► API Pod 5 ────┘
+```
+
+**Capacity Planning** (1000 QPS):
+- **API Pods**: 5 pods @ 200 QPS each
+- **Vector DB**: 3 shards @ 333 QPS each
+- **Elasticsearch**: 3 nodes @ 333 QPS each
 
 ---
 
