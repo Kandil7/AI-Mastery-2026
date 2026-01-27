@@ -1,9 +1,11 @@
-import os
 from setuptools import setup, find_packages
 
 # Read long description from README
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+try:
+    with open("README.md", "r", encoding="utf-8") as fh:
+        long_description = fh.read()
+except FileNotFoundError:
+    long_description = "AI-Mastery-2026: The Ultimate AI Engineering Toolkit"
 
 # Define extra dependencies for focused installs
 EXTRAS = {
@@ -23,25 +25,53 @@ EXTRAS = {
         "seaborn>=0.11.0",
         "plotly>=5.10.0",
     ],
+    "ml": [
+        "torch>=1.12.0",
+        "torchvision>=0.13.0",
+        "torchdiffeq>=0.2.0",
+        "tensorflow>=2.9.0",
+        "keras>=2.9.0",
+        "numba>=0.55.0",
+    ],
     "llm": [
         "transformers>=4.20.0",
         "tokenizers>=0.12.0",
         "langchain>=0.0.200",
-        "openai>=0.27.0",
+        "openai>=1.0.0",
+        "anthropic>=0.25.0",
         "sentence-transformers>=2.2.0",
+        "rank-bm25>=0.2.2",
         "accelerate>=0.12.0",
         "datasets>=2.0.0",
     ],
-    "prod": [
-        "uvicorn[standard]>=0.17.0",
-        "gunicorn>=20.1.0",
+    "vector": [
+        "faiss-cpu>=1.7.0",
+        "hnswlib>=0.7.0",
+        "pgvector>=0.2.5",
+        "qdrant-client>=1.8.0",
+        "weaviate-client>=3.25.0",
+    ],
+    "db": [
         "psycopg2-binary>=2.9.0",
+        "sqlalchemy>=1.4.0",
+    ],
+    "eval": [
+        "ragas>=0.1.0",
+    ],
+    "ui": [
+        "streamlit>=1.10.0",
+    ],
+    "prod": [
+        "gunicorn>=20.1.0",
         "prometheus-client>=0.14.0",
     ],
 }
 
 # Aggregate 'all' extra
-EXTRAS["all"] = [dep for deps in EXTRAS.values() for dep in deps]
+_all_deps = []
+for _deps in EXTRAS.values():
+    _all_deps.extend(_deps)
+EXTRAS["all"] = sorted(set(_all_deps))
 
 setup(
     name="ai-mastery-2026",
@@ -50,16 +80,26 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Kandil7",
-    author_email="kandil@example.com",
+    author_email="medokandeal7@gmail.com",
     url="https://github.com/Kandil7/AI-Mastery-2026",
+    project_urls={
+        "Documentation": "https://github.com/Kandil7/AI-Mastery-2026",
+        "Source": "https://github.com/Kandil7/AI-Mastery-2026",
+        "Issues": "https://github.com/Kandil7/AI-Mastery-2026/issues",
+    },
+    keywords="ai, machine learning, deep learning, llm, rag, mlops, fastapi",
     license="MIT",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
-
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Education",
     ],
@@ -71,17 +111,13 @@ setup(
         "pandas>=1.3.0",
         "scipy>=1.7.0",
         "scikit-learn>=1.0.0",
-        "torch>=1.12.0",
         "fastapi>=0.78.0",
-        "uvicorn[standard]>=0.17.0",  # Moved to core for easier running
+        "uvicorn[standard]>=0.17.0",
         "pydantic>=1.9.0",
         "requests>=2.28.0",
-        "httpx>=0.23.0",
         "tqdm>=4.64.0",
         "python-dotenv>=0.20.0",
-        "numba>=0.55.0",
         "joblib>=1.1.0",
-        "streamlit>=1.10.0",
     ],
     
     extras_require=EXTRAS,

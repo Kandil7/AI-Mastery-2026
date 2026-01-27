@@ -1,4 +1,4 @@
-# System Design: RAG System at Scale (1M Documents)
+﻿# System Design: RAG System at Scale (1M Documents)
 
 ## Problem Statement
 
@@ -11,53 +11,177 @@ Design a Retrieval-Augmented Generation (RAG) system that can:
 
 ---
 
+## دراسات حالة إضافية (2024-2025) + حلول تصميمية
+
+- **Databricks LakehouseIQ (2024)**: مساعد بيانات مؤسسي مبني على Mosaic AI وUnity Catalog. يستخدم
+  فهرسة هجينة (Vector + نص) مع وراثة أذونات الكتالوج ومُخطِّط يربط السؤال بالجداول/اللوحات
+  ذات الصلة ليولّد SQL أو إجابات مؤسَّسة بالسياق. الحوكمة مدمجة لأن كل استرجاع يمر عبر الكتالوج
+  والـ Lineage.
+
+- **Snowflake Cortex Search (GA 2025)**: خدمة مُدارة لـ RAG هجيني فوق الجداول أو الـ Stages بلا
+  إدارة بنية تحتية. Chunking تلقائي، Arctic Embed، فهرسة متجهية + BM25، وخيار target_lag لضبط
+  حداثة البيانات. تُستهلك عبر REST/SDK مع طبقة أمان Snowflake نفسها.
+
+- **Slack Enterprise Search (2024)**: بحث ذكي قائم على RAG فوق رسائل Slack وموصلات SaaS
+  (Google Drive, O365...). استرجاع واعٍ بالأذونات (ACL) قبل الـ LLM، ولا تُخزَّن بيانات الموصلات
+  خارج نطاق المستأجر. إجابات مؤسَّسة بالمراجع وروابط مصدر لتقليل الهلوسة.
+
+---
+
+## Enterprise RAG: Production Patterns (18 Case Studies)
+
+**Context:** هندسة أنظمة توليد النصوص المعزز بالاسترجاع (RAG) في النطاق المؤسسي تتطلب منظومة
+إنتاجية تتحمل ملايين الاستعلامات مع احترام الصلاحيات والاستجابة دون ثانية. أدناه خلاصة هندسية
+قابلة للتنفيذ مبنية على 18 حالة دراسية (Notion، Intercom، Uber، Pinterest، Microsoft،
+Salesforce، Airbnb، Klarna، Shopify، Intuit...).
+
+### 1) أنماط معمارية أثبتت نجاحها
+
+- Hybrid Retrieval هو المعيار الواقعي: متجهات + BM25 + فلاتر ميتاداتا + Reranker مخصص (Fin-cx،
+  ModernBERT، Cross-Encoder) لرفع الدقة وخفض الهلوسة.
+- Agentic RAG بدلاً من تدفق خطي: تفكيك السؤال، تضييق المصدر، استرجاع متوازٍ، Tool calling،
+  تحقق LLM-as-Judge (Uber EAg-RAG، Shopify Agentic Loop).
+- GraphRAG / Work-Graph: رسوم بيانية (Klarna/Neo4j) أو بنية الكتل (Notion) لحفظ العلاقات.
+- Object/Block Chunking: تقطيع هيكلي للجداول والسجلات (Salesforce، Uber) يقلل الانجراف المعرفي.
+- أذونات مدمجة في الاسترجاع: ربط الاستعلام بـ Entra ID/OAuth/RBAC قبل دخول الفهارس لمنع التسرب.
+
+### 2) مرجع معماري مختصر (Canonical Layers)
+
+1. **Ingestion**: تحويل PDF/Docs -> HTML/Markdown، تطبيع الجداول، ميتاداتا غنية، ملخصات جداول
+   واستعلامات تاريخية (Pinterest Text-to-SQL) مع Chunking هيكلي.
+2. **Indexing & Retrieval**: متجهات (Faiss/OpenSearch/Neo4j) + BM25 + فلاتر صلاحيات؛ Fusion
+   (RRF/Weighted)؛ Reranker بنافذة سياق واسعة (8K+).
+3. **Orchestration / Agents**: مخطط استعلام، تحديد مصدر، استرجاع متوازٍ، Tool/SQL/API، تحقق
+   (Validation Agent) مع LLM-as-judge.
+4. **Generation**: توجيه نموذج (Routing) بين صغير/كبير؛ Grounded generation؛ Streaming JSON جزئي.
+5. **Trust & Governance**: صلاحيات في الاسترجاع، Masking مسبق، Trace لكل إجابة، تدقيق سمّية.
+6. **Evaluation & Observability**: بنية تقييم سيادية (LLM+بشر)، RAGAS، مراقبة الانجراف والتكلفة.
+
+### 3) مقاييس نجاح إنتاجية
+
+- Latency: <800ms p95 (مع Streaming) بميزانية زمنية لكل طبقة.
+- Recall@K وPrecision بعد Rerank.
+- Hallucination Rate، Answer Provenance، Task Success Rate.
+- Cost per Query مع مسارات نماذج بديلة وكاش دلالي متدرج.
+
+### 4) خارطة طريق سريعة الدمج مع هذا المستند
+
+- Align: اربط المكونات الحالية (Hybrid + Rerank + Caching) بطبقات المرجع أعلاه.
+- Upgrade Retrieval: فلاتر صلاحيات + Reranker أقوى (ModernBERT/ColBERTv2) بنافذة 8K.
+- Agent Layer: مخطط بسيط (decompose -> retrieve -> tool-call) قبل التوليد لدعم بيانات زمنية.
+- Trust-first: فحص الصلاحيات في الاسترجاع؛ Trace ID مع كل إجابة.
+- Eval Loop: تشغيل LLM-as-judge دوريًا مقابل تعليقات المستخدم.
+
+---
+
+## 1. Enterprise RAG Reference Architecture (قابل للتنفيذ)
+
+### الهدف
+منصة RAG مؤسسية آمنة، منخفضة الكمون، متعددة المصادر، تدعم Agentic/Graph reasoning.
+
+### الطبقات الخمس
+1) **Ingestion**: تحويل PDF/Docs -> HTML/Markdown، تطبيع الجداول، Chunking هيكلي (Blocks/Objects).
+2) **Indexing & Retrieval**: متجهات + BM25 + فلاتر أذونات؛ Fusion (RRF/Weighted)؛ Reranker مخصص.
+3) **Orchestration / Agents**: تفكيك الاستعلام -> تضييق المصدر -> استرجاع متوازٍ -> Tool calling -> تحقق.
+4) **Generation**: توجيه نموذج (Routing) بين صغير/كبير؛ Grounded generation؛ Streaming JSON جزئي.
+5) **Trust & Governance**: صلاحيات على مستوى الاسترجاع، Masking مسبق، Trace لكل إجابة، تدقيق سمّية.
+
+### مبادئ تصميم حاسمة
+- Hybrid retrieval قاعدة وليست خيارًا.
+- الأمان يبدأ من المسترجع.
+- كاش دلالي متدرج لتقليل LLM cost والكمون.
+- تقييم سيادي مستمر (LLM+بشر) لرصد الانجراف.
+
+---
+
+## 2. Product Requirements Document (ملخص تنفيذي)
+
+### Vision
+تحويل RAG إلى Knowledge Operating System يخدم فرق الهندسة، الدعم، التحليلات، والقيادة.
+
+### Functional Requirements
+- FR1: وصول آمن (RBAC/ABAC، عدم تسرب البيانات).
+- FR2: محرك Hybrid Retrieval مع Reranker قابل للضبط.
+- FR3: Agentic reasoning + Tool/SQL/API.
+- FR4: Latency <800ms p95 مع Streaming تدريجي.
+- FR5: تقييم ومراقبة (Provenance، Hallucination، Cost).
+
+### Non-Functional
+Latency <1s p95 | 10M+ q/day | 99.9% توفر | SOC2/ISO | تتبع كامل لكل إجابة.
+
+### Success Metrics
+Accuracy (LLM+Human) | Recall@K | Hallucination rate | Task completion | Cost/query.
+
+---
+
+## 3. Internal Training Program (Enterprise RAG)
+
+- Level 1: Foundations — لماذا يفشل RAG الساذج؟ حدود البحث المتجهي.
+- Level 2: Retrieval Engineering — Hybrid، Rerankers، datasets، تحليل الأخطاء. (Intercom, Notion)
+- Level 3: Agentic RAG — Planners، tool calling، state machines، retry loops. (Shopify, Intuit)
+- Level 4: GraphRAG — Neo4j، multi-hop reasoning، Work-Graph. (Klarna)
+- Level 5: Production & Governance — أمن، تكلفة، مراقبة، incident response.
+
+---
+
+## الخلاصة التنفيذية
+النظام المطلوب منصة معرفة مؤسسية آمنة. الفروق الحاسمة: صلاحيات في طبقة الاسترجاع، إدخال Agent
+Layer قبل التوليد، اعتماد Hybrid+Reranker دائمًا، تقييم سيادي دوري لكشف الانجراف والهلوسة.
+
+## خطوات عملية تالـية
+1) تضمين بيانات الأذونات (tenant_id, user_roles, scopes) في استعلام الاسترجاع.
+2) دمج Reranker قوي (ModernBERT/ColBERTv2) بنافذة 8K وحد 10 مرشحين.
+3) تنفيذ Agent skeleton: `plan -> retrieve -> tool-call -> validate -> generate`.
+4) تفعيل Streaming JSON جزئي لتقليل الكمون المتراكم.
+5) لوحة مراقبة: latency budget لكل طبقة، hallucination rate، cost/query، cache hit-rate.
+
+---
 ## High-Level Architecture
 
 ```
-┌──────────────┐
-│  User Query  │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────────────────────────────┐
-│       API Gateway + Load Balancer    │
-│      (NGINX / AWS ALB / Kong)        │
-└──────┬───────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────────┐
-│    Query Processing Service (FastAPI)│
-│  - Query understanding                │
-│  - Intent classification              │
-│  - Query expansion (HyDE, Multi-Query)│
-└──────┬───────────────────────────────┘
-       │
-       ├─────────────┬─────────────┐
-       ▼             ▼             ▼
-┌─────────┐   ┌──────────┐  ┌──────────┐
-│ Hybrid  │   │ Semantic │  │   BM25   │
-│Retrieval│   │  Search  │  │  Search  │
-│(Fusion) │   │(Vector DB│  │(Elastic) │
-└────┬────┘   └────┬─────┘  └────┬─────┘
-     │             │              │
-     └─────────────┴──────────────┘
-                   │
-                   ▼
-        ┌──────────────────┐
-        │   Re-ranking     │
-        │  (Cross-Encoder) │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │  LLM Generation  │
-        │  (GPT-4 / Llama) │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │  Response + Cite │
-        └──────────────────┘
++-------------+
+|  User Query |
++-------------+
+      |
+      v
++-------------------------------+
+| API Gateway / Load Balancer   |
+| (NGINX / AWS ALB / Kong)      |
++---------------+---------------+
+                |
+                v
++-------------------------------+
+| Query Processing (FastAPI)    |
+| - intent / parsing / expand   |
++-------+-----------+-----------+
+        |           |
+        v           v
+  +-----------+   +------------------+
+  | Semantic  |   | Keyword / BM25   |
+  | Vector DB |   | (Elastic/OpenSrch)|
+  +-----+-----+   +---------+--------+
+        \\             //
+         v           v
+     +--------------------+
+     |  Fusion (RRF/Rank) |
+     +---------+----------+
+               |
+               v
+     +--------------------+
+     |   Reranker         |
+     | (Cross-Encoder)    |
+     +---------+----------+
+               |
+               v
+     +--------------------+
+     |  LLM Generation    |
+     | (GPT-4 / Llama)    |
+     +---------+----------+
+               |
+               v
+     +--------------------+
+     | Response + Cite    |
+     +--------------------+
 ```
 
 ---
@@ -218,21 +342,20 @@ class Reranker:
 **Multi-Level Caching**:
 
 ```
-┌─────────────────┐
-│ L1: In-Memory   │  (LRU, 1000 queries, ~5ms hit)
-│    (Redis)      │
-└────────┬────────┘
-         │ Miss
-         ▼
-┌─────────────────┐
-│ L2: Semantic    │  (Embedding similarity, 10ms)
-│    Cache        │
-└────────┬────────┘
-         │ Miss
-         ▼
-┌─────────────────┐
-│ L3: Vector DB   │  (Full retrieval, 100-200ms)
-└─────────────────┘
++---------------------------+
+| L1: In-Memory (Redis)     | ~5ms, LRU, ~1000 queries
++---------------------------+
+            miss
+             v
++---------------------------+
+| L2: Semantic Cache        | ~10ms similarity
++---------------------------+
+            miss
+             v
++---------------------------+
+| L3: Vector DB             | 100-200ms full retrieval
++---------------------------+
+```
 ```
 
 **Implementation**:
@@ -272,23 +395,13 @@ class SemanticCache:
 | BM25 search | 50ms | Elasticsearch |
 | Re-ranking | 70ms | Cross-encoder (10 docs) |
 | LLM generation | 250ms | GPT-4 Turbo /claude-instant |
-| **Total** | **460ms** | Within target ✓ |
+| **Total** | **460ms** | Within target |
 
-**Horizontal Scaling**:
-```
-Load Balancer
-      │
-      ├─► API Pod 1 ────┐
-      ├─► API Pod 2 ────┤
-      ├─► API Pod 3 ────┼──► Vector DB Cluster (3 shards, 2 replicas)
-      ├─► API Pod 4 ────┤
-      └─► API Pod 5 ────┘
-```
-
-**Capacity Planning** (1000 QPS):
-- **API Pods**: 5 pods @ 200 QPS each
-- **Vector DB**: 3 shards @ 333 QPS each
-- **Elasticsearch**: 3 nodes @ 333 QPS each
+**Horizontal Scaling (text view):**
+- Load balancer in front of API pods.
+- 5× API pods, each ~200 QPS.
+- Vector DB cluster: 3 shards, 2 replicas.
+- Elasticsearch: 3 nodes (~333 QPS each).
 
 ---
 
@@ -321,7 +434,7 @@ COST_PER_QUERY = Counter('rag_cost_per_query_usd', ...)
 |-----------|------|-------|
 | Qdrant (self-hosted) | $300 | 3x c5.2xlarge EC2 |
 | Elasticsearch | $400 | 3x r5.large |
-| LLM API (GPT-4 Turbo) | $5000 | 1000 QPS × 250 tokens × $0.01/1K |
+| LLM API (GPT-4 Turbo) | $5000 | 1000 QPS x 250 tokens x $0.01/1K |
 | Redis Cache | $50 | ElastiCache |
 | Data Transfer | $100 | Egress |
 | **Total** | **~$5,850/month** | |
@@ -353,7 +466,7 @@ COST_PER_QUERY = Counter('rag_cost_per_query_usd', ...)
    - TTL on cache entries
 
 2. **What if latency exceeds 500ms?**
-   - Reduce re-ranking candidates (10 → 5)
+   - Reduce re-ranking candidates (10 -> 5)
    - Switch to faster LLM (GPT-3.5 / claude-instant)
    - Pre-compute query embeddings for common patterns
 
@@ -378,7 +491,7 @@ This design handles 1M documents at 1000 QPS with <500ms p95 latency by:
 - **Smart cost optimization** (quantization, open-source LLMs)
 
 **Production-ready checklist**:
-- ✅ Handles 10x traffic spike (autoscaling)
-- ✅ Fault-tolerant (replicas, health checks)
-- ✅ Observable (metrics, logs, traces)
-- ✅ Cost-effective (<$6K/month)
+- [OK] Handles 10x traffic spike (autoscaling)
+- [OK] Fault-tolerant (replicas, health checks)
+- [OK] Observable (metrics, logs, traces)
+- [OK] Cost-effective (<$6K/month)
