@@ -266,6 +266,252 @@ model.add(Activation('sigmoid'))
 
 ---
 
+## Case Study 7: Uber Eats GNN Recommendations
+
+### Problem
+Marketplace recommendations optimized for clicks, not repeat orders; cold-start pain for new
+restaurants.
+
+### Solution
+- User-restaurant bipartite graph with weighted edges (order counts).
+- GraphSAGE embeddings feed a two-tower ranker with low-rank-positive hinge loss to favor frequent
+  orders.
+- Cold-start handled by demographics + content fallback; daily mini-batch retrains.
+
+**Architecture (text):**
+```
+Orders/menus -> Graph builder -> GraphSAGE embeddings -> Two-tower ranker
+                           -> Low-rank positive loss -> Ranked restaurants API
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Order Conversion Rate | 12.3% | 15.7% |
+| Repeat Order Rate | 34% | 41% |
+| New Restaurant Discovery | 8% | 14% |
+| Rec Latency (p95) | 45ms | 38ms |
+
+More: `case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md`.  
+System design: `docs/system_design_solutions/02_recommendation_system.md`.
+
+---
+
+## Case Study 8: Notion AI Enterprise RAG
+
+### Problem
+Answer questions over millions of tenant workspaces with low hallucination and controlled cost.
+
+### Solution
+- Hierarchical semantic chunking preserves page structure.
+- Hybrid retrieval (vector + BM25) with RRF fusion and reranker.
+- Model router sends 80% of traffic to cheaper models; LLM-as-judge scores outputs.
+
+**Architecture (text):**
+```
+Workspace pages -> Semantic chunker -> Hybrid retrieval + rerank -> Model router
+                           -> LLM generation -> LLM-as-judge -> Answer with cites
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Answer Accuracy | 72% | 89% |
+| Hallucination Rate | 15% | 4% |
+| Avg Cost/Query | $0.018 | $0.007 |
+| P95 Latency | 3.2s | 1.8s |
+| User Satisfaction | 3.6/5 | 4.4/5 |
+
+More: `case_studies/full_stack_ai/02_notion_ai_rag_architecture.md`.  
+System design: `docs/system_design_solutions/01_rag_at_scale.md`.
+
+---
+
+## Case Study 9: Streaming Platform Recommender
+
+### Problem
+Homepage failed to personalize; 45% of users never watched beyond first screen.
+
+### Solution
+- Hybrid three-stage pipeline: candidate gen (ALS + popularity + content), feature enrichment, deep
+  re-rank.
+- Nightly pre-compute per-user candidates (Redis/Cassandra) for sub-400ms latency.
+- Diversity post-processing and Thompson-sampling bandits for exploration.
+
+**Architecture (text):**
+```
+Events -> Offline training (ALS + BERT + two-tower) -> Precomputed candidates store
+API -> Fetch candidates -> Feature enrich -> Neural rerank -> Diversity -> Top-20
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| CTR | 18.2% | 24.1% |
+| Watch Time (hr/user/week) | 8.4 | 11.1 |
+| 7-Day Retention | 68% | 73% |
+| Rec Latency (p95) | 400ms | 227ms |
+| Revenue Impact | - | ~$17M/year |
+
+More: `case_studies/03_recommender_system.md`.  
+System design: `docs/system_design_solutions/02_recommendation_system.md`.
+
+---
+
+## Case Study 10: Legal Document RAG
+
+### Problem
+Contract analysis needed strict citation, low hallucination, and sub-2s latency for lawyers.
+
+### Solution
+- White-box RAG with dense + BM25 hybrid search, FAISS vector store, Postgres metadata, Redis cache.
+- Cross-encoder reranker, citation-aware prompts, and validator to block low-confidence answers.
+- PII filter, audit logging, and document versioning for compliance.
+
+**Architecture (text):**
+```
+PDF/DOCX -> Chunker -> Embeddings (FAISS) + Metadata (Postgres)
+Query -> Redis cache -> Hybrid search (dense + BM25) -> Rerank -> Prompt builder
+LLM -> Validator -> Response with citations
+```
+
+**Results/Targets:**
+| Metric | Target |
+|--------|--------|
+| Retrieval Latency | < 100 ms |
+| End-to-End Latency | < 2 s |
+| Recall@10 | > 85% |
+| Answer Accuracy | > 90% |
+
+More: `case_studies/legal_document_rag_system/architecture.md`.  
+System design: `docs/system_design_solutions/01_rag_at_scale.md`.
+
+---
+
+## Case Study 11: Medical Diagnosis Agent
+
+### Problem
+Provide differential diagnoses with strong safety, PII protection, and uncertainty disclosure.
+
+### Solution
+- Safety layer (PII scrubber, consent check, input validator) before processing.
+- Symptom extractor feeds chain-of-thought reasoning and evidence-scored differential list.
+- Validation layer adds calibrated confidence, contraindication checks, and escalation when risk is
+  high.
+
+**Architecture (text):**
+```
+Patient input -> PII filter -> Validation -> Symptom extractor -> History + KB
+-> Chain-of-thought -> Differential ranking -> Confidence + contraindication checks
+-> Response + audit log; escalate if uncertainty high
+```
+
+**Safety Guarantees:**
+| Control | Behavior |
+|---------|----------|
+| No direct diagnosis | Always recommends clinician follow-up |
+| Uncertainty bounds | Returns confidence and rationale |
+| Auditability | Logs every interaction |
+| Escalation | Auto-escalates high-risk patterns |
+
+More: `case_studies/medical_diagnosis_agent/architecture.md`.  
+System design: `docs/system_design_solutions/04_ml_model_serving.md`.
+
+---
+
+## Case Study 12: Supply Chain Optimization
+
+### Problem
+Cut transportation, inventory, and delivery costs while improving on-time performance.
+
+### Solution
+- Linear programming for inventory and lane allocation; MILP for delivery scheduling.
+- DeepAR-style demand forecasting to size inventory buffers with uncertainty.
+- Hybrid OR + ML loop refreshed nightly from warehouse telemetry.
+
+**Architecture (text):**
+```
+Orders/demand -> Forecasting (DeepAR) -> LP allocation -> MILP scheduling
+-> Execution systems (TMS/WMS) -> Metrics and retraining
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Delivery Cost (per pkg) | $2.50 | $1.80 |
+| Inventory Waste | 8% | 3% |
+| On-time Delivery | 89% | 97% |
+| Route Efficiency | - | +25% |
+
+More: `case_studies/supply_chain_optimization/README.md`.
+
+---
+
+## Case Study 13: Retail Time-Series Forecasting
+
+### Problem
+Forecast daily sales per store with seasonality, promotions, and holidays; need 7-day horizon and
+CIs.
+
+### Solution
+- Benchmarked ARIMA, Prophet, and LSTM; LSTM with exogenous features won.
+- Feature set includes weekend, holiday, promotion flags; MAPE monitoring and anomaly alerts.
+- FastAPI service returns forecast plus confidence interval per store.
+
+**Architecture (text):**
+```
+Sales events -> Feature builder -> Model zoo (ARIMA, Prophet, LSTM)
+-> Champion (LSTM) -> FastAPI /forecast -> CI + anomaly flagging
+```
+
+**Results:**
+| Model | MAPE |
+|-------|------|
+| ARIMA | ~8.5% |
+| Prophet | ~7.8% |
+| LSTM | ~6.2% (selected) |
+
+More: `case_studies/time_series_forecasting/README.md`.  
+System design: `docs/system_design_solutions/04_ml_model_serving.md`.
+
+---
+
+## Case Study 14: Experimentation Platform for a Global Marketplace
+
+### Problem
+120+ concurrent experiments ran across web/iOS/Android with inconsistent assignments, slow metrics
+(3-5 days), and misconfigured tests that hurt revenue.
+
+### Solution
+- Centralized experimentation platform with consistent hashing, config-driven enrollment, and cached
+  SDKs.
+- Guardrails, sequential tests (SPRT), and bandits for long-tail optimizations; kill-switches
+  broadcast to clients.
+- Near-real-time metrics via Kafka -> Flink -> Druid with 5-minute guardrail windows.
+
+**Architecture (text):**
+```
+Clients -> Assignment SDK (hash + cache + kill-switch)
+        -> Experiment Config Service (Redis + Postgres + CDN snapshots)
+Events -> Kafka -> Stream Processor -> Metrics Store -> Stats Engine -> Alerts/Kill-switch
+Control plane: Admin UI -> Config API -> Postgres -> Redis
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Assignment p95 | ~22 ms | 4.3 ms |
+| Metrics freshness | Nightly batch | 12-15 minutes |
+| Exposure loss | ~1.2% | 0.08% |
+| Incidents from bad splits | 3 / month | <1 / quarter |
+| Time-to-decision | 3-5 days | Same day (p50 6h) |
+| GMV impact | - | +1.8% weekly lift |
+
+More: `case_studies/04_ab_testing_platform.md`.  
+System design: `docs/system_design_solutions/07_experimentation_platform.md`.
+
+---
+
 ## Lessons Learned
 
 ### 1. Start Simple
