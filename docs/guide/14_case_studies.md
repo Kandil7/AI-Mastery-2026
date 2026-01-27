@@ -4,19 +4,49 @@ Real-world applications built with the AI-Mastery-2026 toolkit.
 
 ---
 
-## Case Study 1: E-Commerce Product Classifier
+## Case Study 1: Churn Prediction for B2B SaaS
 
 ### Problem
-An e-commerce platform needed to automatically categorize 500K+ products into 150 categories from product descriptions and images.
+12k-customer SaaS product with 15% monthly churn (~$2M annual revenue loss).
+
+### Solution
+- ML churn predictor (47 behavioral features) flags at-risk customers 30 days ahead.
+- Dual-path serving: daily batch scoring for all tenants plus FastAPI low-latency endpoint.
+- Interventions via Salesforce tasks and templated emails; governed by data contracts and GE checks.
+
+**Architecture (text):**
+```
+Usage/Billing/Support -> Airflow + Great Expectations -> Feature Store (Redis + Parquet)
+Feature Store -> Batch Scoring -> Warehouse/S3 -> Salesforce + Email
+Feature Store + Model -> FastAPI Scoring -> Salesforce + CS Dashboard
+```
+
+**Results:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Monthly Churn | 15% | 9% |
+| Recall @0.35 | - | 79% |
+| Precision @0.35 | - | 73% |
+| Revenue Impact | - | ~$800K retained annually |
+
+More: `case_studies/01_churn_prediction.md`.
+System design: `docs/system_design_solutions/06_churn_prediction.md`.
+
+---
+
+## Case Study 2: E-Commerce Product Classifier
+
+### Problem
+Categorize 500K+ products into 150 categories from descriptions and images.
 
 ### Solution
 
 **Architecture:**
 ```
-User Upload → API → Text Embedding → Classification → Category Assignment
-                 ↓
-              Image → CNN → Feature Extraction
-                        ↓
+User Upload -> API -> Text Embedding -> Classification -> Category Assignment
+                 |
+              Image -> CNN -> Feature Extraction
+                        |
                     Ensemble Model
 ```
 
@@ -46,21 +76,21 @@ ensemble = RandomForestScratch(n_estimators=100)
 
 ---
 
-## Case Study 2: Customer Support Chatbot with RAG
+## Case Study 3: Customer Support Chatbot with RAG
 
 ### Problem
-Tech company receiving 10K+ support tickets/day needed intelligent routing and automated responses.
+Tech company with 10K+ tickets/day needed intelligent routing and auto responses.
 
 ### Solution
 
 **Architecture:**
 ```
-Customer Query → RAG → Retrieve Docs → Generate Response
-                                    ↓
+Customer Query -> RAG -> Retrieve Docs -> Generate Response
+                                    |
                               Confidence Check
-                                    ↓
-                        High → Auto-respond
-                        Low  → Route to Human
+                                    |
+                        High -> Auto-respond
+                        Low  -> Route to Human
 ```
 
 **Implementation:**
@@ -96,19 +126,19 @@ def handle_ticket(query):
 
 ---
 
-## Case Study 3: Fraud Detection System
+## Case Study 4: Fraud Detection System
 
 ### Problem
-Financial services company needed real-time fraud detection for credit card transactions.
+Real-time fraud detection for credit card transactions.
 
 ### Solution
 
 **Architecture:**
 ```
-Transaction → Feature Engineering → SVM Classifier → Risk Score
-                                         ↓
+Transaction -> Feature Engineering -> SVM Classifier -> Risk Score
+                                         |
                                    Threshold Check
-                                         ↓
+                                         |
                                Approve / Flag / Block
 ```
 
@@ -147,7 +177,7 @@ async def score_transaction(tx: Transaction):
 
 ---
 
-## Case Study 4: Document Intelligence Pipeline
+## Case Study 5: Document Intelligence Pipeline
 
 ### Problem
 Legal firm needed to extract structured information from thousands of contracts.
@@ -156,10 +186,10 @@ Legal firm needed to extract structured information from thousands of contracts.
 
 **Architecture:**
 ```
-PDF Upload → Text Extraction → NER → Entity Linking → Structured Output
-                                ↓
+PDF Upload -> Text Extraction -> NER -> Entity Linking -> Structured Output
+                                |
                          Attention-based Classifier
-                                ↓
+                                |
                           Contract Type Detection
 ```
 
@@ -197,17 +227,17 @@ class DocumentClassifier(NeuralNetwork):
 
 ---
 
-## Case Study 5: Predictive Maintenance
+## Case Study 6: Predictive Maintenance
 
 ### Problem
-Manufacturing company needed to predict equipment failures before they occur.
+Predict equipment failures before they occur.
 
 ### Solution
 
 **Architecture:**
 ```
-Sensor Data → Time Series DB → Feature Extraction → LSTM Model → Failure Prediction
-                                                          ↓
+Sensor Data -> Time Series DB -> Feature Extraction -> LSTM Model -> Failure Prediction
+                                                          |
                                                    Maintenance Alert
 ```
 
@@ -239,7 +269,7 @@ model.add(Activation('sigmoid'))
 ## Lessons Learned
 
 ### 1. Start Simple
-Begin with classical ML (SVM, Random Forest) before jumping to deep learning. Often simpler models are sufficient.
+Start with classical ML (SVM, RF) before deep learning; simpler often suffices.
 
 ### 2. Data Quality > Model Complexity
 Investing in data cleaning and feature engineering provides better ROI than complex architectures.

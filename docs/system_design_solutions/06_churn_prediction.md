@@ -102,4 +102,4 @@ Response 200
 
 ## Links
 - Case study narrative: `case_studies/01_churn_prediction.md`
-- Architecture diagram: `docs/architecture_diagrams/system_overview.md` (extend with churn view).
+- Architecture diagram: `docs/architecture_diagrams/churn_prediction.md`.
