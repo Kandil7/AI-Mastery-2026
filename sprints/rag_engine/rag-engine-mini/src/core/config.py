@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # =========================================================================
     # LLM Provider / مزود نموذج اللغة
     # =========================================================================
-    llm_backend: Literal["openai", "ollama"] = Field(default="openai")
+    llm_backend: Literal["openai", "ollama", "gemini", "huggingface"] = Field(default="openai")
     
     # OpenAI
     openai_api_key: str | None = Field(default=None)
@@ -95,6 +95,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434")
     ollama_chat_model: str = Field(default="llama3.1")
     ollama_embed_model: str = Field(default="nomic-embed-text")
+
+    # Gemini
+    gemini_api_key: str | None = Field(default=None)
+    gemini_model: str = Field(default="gemini-1.5-flash")
+
+    # Hugging Face
+    hf_api_key: str | None = Field(default=None)
+    hf_model: str = Field(default="mistralai/Mistral-7B-Instruct-v0.2")
+    hf_use_inference_api: bool = Field(default=True)
     
     # =========================================================================
     # Reranking / إعادة الترتيب

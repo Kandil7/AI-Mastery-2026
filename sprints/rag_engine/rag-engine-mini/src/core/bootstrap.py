@@ -74,6 +74,18 @@ def get_container() -> dict:
             base_url=settings.ollama_base_url,
             model=settings.ollama_chat_model,
         )
+    elif settings.llm_backend == "gemini":
+        from src.adapters.llm.gemini_llm import GeminiLLM
+        llm = GeminiLLM(
+            api_key=settings.gemini_api_key or "",
+            model_name=settings.gemini_model,
+        )
+    elif settings.llm_backend == "huggingface":
+        from src.adapters.llm.huggingface_llm import HuggingFaceLLM
+        llm = HuggingFaceLLM(
+            api_key=settings.hf_api_key or "",
+            model_name=settings.hf_model,
+        )
     else:
         llm = OpenAILLM(
             api_key=settings.openai_api_key or "",

@@ -151,7 +151,7 @@ LOCAL_EMBED_DEVICE=cuda
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `LLM_BACKEND` | enum | `openai` | Backend: `openai`, `ollama` |
+| `LLM_BACKEND` | enum | `openai` | Backend: `openai`, `ollama`, `gemini`, `huggingface` |
 
 #### OpenAI
 
@@ -182,6 +182,35 @@ OPENAI_TEMPERATURE=0.2
 LLM_BACKEND=ollama
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=llama3.1
+```
+
+#### Gemini
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `GEMINI_API_KEY` | str | null | **Required** for Gemini |
+| `GEMINI_MODEL` | str | `gemini-1.5-flash` | Chat model |
+
+**Example:**
+```env
+LLM_BACKEND=gemini
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+#### Hugging Face
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `HF_API_KEY` | str | null | **Required** for HF API |
+| `HF_MODEL` | str | `mistralai/Mistral-7B-Instruct-v0.2` | Model ID |
+| `HF_USE_INFERENCE_API` | bool | `true` | Use Hugging Face Inference API |
+
+**Example:**
+```env
+LLM_BACKEND=huggingface
+HF_API_KEY=your_key_here
+HF_MODEL=mistralai/Mistral-7B-Instruct-v0.2
 ```
 
 ---

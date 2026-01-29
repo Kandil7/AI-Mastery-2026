@@ -7,6 +7,7 @@ RAG with hybrid search (vector + keyword) and reranking.
 """
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from src.application.ports.chunk_text_reader import ChunkTextReaderPort
 from src.application.ports.keyword_store import KeywordStorePort

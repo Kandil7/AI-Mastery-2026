@@ -66,6 +66,10 @@ dependencies = [
     "aiofiles>=23.2.1",
     "httpx>=0.26.0",
     "gradio>=4.20.0",
+    
+    # LLM Extensions
+    "google-generativeai>=0.4.0",
+    "huggingface-hub>=0.20.0",
 ]
 
 [project.optional-dependencies]
