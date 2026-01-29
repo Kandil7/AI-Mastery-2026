@@ -1,0 +1,197 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-engine-mini"
+version = "0.1.0"
+description = "Production-Ready RAG Starter Template with Hybrid Search and Reranking"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "AI-Mastery-2026", email = "dev@example.com" }
+]
+keywords = ["rag", "retrieval", "llm", "fastapi", "vector-search", "hybrid-search"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    
+    # Configuration & Validation
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    
+    # Database
+    "sqlalchemy>=2.0.25",
+    "psycopg[binary]>=3.1.17",
+    "alembic>=1.13.1",
+    
+    # Vector Store
+    "qdrant-client>=1.7.0",
+    
+    # LLM & Embeddings
+    "openai>=1.10.0",
+    "tiktoken>=0.5.2",
+    
+    # Reranking
+    "sentence-transformers>=2.3.0",
+    
+    # Document Processing
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    
+    # Async & Background Tasks
+    "celery>=5.3.6",
+    "redis>=5.0.1",
+    
+    # Logging & Observability
+    "structlog>=24.1.0",
+    
+    # Utilities
+    "aiofiles>=23.2.1",
+    "httpx>=0.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "httpx>=0.26.0",  # For TestClient
+    
+    # Code Quality
+    "ruff>=0.2.0",
+    "mypy>=1.8.0",
+    "black>=24.1.0",
+    "isort>=5.13.0",
+    
+    # Types
+    "types-redis>=4.6.0",
+    "types-aiofiles>=23.2.0",
+]
+
+local = [
+    # Local LLM support
+    "ollama>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/rag-engine-mini"
+Documentation = "https://github.com/your-org/rag-engine-mini#readme"
+Repository = "https://github.com/your-org/rag-engine-mini"
+
+[project.scripts]
+rag-engine = "src.main:main"
+
+# =============================================================================
+# Tool Configurations
+# =============================================================================
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | __pycache__
+    | migrations
+    | \.mypy_cache
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "migrations"]
+known_first_party = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".venv",
+    "migrations",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    "migrations/",
+    ".venv/",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "qdrant_client.*",
+    "sentence_transformers.*",
+    "docx.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/migrations/*",
+    "*/__pycache__/*",
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
