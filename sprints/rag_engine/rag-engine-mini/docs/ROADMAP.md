@@ -65,6 +65,11 @@
 *   **Milestone**: Run `14_multi_agent_swarm_orchestration.ipynb`. Observe collaborative reasoning in action. [COMPLETED ✅]
 *   **Study**: [Multi-Agent Swarms](./docs/deep-dives/multi-agent-swarms.md).
 
+## 🛡️ Level 13: The Shield Architect (The Final Fortress)
+*   **Concepts**: Red Teaming, Indirect Prompt Injection, Output Guardrails.
+*   **Milestone**: Run `15_adversarial_ai_red_teaming.ipynb`. Successfully block a malicious prompt injection. [COMPLETED ✅]
+*   **Study**: [Adversarial RAG Security](./docs/deep-dives/adversarial-rag-security.md).
+
 ## 🚀 Post-Completion: The Future (Next Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
