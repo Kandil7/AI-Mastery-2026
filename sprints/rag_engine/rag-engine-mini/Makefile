@@ -164,8 +164,8 @@ docker-down:
 
 ## 🚀 Production Deployment
 prod-check:
-	@echo "🔍 Running production readiness audit..."
-	PYTHONPATH=. python scripts/check_prod_readiness.py
+	@echo "🔍 Running production readiness audit (Inside Container)..."
+	docker compose -f docker/docker-compose.prod.yml run --rm api python scripts/check_prod_readiness.py
 
 prod-up:
 	@echo "🚀 Deploying Production Stack..."

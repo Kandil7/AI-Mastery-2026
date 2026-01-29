@@ -27,6 +27,7 @@ For those who want to understand the "Why" behind the architecture:
 - [**Multi-Modal & Tables (Stage 4)**](deep-dives/stage-4-multimodal.md): Tables-to-Markdown and Image Vision.
 - [**Autonomous Agent (Stage 5)**](deep-dives/stage-5-autonomy.md): Routing, Web-Search and Privacy.
 - [**Privacy & Compliance**](deep-dives/privacy-and-compliance.md): PII Redaction and Security.
+- [**Production Readiness**](deployment.md#production-readiness-audit): Infrastructure, Health Checks, and Hardening.
 - [**LLM Provider Strategy & Adapters**](./notebooks/08_llm_provider_strategy.ipynb): Adapters for different LLM services.
 - [**Semantic Chunking**](./notebooks/09_semantic_chunking.ipynb): High-precision embedding-based splitting.
 - [**Vector Visualization**](./notebooks/10_vector_visualization.ipynb): 3D semantic cluster visualization (PCA).

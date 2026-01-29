@@ -182,6 +182,13 @@ volumes:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+### Production Readiness Audit
+Before deploying, run the containerized auditor to verify all connectivity and secrets:
+```bash
+make prod-check
+```
+This ensures the API can reach Postgres, Redis, and Qdrant within the Docker network.
+
 ---
 
 ## Kubernetes Deployment

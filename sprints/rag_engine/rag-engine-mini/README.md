@@ -27,13 +27,15 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 | Challenge | Our Solution |
 |-----------|--------------|
 | **Recall issues** | Hybrid search (Vector + Keyword FTS) + **Query Expansion** |
-| **Precision problems** | Cross-Encoder reranking |
-| **Cost control** | Batch embeddings + Redis caching |
+| **Precision problems** | Cross-Encoder reranking + **Self-Corrective RAG** |
+| **Complex Reasoning** | **Agentic RAG (ReAct)** + **Graph-Enhanced Retrieval** |
+| **Cost control** | Batch embeddings + Redis caching + **Semantic Router** |
 | **Data isolation** | Multi-tenant by design |
 | **Duplicate processing** | File hash idempotency + chunk dedup |
-| **Vendor lock-in** | Ports & Adapters pattern |
+| **Vendor lock-in** | **Multi-LLM Adapters** (OpenAI, Gemini, HF, Ollama) |
 | **Scalability** | Async indexing with Celery |
 | **Visibility** | **Prometheus Metrics** + **Gradio Demo UI** |
+| **Data Quality** | **Synthetic Data Generator (Flywheel)** |
 
 ---
 
@@ -48,13 +50,15 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 | التحدي | حلّنا |
 |--------|-------|
 | **مشاكل الاستدعاء** | بحث هجين + **توسيع الاستعلام (Query Expansion)** |
-| **مشاكل الدقة** | إعادة ترتيب بـ Cross-Encoder |
-| **التحكم بالتكلفة** | تضمين دفعي + تخزين Redis مؤقت |
+| **مشاكل الدقة** | إعادة ترتيب + **التصحيح الذاتي (Self-Corrective RAG)** |
+| **الاستنتاج المعقد** | **الوكيل الذكي (Agentic RAG)** + **استرجاع معزز بالرسوم البيانية** |
+| **التحكم بالتكلفة** | تضمين دفعي + تخزين Redis + **المُوجّه الدلالي (Semantic Router)** |
 | **عزل البيانات** | تصميم متعدد المستأجرين |
 | **المعالجة المكررة** | تجزئة الملفات + إزالة تكرار القطع |
-| **الارتباط بمزود** | نمط المنافذ والمحولات |
+| **الارتباط بمزود** | **محولات متعددة** (OpenAI, Gemini, HF, Ollama) |
 | **قابلة التوسع** | فهرسة غير متزامنة مع Celery |
 | **الرؤية والمراقبة** | **مقاييس Prometheus** + **واجهة تجريبية Gradio** |
+| **جودة البيانات** | **مولد البيانات الاصطناعية (Flywheel)** |
 
 ---
 
@@ -85,6 +89,10 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 🎯 Cross-Encoder Reranking
     ↓
 💬 LLM Answer Generation
+    ↓
+💡 Self-Critique & Corrective Loop (Optional)
+    ↓
+🤖 Agentic Tool Use (Search/Graph)
 ```
 
 ### Production Features / مميزات الإنتاج
@@ -99,7 +107,8 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 | 🎨 **Demo UI** | Built-in Gradio frontend for testing | واجهة Gradio تجريبية للاختبار |
 | 🧪 **Eval Script** | RAGAS & Retrieval quality evaluation | سكربت تقييم جودة الاسترجاع |
 | 🎓 **Mastery Journey** | **[10-Level AI Engineering Course](./docs/MASTERY_JOURNEY.md)** | **دورة هندسة الذكاء الاصطناعي الكاملة** |
-| 🔄 **Query Expansion** | Multi-query generation for better recall | توليد استعلامات متعددة لاستدعاء أفضل |
+| 🔄 **Data Flywheel** | **[Synthetic Data Generation](./scripts/generate_synthetic_testset.py)** | **توليد البيانات الاصطناعية لتقييم النظام** |
+| 🚀 **Prod Ready** | **[Hardened Infrastructure & Audit](./docs/deployment.md)** | **بنية تحتية قوية وأداة فحص الجاهزية** |
 
 ---
 
