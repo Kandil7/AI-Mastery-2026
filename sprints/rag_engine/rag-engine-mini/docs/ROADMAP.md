@@ -55,7 +55,12 @@
 *   **Milestone**: Run `12_synthetic_data_flywheel.ipynb`. Generate 50 test cases autonomously. [COMPLETED ✅]
 *   **Study**: [Synthetic Data Engineering](./docs/deep-dives/synthetic-data-engineering.md).
 
-## 🚀 Post-Completion: The Future (Final Boss and Beyond)
+## 👑 Level 11: The Grand Finale (Agentic GraphRAG)
+*   **Concepts**: Global Reasoning, Entity-Relation Extraction, Graph Traversal Agents.
+*   **Milestone**: Run `13_agentic_graph_rag_mastery.ipynb`. Discover non-obvious paths in the Knowledge Graph. [COMPLETED ✅]
+*   **Study**: [Agentic GraphRAG](./docs/deep-dives/agentic-graph-rag.md).
+
+## 🚀 Post-Completion: The Future (Next Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
 *   **Privacy Layer**: Integrated Zero-Knowledge proofs for data.
