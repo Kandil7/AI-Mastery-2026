@@ -26,6 +26,12 @@ For those who want to understand the "Why" behind the architecture:
 - [**Intelligence & Graph (Stage 3)**](deep-dives/stage-3-intelligence.md): Self-Corrective RAG and Knowledge Graphs.
 - [**Scaling RAG Pipes**](deep-dives/scaling-rag-pipelines.md): Async workers, Caching, and Redis.
 - [**LLM-as-a-Judge**](deep-dives/llm-as-a-judge.md): Verification and Grounding.
+- [**Common RAG Pitfalls**](deep-dives/common-rag-pitfalls.md): Troubleshooting common failures.
+
+## 🎓 Visuals & Notebooks
+
+- [**Visual Guide**](./VISUAL_GUIDE.md): Flowcharts of Architecture and Data.
+- [**Notebooks Index**](../notebooks/): Step-by-step interactive tutorials.
 
 ## 📖 Global Resources
 
