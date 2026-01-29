@@ -67,17 +67,31 @@ def get_container() -> dict:
     # LLM & Embeddings
     # =========================================================================
     
-    # LLM
-    llm = OpenAILLM(
-        api_key=settings.openai_api_key or "",
-        model=settings.openai_chat_model,
-    )
+    # LLM Choice
+    if settings.llm_backend == "ollama":
+        from src.adapters.llm.ollama_llm import OllamaLLM
+        llm = OllamaLLM(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_chat_model,
+        )
+    else:
+        llm = OpenAILLM(
+            api_key=settings.openai_api_key or "",
+            model=settings.openai_chat_model,
+        )
     
-    # Embeddings
-    embeddings = OpenAIEmbeddings(
-        api_key=settings.openai_api_key or "",
-        model=settings.openai_embed_model,
-    )
+    # Embeddings Choice
+    if settings.embeddings_backend == "local":
+        from src.adapters.embeddings.local_embeddings import LocalEmbeddings
+        embeddings = LocalEmbeddings(
+            model_name=settings.local_embed_model,
+            device=settings.local_embed_device,
+        )
+    else:
+        embeddings = OpenAIEmbeddings(
+            api_key=settings.openai_api_key or "",
+            model=settings.openai_embed_model,
+        )
     
     # Cached embeddings wrapper
     cached_embeddings = CachedEmbeddings(
@@ -110,6 +124,9 @@ def get_container() -> dict:
             model_name=settings.cross_encoder_model,
             device=settings.cross_encoder_device,
         )
+    elif settings.rerank_backend == "llm":
+        from src.adapters.rerank.llm_reranker import LLMReranker
+        reranker = LLMReranker(llm=llm)
     else:
         reranker = NoopReranker()
     
@@ -117,16 +134,14 @@ def get_container() -> dict:
     # Database repositories
     # =========================================================================
     
-    import os
-    use_real_db = os.environ.get("USE_REAL_DB", "false").lower() == "true"
-    
-    if use_real_db:
+    if settings.use_real_db:
         # Production: Use real Postgres implementations
         from src.adapters.persistence.postgres import (
             PostgresDocumentRepo,
             PostgresChunkDedupRepo,
             PostgresChunkTextReader,
             PostgresKeywordStore,
+            PostgresChatRepo,
         )
         
         document_repo = PostgresDocumentRepo()
@@ -135,6 +150,8 @@ def get_container() -> dict:
         chunk_dedup_repo = PostgresChunkDedupRepo()
         chunk_text_reader = PostgresChunkTextReader()
         keyword_store = PostgresKeywordStore()
+        chat_repo = PostgresChatRepo()
+        graph_repo = PostgresGraphRepo()
     else:
         # Development: Use in-memory placeholder implementations
         from src.adapters.persistence.placeholder import (
@@ -152,6 +169,22 @@ def get_container() -> dict:
         chunk_dedup_repo = PlaceholderChunkDedupRepo()
         chunk_text_reader = PlaceholderChunkTextReader()
         keyword_store = PlaceholderKeywordStore()
+        # Chat repo placeholder (inline for now)
+        from src.adapters.persistence.postgres.repo_chat import PostgresChatRepo
+        chat_repo = PostgresChatRepo()  # Still Postgres based but can be mocked
+        graph_repo = PostgresGraphRepo() # Reusing real for now as placeholders are complex
+    
+    # Query Expansion
+    from src.application.services.query_expansion import QueryExpansionService
+    query_expansion_service = QueryExpansionService(llm=llm)
+    
+    # Self Critique & Self-RAG
+    from src.application.services.self_critique import SelfCritiqueService
+    self_critique_service = SelfCritiqueService(llm=llm)
+
+    # Graph Extraction (Stage 3)
+    from src.application.services.graph_extractor import GraphExtractorService
+    graph_extractor_service = GraphExtractorService(llm=llm)
     
     # =========================================================================
     # Use cases
@@ -171,6 +204,8 @@ def get_container() -> dict:
         chunk_text_reader=chunk_text_reader,
         reranker=reranker,
         llm=llm,
+        query_expansion_service=query_expansion_service,
+        self_critique=self_critique_service,
     )
     
     # =========================================================================
@@ -200,6 +235,11 @@ def get_container() -> dict:
         "document_reader": document_reader,
         "chunk_dedup_repo": chunk_dedup_repo,
         "chunk_text_reader": chunk_text_reader,
+        "chat_repo": chat_repo,
+        "graph_repo": graph_repo,
+
+        # Services
+        "graph_extractor": graph_extractor_service,
         
         # Use cases
         "upload_use_case": upload_use_case,

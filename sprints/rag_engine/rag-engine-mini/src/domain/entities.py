@@ -89,17 +89,16 @@ class Chunk:
     """
     A chunk of text from a document with its metadata.
     
-    Design Decision: Using frozen dataclass for:
-    - Immutability (safe to pass around)
-    - Hashability (can be used in sets/dicts)
-    - Clear data structure
-    
     قطعة نصية من مستند مع بياناتها الوصفية
     """
     id: str
     tenant_id: TenantId
     document_id: DocumentId
     text: str
+    
+    # Hierarchical / Contextual retrieval (Stage 2)
+    parent_id: str | None = None
+    chunk_context: str | None = None  # Document-level context (for Contextual Retrieval)
     
     def __hash__(self) -> int:
         return hash(self.id)
@@ -120,6 +119,11 @@ class ChunkSpec:
     max_tokens: int = 512
     overlap_tokens: int = 50
     encoding_name: str = "cl100k_base"
+    
+    # Hierarchical strategy (Stage 2)
+    strategy: str = "fixed"  # fixed, hierarchical, semantic
+    parent_size: int = 2048
+    child_size: int = 512
 
 
 @dataclass(frozen=True)

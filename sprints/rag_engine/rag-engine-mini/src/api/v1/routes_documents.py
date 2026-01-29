@@ -94,11 +94,26 @@ async def get_document_status(
     
     الحصول على حالة معالجة المستند
     """
-    # TODO: Implement with document_repo.get_status()
+    from src.domain.entities import DocumentId, TenantId
+    
+    container = get_container()
+    repo = container["document_repo"]
+    
+    doc = repo.get_document(
+        tenant_id=TenantId(tenant_id),
+        document_id=DocumentId(document_id),
+    )
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
     return {
-        "document_id": document_id,
-        "status": "indexed",  # Placeholder
-        "chunks_count": 0,
+        "document_id": doc.id.value,
+        "filename": doc.filename,
+        "status": doc.status.value,
+        "chunks_count": doc.chunks_count,
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
+        "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
     }
 
 
@@ -113,10 +128,57 @@ async def list_documents(
     
     قائمة المستندات للمستأجر الحالي
     """
-    # TODO: Implement with document_repo.list_documents()
+    from src.domain.entities import TenantId
+    
+    container = get_container()
+    repo = container["document_repo"]
+    
+    docs = repo.list_documents(
+        tenant_id=TenantId(tenant_id),
+        limit=limit,
+        offset=offset,
+    )
+    
+    total = repo.count_documents(tenant_id=TenantId(tenant_id))
+    
     return {
-        "documents": [],
-        "total": 0,
+        "documents": [
+            {
+                "document_id": d.id.value,
+                "filename": d.filename,
+                "status": d.status.value,
+                "chunks_count": d.chunks_count,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in docs
+        ],
+        "total": total,
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: str,
+    tenant_id: str = Depends(get_tenant_id),
+) -> dict:
+    """
+    Delete a document and all its chunks.
+    
+    حذف مستند وجميع متعلقه
+    """
+    from src.domain.entities import DocumentId, TenantId
+    
+    container = get_container()
+    repo = container["document_repo"]
+    
+    success = repo.delete_document(
+        tenant_id=TenantId(tenant_id),
+        document_id=DocumentId(document_id),
+    )
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    return {"status": "deleted", "document_id": document_id}

@@ -26,13 +26,14 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 
 | Challenge | Our Solution |
 |-----------|--------------|
-| **Recall issues** | Hybrid search (Vector + Keyword FTS) |
+| **Recall issues** | Hybrid search (Vector + Keyword FTS) + **Query Expansion** |
 | **Precision problems** | Cross-Encoder reranking |
 | **Cost control** | Batch embeddings + Redis caching |
 | **Data isolation** | Multi-tenant by design |
 | **Duplicate processing** | File hash idempotency + chunk dedup |
 | **Vendor lock-in** | Ports & Adapters pattern |
 | **Scalability** | Async indexing with Celery |
+| **Visibility** | **Prometheus Metrics** + **Gradio Demo UI** |
 
 ---
 
@@ -46,13 +47,14 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 
 | التحدي | حلّنا |
 |--------|-------|
-| **مشاكل الاستدعاء** | بحث هجين (متجه + نص كامل) |
+| **مشاكل الاستدعاء** | بحث هجين + **توسيع الاستعلام (Query Expansion)** |
 | **مشاكل الدقة** | إعادة ترتيب بـ Cross-Encoder |
 | **التحكم بالتكلفة** | تضمين دفعي + تخزين Redis مؤقت |
 | **عزل البيانات** | تصميم متعدد المستأجرين |
 | **المعالجة المكررة** | تجزئة الملفات + إزالة تكرار القطع |
 | **الارتباط بمزود** | نمط المنافذ والمحولات |
-| **قابلية التوسع** | فهرسة غير متزامنة مع Celery |
+| **قابلة التوسع** | فهرسة غير متزامنة مع Celery |
+| **الرؤية والمراقبة** | **مقاييس Prometheus** + **واجهة تجريبية Gradio** |
 
 ---
 
@@ -75,7 +77,8 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
     ↓
 🔍 Hybrid Retrieval:
     ├── Vector Search (semantic)
-    └── Keyword Search (FTS + tsvector)
+    ├── Keyword Search (FTS + tsvector)
+    └── 🔀 Query Expansion (LLM-based)
     ↓
 🔀 RRF Fusion (merge results)
     ↓
@@ -91,12 +94,11 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 | 🏗️ **Clean Architecture** | Domain/Application/Adapters separation | فصل المجال/التطبيق/المحولات |
 | 🔌 **Ports & Adapters** | Swap providers without code changes | تبديل المزودين بدون تغيير الكود |
 | 👥 **Multi-Tenant** | Complete user_id isolation | عزل كامل بمعرف المستخدم |
-| 🔐 **API Key Auth** | Secure tenant identification | مصادقة آمنة للمستأجرين |
 | ⚡ **Async Indexing** | Celery workers for heavy processing | عمال Celery للمعالجة الثقيلة |
-| 💰 **Cost Optimized** | Batch embeddings + Redis caching | تضمين دفعي + تخزين مؤقت |
-| 🔄 **Idempotent Upload** | SHA256 file hash prevents re-indexing | تجزئة SHA256 تمنع إعادة الفهرسة |
-| 📦 **Chunk Dedup** | Per-tenant chunk deduplication | إزالة تكرار القطع لكل مستأجر |
-| 📊 **Observability Ready** | Structured logging, metrics-friendly | سجلات منظمة، جاهز للقياسات |
+| 📈 **Observability** | Prometheus metrics + Structured logging | مقاييس Prometheus + سجلات منظمة |
+| 🎨 **Demo UI** | Built-in Gradio frontend for testing | واجهة Gradio تجريبية للاختبار |
+| 🧪 **Eval Script** | Retrieval quality evaluation script | سكربت تقييم جودة الاسترجاع |
+| 🔄 **Query Expansion** | Multi-query generation for better recall | توليد استعلامات متعددة لاستدعاء أفضل |
 
 ---
 
@@ -120,7 +122,7 @@ python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate   # Windows
 
-# Install dependencies
+# Install dependencies (including Gradio)
 pip install -e ".[dev]"
 
 # Copy environment template
@@ -132,13 +134,13 @@ cp .env.example .env
 
 ```bash
 # Start Postgres + Redis + Qdrant
-docker compose -f docker/docker-compose.yml up -d
+make docker-up
 
 # Run database migrations
-alembic upgrade head
+make migrate
 
 # Seed demo user
-python scripts/seed_user.py
+make seed
 ```
 
 ### 3. Run the Application / تشغيل التطبيق
@@ -146,21 +148,20 @@ python scripts/seed_user.py
 ```bash
 # Terminal 1: API Server
 make run
-# or: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2: Celery Worker
 make worker
-# or: celery -A src.workers.celery_app.celery_app worker -Q indexing -l INFO
+
+# Terminal 3: Demo UI (Optional)
+make demo
 ```
 
 ### 4. Verify Installation / التحقق من التثبيت
 
 ```bash
-# Health check
+# Health & Metrics
 curl http://localhost:8000/health
-
-# Expected response:
-# {"status": "ok", "env": "dev"}
+curl http://localhost:8000/metrics
 ```
 
 ---
@@ -535,12 +536,17 @@ redis-cli ping
 
 ## 📚 Documentation / التوثيق
 
-| Document | Description | الوصف |
-|----------|-------------|-------|
-| [architecture.md](./docs/architecture.md) | Detailed architecture | المعمارية التفصيلية |
-| [modules.md](./docs/modules.md) | Module explanations | شرح الوحدات |
 | [workflows.md](./docs/workflows.md) | Key workflows | سير العمليات الرئيسية |
 | [contributing.md](./docs/contributing.md) | Contribution guide | دليل المساهمة |
+| [deep-dives/](./docs/deep-dives/) | 🧠 Technical Deep Dives | شروحات تقنية عميقة |
+
+---
+
+## 🎓 Learning Center / مركز التعلم
+
+- **[The RAG Blueprint](./CONSTRUCTING_RAG.md)**: The engineering philosophy behind this project.
+- **[Notebooks Index](./notebooks/)**: Step-by-step guides from zero to production.
+- **[Architecture Deep-Dive](./docs/architecture.md)**: For those interested in system design.
 
 ---
 

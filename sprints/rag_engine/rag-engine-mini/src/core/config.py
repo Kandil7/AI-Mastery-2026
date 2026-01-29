@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     )
     db_pool_size: int = Field(default=5, ge=1, le=20)
     db_max_overflow: int = Field(default=10, ge=0, le=50)
+    use_real_db: bool = Field(default=False, description="Use Postgres if True, memory if False")
     
     # =========================================================================
     # Redis / ريديس

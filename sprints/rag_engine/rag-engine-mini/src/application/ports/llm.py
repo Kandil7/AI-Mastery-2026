@@ -30,16 +30,25 @@ class LLMPort(Protocol):
     ) -> str:
         """
         Generate text completion from prompt.
+        """
+        ...
+
+    def generate_stream(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 700,
+    ) -> list[str]:  # Note: In real world use Iterator/Generator, using list[str] for simple typing in port
+        """
+        Generate text as a stream of tokens/chunks.
         
         Args:
             prompt: The input prompt
-            temperature: Sampling temperature (0-2)
-            max_tokens: Maximum tokens in response
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens
             
         Returns:
-            Generated text response
-            
-        Raises:
-            LLMError: If generation fails
+            Generator yielding text chunks
         """
         ...

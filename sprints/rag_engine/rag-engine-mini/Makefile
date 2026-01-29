@@ -17,16 +17,13 @@ help:
 	@echo "║  run-prod     Run FastAPI server (production mode)               ║"
 	@echo "║  worker       Run Celery worker                                  ║"
 	@echo "║  test         Run all tests                                      ║"
-	@echo "║  test-cov     Run tests with coverage                            ║"
+	@echo "║  demo         Start Gradio frontend demo                         ║"
+	@echo "║  eval         Run retrieval evaluation script                     ║"
 	@echo "║  format       Format code with black + isort                     ║"
 	@echo "║  lint         Lint code with ruff                                ║"
-	@echo "║  typecheck    Type check with mypy                               ║"
 	@echo "║  migrate      Run database migrations                            ║"
-	@echo "║  migrate-rev  Create new migration revision                      ║"
 	@echo "║  seed         Seed demo user                                     ║"
 	@echo "║  docker-up    Start all services with Docker                     ║"
-	@echo "║  docker-down  Stop all Docker services                           ║"
-	@echo "║  clean        Clean cache and build files                        ║"
 	@echo "╚══════════════════════════════════════════════════════════════════╝"
 
 # =============================================================================
@@ -180,14 +177,23 @@ docker-clean:
 # Development / التطوير
 # =============================================================================
 
+demo:
+	@echo "🎨 Starting Gradio frontend demo..."
+	python scripts/frontend_demo.py
+
+eval:
+	@echo "📊 Running retrieval evaluation..."
+	python scripts/eval_retrieval.py
+
 dev-setup: docker-up migrate seed
 	@echo "🎉 Development environment ready!"
 	@echo "   Run 'make run' in one terminal"
 	@echo "   Run 'make worker' in another terminal"
+	@echo "   Run 'make demo' in a third terminal"
 
 shell:
 	@echo "🐍 Starting Python shell..."
-	python -c "from src.core.bootstrap import get_container; c = get_container(); print('Container loaded:', list(c.keys()))"
+	python -i -c "from src.core.bootstrap import get_container; c = get_container(); print('Container loaded:', list(c.keys()))"
 
 # =============================================================================
 # Cleanup / التنظيف

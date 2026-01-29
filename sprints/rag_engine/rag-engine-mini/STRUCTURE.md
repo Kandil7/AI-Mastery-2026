@@ -1,4 +1,4 @@
-# RAG Engine Mini - Project Structure (Stage 1)
+# 🏗️ RAG Engine Mini - Project Structure (Final)
 
 > **Production-Ready RAG Starter Template** with Clean Architecture, Hybrid Search (Vector + Keyword), Reranking, and Multi-Tenant Support.
 

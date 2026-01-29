@@ -31,6 +31,8 @@ class ChunkRepoPort(Protocol):
         tenant_id: TenantId,
         chunk_hash: str,
         text: str,
+        parent_id: str | None = None,
+        chunk_context: str | None = None,
     ) -> str:
         """
         Upsert a chunk to the store (deduplicated).

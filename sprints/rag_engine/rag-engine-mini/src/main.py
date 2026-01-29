@@ -17,6 +17,8 @@ from src.core.logging import setup_logging, get_logger
 from src.api.v1.routes_health import router as health_router
 from src.api.v1.routes_documents import router as documents_router
 from src.api.v1.routes_queries import router as queries_router
+from src.api.v1.routes_chat import router as chat_router
+
 
 log = get_logger(__name__)
 
@@ -37,14 +39,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         env=settings.env,
     )
     
-    # Initialize resources here (e.g., database connections)
-    # The container is lazily initialized on first request
-    
     yield
     
     # Shutdown
     log.info("application_stopping")
-    # Cleanup resources here
 
 
 def create_app() -> FastAPI:
@@ -83,6 +81,11 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(documents_router)
     app.include_router(queries_router)
+    app.include_router(chat_router)
+
+    # Setup observability
+    from src.core.observability import setup_observability
+    setup_observability(app)
     
     return app
 
