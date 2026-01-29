@@ -27,6 +27,7 @@ For those who want to understand the "Why" behind the architecture:
 - [**Multi-Modal & Tables (Stage 4)**](deep-dives/stage-4-multimodal.md): Tables-to-Markdown and Image Vision.
 - [**Autonomous Agent (Stage 5)**](deep-dives/stage-5-autonomy.md): Routing, Web-Search and Privacy.
 - [**Privacy & Compliance**](deep-dives/privacy-and-compliance.md): PII Redaction and Security.
+- [**LLM Provider Strategy**](deep-dives/llm-provider-strategy.md): Adapters for different LLM services.
 - [**Scaling RAG Pipes**](deep-dives/scaling-rag-pipelines.md): Async workers, Caching, and Redis.
 - [**LLM-as-a-Judge**](deep-dives/llm-as-a-judge.md): Verification and Grounding.
 - [**Common RAG Pitfalls**](deep-dives/common-rag-pitfalls.md): Troubleshooting common failures.

@@ -30,6 +30,11 @@
 *   **Study**: [Autonomous Agent](./docs/deep-dives/stage-5-autonomy.md).
 
 
+## 💠 Level 6: LLM Ecosystem Mastery (Advanced)
+*   **Concepts**: Adapter Pattern, Multi-Provider Fallbacks, API Benchmarking.
+*   **Milestone**: Run `08_llm_provider_strategy.ipynb`. Compare latency between Gemini and OpenAI.
+*   **Study**: [LLM Provider Strategy](./docs/deep-dives/llm-provider-strategy.md).
+
 ## 🚀 The Future (Final Boss and Beyond)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
