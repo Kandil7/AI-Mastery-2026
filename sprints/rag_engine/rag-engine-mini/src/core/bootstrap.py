@@ -185,6 +185,10 @@ def get_container() -> dict:
     # Graph Extraction (Stage 3)
     from src.application.services.graph_extractor import GraphExtractorService
     graph_extractor_service = GraphExtractorService(llm=llm)
+
+    # Vision Service (Stage 4)
+    from src.application.services.vision_service import VisionService
+    vision_service = VisionService(llm=llm)
     
     # =========================================================================
     # Use cases
@@ -240,6 +244,7 @@ def get_container() -> dict:
 
         # Services
         "graph_extractor": graph_extractor_service,
+        "vision_service": vision_service,
         
         # Use cases
         "upload_use_case": upload_use_case,

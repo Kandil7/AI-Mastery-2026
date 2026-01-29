@@ -38,15 +38,32 @@ class DefaultTextExtractor:
         raise UnsupportedFileTypeError(extension, ["pdf", "docx", "txt"])
     
     def _extract_pdf(self, file_path: str) -> ExtractedText:
-        """Extract text from PDF using PyMuPDF."""
+        """Extract text and tables from PDF using PyMuPDF."""
         try:
             doc = fitz.open(file_path)
             pages = []
+            tables_count = 0
             
             for i, page in enumerate(doc, start=1):
+                # 1. Extract plain text
                 text = page.get_text("text") or ""
-                if text.strip():
-                    pages.append(f"\n--- Page {i} ---\n{text}")
+                
+                # 2. Extract Tables (Stage 4)
+                # We find tables and convert them to Markdown to preserve structure
+                tabs = page.find_tables()
+                table_mds = []
+                for tab in tabs:
+                    df = tab.to_pandas() # Requires pandas
+                    if not df.empty:
+                        table_mds.append(f"\n[Table found on Page {i}]:\n" + df.to_markdown(index=False))
+                        tables_count += 1
+                
+                page_content = f"\n--- Page {i} ---\n{text}"
+                if table_mds:
+                    page_content += "\n" + "\n".join(table_mds)
+                    
+                if page_content.strip():
+                    pages.append(page_content)
             
             full_text = "\n".join(pages).strip()
             
@@ -56,6 +73,7 @@ class DefaultTextExtractor:
                     "type": "pdf",
                     "pages": len(doc),
                     "engine": "pymupdf",
+                    "tables_detected": tables_count,
                 },
             )
         except Exception as e:

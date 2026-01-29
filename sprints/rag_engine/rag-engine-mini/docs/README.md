@@ -24,6 +24,7 @@ For those who want to understand the "Why" behind the architecture:
 - [**Clean Architecture for AI**](deep-dives/clean-architecture-for-ai.md): Using Ports & Adapters for RAG.
 - [**Advanced RAG (Stage 2)**](deep-dives/stage-2-advanced-rag.md): Streaming, Parent-Child, and Contextual Retrieval.
 - [**Intelligence & Graph (Stage 3)**](deep-dives/stage-3-intelligence.md): Self-Corrective RAG and Knowledge Graphs.
+- [**Multi-Modal & Tables (Stage 4)**](deep-dives/stage-4-multimodal.md): Tables-to-Markdown and Image Vision.
 - [**Scaling RAG Pipes**](deep-dives/scaling-rag-pipelines.md): Async workers, Caching, and Redis.
 - [**LLM-as-a-Judge**](deep-dives/llm-as-a-judge.md): Verification and Grounding.
 - [**Common RAG Pitfalls**](deep-dives/common-rag-pitfalls.md): Troubleshooting common failures.
