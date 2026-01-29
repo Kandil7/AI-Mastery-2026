@@ -275,6 +275,61 @@ def test_hallucination():
 
 ---
 
+---
+
+## Stage-Specific Prompts
+
+In RAG Engine Mini, we use specialized prompts for advanced features.
+
+### 1. Document Summarization (Stage 2)
+Used during indexing to provide context for chunks.
+```python
+"Summarize the following document content in 1-2 sentences to provide context for RAG chunks. "
+"Output ONLY the summary sentences:\n\n{text}"
+```
+
+### 2. Retrieval Relevance Grading (Stage 3)
+Used in Self-Corrective RAG to evaluate search results.
+```text
+"You are a grader evaluating the relevance of retrieved documents to a user question.\n"
+"User Question: {question}\n\n"
+"Retrieved Documents:\n{context}\n\n"
+"If the documents contain information that can answer the question, respond with 'relevant'.\n"
+"Otherwise, respond with 'irrelevant'. respond with ONLY one word."
+```
+
+### 3. Hallucination Grading (Stage 3)
+Verifying if the generated answer is grounded in facts.
+```text
+"You are a grader evaluating if an answer is grounded in / supported by a set of facts.\n"
+"Facts:\n{context}\n\n"
+"Question: {question}\n"
+"Answer: {answer}\n\n"
+"Is the answer fully supported by the facts? Respond with 'grounded'.\n"
+"If there is ANY info in the answer not in the facts, respond with 'hallucination'.\n"
+"Respond with ONLY one word."
+```
+
+### 4. Knowledge Graph Extraction (Stage 3)
+Building structured triplets from text.
+```text
+"Extract key entities and their relationships from the text below.\n"
+"Format the output as a JSON list of objects with keys: 'subject', 'relation', 'obj'.\n"
+"Keep entities concise (1-3 words).\n\n"
+"Text: {text}\n\n"
+"JSON Output:"
+```
+
+### 5. Vision-to-Text (Stage 4)
+Describing images for multi-modal indexing.
+```text
+"You are a vision assistant. Describe the provided image in detail. "
+"Focus on text, charts, or logical diagrams if present. "
+"Output your description in 1-2 concise paragraphs."
+```
+
+---
+
 ## Best Practices Summary
 
 1. ✅ Always include explicit grounding instructions
@@ -285,3 +340,4 @@ def test_hallucination():
 6. ✅ Monitor for hallucination in production
 7. ❌ Don't assume the model will follow instructions perfectly
 8. ❌ Don't use high temperatures for factual RAG
+

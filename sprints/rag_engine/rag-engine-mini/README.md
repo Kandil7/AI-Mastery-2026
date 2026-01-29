@@ -544,8 +544,11 @@ redis-cli ping
 
 ## 🎓 Learning Center / مركز التعلم
 
+- **[RAG Mastery Roadmap](./docs/ROADMAP.md)**: Your step-by-step learning path.
+- **[Architecture Patterns](./docs/deep-dives/architecture-patterns.md)**: The "Why" behind the design.
 - **[Visual Architecture Guide](./docs/VISUAL_GUIDE.md)**: Diagrams showing how data flows.
-- **[The RAG Blueprint](./CONSTRUCTING_RAG.md)**: The engineering philosophy behind this project.
+- **[Developer Guide](./docs/developer-guide.md)**: Deep dive for contributors.
+- **[Frequently Asked Questions](./docs/FAQ.md)**: Solving common engineering doubts.
 - **[Notebooks Index](./notebooks/)**: Step-by-step guides from zero to production.
 - **[Architecture Deep-Dive](./docs/architecture.md)**: For those interested in system design.
 
