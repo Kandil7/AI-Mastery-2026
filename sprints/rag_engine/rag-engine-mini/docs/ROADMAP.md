@@ -57,8 +57,13 @@
 
 ## 👑 Level 11: The Grand Finale (Agentic GraphRAG)
 *   **Concepts**: Global Reasoning, Entity-Relation Extraction, Graph Traversal Agents.
-*   **Milestone**: Run `13_agentic_graph_rag_mastery.ipynb`. Discover non-obvious paths in the Knowledge Graph. [COMPLETED ✅]
+*   **Milestone**: Run `13_agent_graph_rag_mastery.ipynb`. Discover non-obvious paths in the Knowledge Graph. [COMPLETED ✅]
 *   **Study**: [Agentic GraphRAG](./docs/deep-dives/agentic-graph-rag.md).
+
+## 🚀 Level 12: The Master of Swarms (Architect Elite)
+*   **Concepts**: Multi-Agent Orchestration, Supervisor/Worker patterns, Specialized Personas.
+*   **Milestone**: Run `14_multi_agent_swarm_orchestration.ipynb`. Observe collaborative reasoning in action. [COMPLETED ✅]
+*   **Study**: [Multi-Agent Swarms](./docs/deep-dives/multi-agent-swarms.md).
 
 ## 🚀 Post-Completion: The Future (Next Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
