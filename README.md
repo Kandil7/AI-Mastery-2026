@@ -356,17 +356,51 @@ docker run -p 8000:8000 issue-classifier
 
 ### Installation
 
-We use a modular `setup.py` for flexibility.
+We use a modular `setup.py` for flexibility, and provide automated setup for conda or venv.
 
 ```bash
-# 1. Clone & Venv
+# 1) Clone
 git clone https://github.com/Kandil7/AI-Mastery-2026.git
 cd AI-Mastery-2026
+```
+
+#### Option A: Automated setup (recommended)
+
+Windows PowerShell:
+```powershell
+.\setup.ps1 -EnvManager auto -Jupyter -Test
+# GPU (CUDA example):
+.\setup.ps1 -EnvManager conda -Cuda 11.8 -Jupyter -Test
+```
+
+macOS/Linux/WSL:
+```bash
+./setup.sh --auto --jupyter --test
+# GPU (CUDA example):
+./setup.sh --conda --cuda 11.8 --jupyter --test
+```
+
+#### Option B: Conda (full environment)
+
+```bash
+conda env create -f environment.full.yml
+conda activate ai-mastery-2026
+python -m ipykernel install --user --name ai-mastery-2026 --display-name "AI-Mastery-2026"
+```
+
+#### Option C: Venv (classic)
+
+```bash
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 # or: .venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+python -m ipykernel install --user --name ai-mastery-2026 --display-name "AI-Mastery-2026"
+```
 
-# 2. Install (Choose your flavor)
+#### Option D: Editable installs (package extras)
+
+```bash
 pip install -e .          # Core only (Foundations)
 pip install -e ".[dev]"   # + Testing tools
 pip install -e ".[llm]"   # + Heavy AI libraries (Torch, Transformers)

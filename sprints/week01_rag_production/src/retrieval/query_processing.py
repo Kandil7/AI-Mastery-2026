@@ -13,6 +13,7 @@ The RAG query processing follows production best practices:
 - Source attribution and citation
 - Performance optimization for query execution
 - Integration with various LLM providers
+- Comprehensive error handling and monitoring
 
 Key Features:
 - Query classification and routing
@@ -23,6 +24,8 @@ Key Features:
 - Integration with various LLM providers
 - Query reformulation and expansion
 - Context-aware response generation
+- Error handling and logging
+- Performance monitoring
 
 Security Considerations:
 - Input sanitization for queries
@@ -32,25 +35,17 @@ Security Considerations:
 - Rate limiting for query processing
 """
 
-import asyncio
-import logging
-from typing import List, Dict, Any, Optional, Tuple, Union
-from enum import Enum
-from dataclasses import dataclass
 import time
 import re
-from abc import ABC, abstractmethod
+import logging
+from enum import Enum
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
 
-from transformers import pipeline
-import torch
-
-from src.retrieval import Document, RetrievalResult, HybridRetriever
-from src.pipeline import RAGPipeline, RAGConfig
-from src.chunking import ChunkingConfig
+from src.retrieval import Document, RetrievalResult, QueryOptions, HybridRetriever
 
 
 class QueryType(Enum):
-    """Enumeration for different types of queries."""
     SIMPLE_FACT = "simple_fact"
     COMPLEX_REASONING = "complex_reasoning"
     COMPARATIVE = "comparative"
@@ -60,41 +55,17 @@ class QueryType(Enum):
     UNCERTAIN = "uncertain"
 
 
+@dataclass
 class QueryClassificationResult:
-    """
-    Result of query classification.
-
-    Attributes:
-        query_type (QueryType): Type of the query
-        confidence (float): Confidence score of the classification
-        keywords (List[str]): Important keywords identified in the query
-        entities (List[str]): Named entities identified in the query
-        intent (str): Intent of the query
-    """
-    def __init__(self, query_type: QueryType, confidence: float, 
-                 keywords: List[str], entities: List[str], intent: str):
-        self.query_type = query_type
-        self.confidence = confidence
-        self.keywords = keywords
-        self.entities = entities
-        self.intent = intent
+    query_type: QueryType
+    confidence: float
+    keywords: List[str]
+    entities: List[str]
+    intent: str
 
 
 @dataclass
 class QueryProcessingResult:
-    """
-    Result of query processing.
-
-    Attributes:
-        query (str): Original query
-        response (str): Generated response
-        sources (List[RetrievalResult]): Retrieved sources
-        query_type (QueryType): Type of the query
-        processing_time_ms (float): Time taken for processing
-        confidence_score (float): Confidence in the response
-        citations (List[Dict[str, Any]]): Citations for the response
-        metadata (Dict[str, Any]): Additional metadata about the processing
-    """
     query: str
     response: str
     sources: List[RetrievalResult]
@@ -106,436 +77,236 @@ class QueryProcessingResult:
 
 
 class QueryClassifier:
-    """
-    Classifier for determining query type and characteristics.
-    """
-    
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        
-        # Define patterns for different query types
         self.patterns = {
-            QueryType.SIMPLE_FACT: [
-                r'what is\b', r'who is\b', r'when was\b', r'where is\b',
-                r'how many\b', r'what are\b', r'define\b', r'meaning of\b'
-            ],
-            QueryType.COMPLEX_REASONING: [
-                r'why\b', r'how does\b', r'what causes\b', r'explain\b',
-                r'describe\b', r'analyze\b', r'evaluate\b', r'assess\b'
-            ],
-            QueryType.COMPARATIVE: [
-                r'compare\b', r'contrast\b', r'similar to\b', r'different from\b',
-                r'better than\b', r'vs\b', r'versus\b', r'advantages of\b'
-            ],
-            QueryType.PROCEDURAL: [
-                r'how to\b', r'steps to\b', r'process of\b', r'procedure for\b',
-                r'guide to\b', r'tutorial on\b', r'instructions for\b'
-            ],
-            QueryType.DEFINITIONAL: [
-                r'what is the definition of\b', r'define\b', r'meaning of\b',
-                r'what does \w+ mean\b', r'what is \w+\?', r'explain what\b'
-            ],
-            QueryType.ANALYTICAL: [
-                r'analyze\b', r'evaluate\b', r'assess\b', r'critique\b',
-                r'interpret\b', r'understand\b', r'break down\b'
-            ]
+            QueryType.SIMPLE_FACT: [r"\bwhat is\b", r"\bwho is\b", r"\bwhen\b", r"\bwhere\b", r"\bhow many\b"],
+            QueryType.COMPLEX_REASONING: [r"\bwhy\b", r"\bexplain\b", r"\banalyze\b", r"\bevaluate\b"],
+            QueryType.COMPARATIVE: [r"\bcompare\b", r"\bvs\b", r"\bversus\b", r"\bdifference\b"],
+            QueryType.PROCEDURAL: [r"\bhow to\b", r"\bsteps\b", r"\bguide\b", r"\btutorial\b"],
+            QueryType.DEFINITIONAL: [r"\bdefine\b", r"\bdefinition\b", r"\bmeaning\b"],
+            QueryType.ANALYTICAL: [r"\bcritique\b", r"\bassess\b", r"\bbreak down\b"],
         }
-    
-    def classify_query(self, query: str) -> QueryClassificationResult:
-        """
-        Classify the query type and extract relevant information.
 
-        Args:
-            query: Query string to classify
+    def classify(self, query: str) -> QueryClassificationResult:
+        try:
+            q = query.lower().strip()
+            scores = {}
+            for qt, pats in self.patterns.items():
+                scores[qt] = sum(1 for p in pats if re.search(p, q))
 
-        Returns:
-            QueryClassificationResult with classification details
-        """
-        query_lower = query.lower().strip()
-        
-        # Identify query type based on patterns
-        scores = {}
-        for query_type, patterns in self.patterns.items():
-            score = 0
-            for pattern in patterns:
-                if re.search(pattern, query_lower):
-                    score += 1
-            scores[query_type] = score
-        
-        # Determine the most likely query type
-        best_type = max(scores, key=scores.get)
-        best_score = scores[best_type]
-        
-        # Calculate confidence (normalize by total possible matches)
-        total_possible = sum(len(patterns) for patterns in self.patterns.values())
-        confidence = best_score / total_possible if total_possible > 0 else 0.0
-        
-        # Extract keywords (simple approach)
-        keywords = re.findall(r'\b\w+\b', query_lower)
-        keywords = [kw for kw in keywords if len(kw) > 2]  # Filter short words
-        
-        # Extract entities (simple approach)
-        entities = re.findall(r'\b[A-Z][a-z]+\b', query)  # Capitalized words
-        
-        # Determine intent
-        intent = best_type.value
-        
-        return QueryClassificationResult(
-            query_type=best_type,
-            confidence=confidence,
-            keywords=keywords,
-            entities=entities,
-            intent=intent
-        )
+            best = max(scores, key=scores.get)
+            best_score = scores[best]
+            # Confidence: relative to number of matches, bounded
+            confidence = min(1.0, best_score / max(1, len(self.patterns[best])))
+
+            keywords = [w for w in re.findall(r"\b\w+\b", q) if len(w) > 2]
+            entities = re.findall(r"\b[A-Z][a-zA-Z0-9_]+\b", query)
+            result = QueryClassificationResult(best, confidence, keywords, entities, best.value)
+            self.logger.debug(f"Classified query as {result.query_type.value} with confidence {result.confidence}")
+            return result
+        except Exception as e:
+            self.logger.error(f"Error classifying query: {e}", exc_info=True)
+            # Return uncertain classification as fallback
+            return QueryClassificationResult(QueryType.UNCERTAIN, 0.0, [], [], "uncertain")
 
 
-class QueryExpander:
+class QueryRewriter:
     """
-    Expands queries to improve retrieval effectiveness.
+    Production-safe rewrite without LLM:
+    - normalize whitespace
+    - preserve quoted phrases
+    - lightweight expansion for acronyms (AI/ML/RAG)
     """
-    
+    ACR = {"rag": "retrieval augmented generation", "ai": "artificial intelligence", "ml": "machine learning"}
+
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        
-        # Synonym mappings for common terms
-        self.synonyms = {
-            'ai': ['artificial intelligence', 'machine learning', 'algorithm'],
-            'ml': ['machine learning', 'artificial intelligence', 'statistical learning'],
-            'model': ['algorithm', 'framework', 'system', 'architecture'],
-            'data': ['information', 'dataset', 'records', 'statistics'],
-            'learn': ['study', 'understand', 'acquire', 'gain knowledge'],
-            'system': ['framework', 'platform', 'architecture', 'solution'],
-            'algorithm': ['method', 'procedure', 'formula', 'technique'],
-            'network': ['connection', 'web', 'mesh', 'structure'],
-            'neural': ['artificial', 'deep', 'biological', 'brain-inspired'],
-            'training': ['learning', 'education', 'preparation', 'coaching'],
-            'prediction': ['forecast', 'estimate', 'projection', 'anticipation'],
-            'accuracy': ['precision', 'correctness', 'exactness', 'reliability']
-        }
-    
-    def expand_query(self, query: str) -> str:
-        """
-        Expand the query with synonyms and related terms.
 
-        Args:
-            query: Original query string
-
-        Returns:
-            Expanded query string
-        """
-        expanded_terms = []
-        query_lower = query.lower()
-        
-        for term in query.split():
-            # Add original term
-            expanded_terms.append(term)
-            
-            # Add synonyms if available
-            term_lower = term.lower()
-            if term_lower in self.synonyms:
-                synonyms = self.synonyms[term_lower]
-                expanded_terms.extend(synonyms)
-        
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_expanded = []
-        for term in expanded_terms:
-            if term not in seen:
-                seen.add(term)
-                unique_expanded.append(term)
-        
-        return ' '.join(unique_expanded)
-
-
-class ResponseGenerator:
-    """
-    Generates responses based on retrieved context and query.
-    """
-    
-    def __init__(self, model_name: str = "gpt2"):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.model_name = model_name
-        
+    def rewrite(self, query: str) -> str:
         try:
-            # Initialize the text generation pipeline
-            self.generator = pipeline(
-                "text-generation",
-                model=model_name,
-                tokenizer=model_name,
-                device=0 if torch.cuda.is_available() else -1
-            )
-            self.logger.info(f"Initialized response generator with model: {model_name}")
+            q = " ".join(query.strip().split())
+            tokens = q.split()
+            out = []
+            for t in tokens:
+                key = t.lower().strip(".,!?")
+                out.append(t)
+                if key in self.ACR:
+                    out.append(self.ACR[key])
+            # dedup in order
+            seen = set()
+            final = []
+            for t in out:
+                if t not in seen:
+                    seen.add(t)
+                    final.append(t)
+            rewritten_query = " ".join(final)
+            self.logger.debug(f"Rewrote query: '{query}' -> '{rewritten_query}'")
+            return rewritten_query
         except Exception as e:
-            self.logger.warning(f"Failed to initialize generator with {model_name}: {e}")
-            # Fallback to a simpler approach
-            self.generator = None
-    
-    def generate_response(self, query: str, context: str, 
-                         max_new_tokens: int = 300) -> str:
-        """
-        Generate a response based on query and context.
+            self.logger.error(f"Error rewriting query: {e}", exc_info=True)
+            # Return original query as fallback
+            return query
 
-        Args:
-            query: Original query
-            context: Retrieved context
-            max_new_tokens: Maximum number of tokens to generate
 
-        Returns:
-            Generated response string
-        """
-        if not context.strip():
-            return "I don't have enough information to answer this question."
-        
-        # Construct the prompt
-        prompt = f"Context: {context}\n\nQuestion: {query}\n\nAnswer:"
-        
-        if self.generator:
-            try:
-                # Generate response
-                outputs = self.generator(
-                    prompt,
-                    max_new_tokens=max_new_tokens,
-                    num_return_sequences=1,
-                    temperature=0.7,
-                    pad_token_id=self.generator.tokenizer.eos_token_id
+class CitationBuilder:
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def build(self, results: List[RetrievalResult]) -> List[Dict[str, Any]]:
+        try:
+            citations = []
+            for r in results:
+                d = r.document
+                citations.append(
+                    {
+                        "doc_id": d.id,
+                        "rank": r.rank,
+                        "score": r.score,
+                        "source": d.source,
+                        "doc_type": d.doc_type,
+                        "meta": {k: d.metadata.get(k) for k in list(d.metadata.keys())[:10]},
+                    }
                 )
-                
-                # Extract the generated text
-                generated_text = outputs[0]['generated_text']
-                
-                # Extract just the answer part
-                answer_start = generated_text.find("Answer:") + len("Answer:")
-                if answer_start != -1:
-                    answer = generated_text[answer_start:].strip()
-                else:
-                    # If "Answer:" not found, return the whole generated part after the prompt
-                    answer = generated_text[len(prompt):].strip()
-                
-                return answer
-            except Exception as e:
-                self.logger.error(f"Error generating response: {e}")
-                return f"I encountered an error processing your request: {str(e)}"
-        else:
-            # Fallback response generation
-            return f"Based on the provided context, here's an answer to your question '{query}': [Response would be generated here if model was available]"
+            self.logger.debug(f"Built {len(citations)} citations")
+            return citations
+        except Exception as e:
+            self.logger.error(f"Error building citations: {e}", exc_info=True)
+            return []
 
 
-class CitationExtractor:
+def _confidence(results: List[RetrievalResult], cls_conf: float) -> float:
+    try:
+        if not results:
+            return 0.05
+        top = results[0].score
+        avg = sum(r.score for r in results) / len(results)
+        # Penalize flat distributions (weak signal)
+        spread = max(r.score for r in results) - min(r.score for r in results) if len(results) > 1 else 0.0
+        c = 0.25 * cls_conf + 0.45 * top + 0.20 * avg + 0.10 * min(1.0, spread)
+        confidence = max(0.0, min(1.0, c))
+        return confidence
+    except Exception as e:
+        logging.error(f"Error calculating confidence: {e}", exc_info=True)
+        return 0.1  # Default low confidence on error
+
+
+class ResponseSynthesizer:
     """
-    Extracts citations from responses and matches them to sources.
+    هذا مكان ربط LLM الحقيقي.
+    في patch الحالي نرجع "draft" آمن:
+    - يضع ملخص سياقي + يرفض إذا السياق غير كافٍ
     """
-    
-    def extract_citations(self, response: str, sources: List[RetrievalResult]) -> List[Dict[str, Any]]:
-        """
-        Extract citations from the response and match them to sources.
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
 
-        Args:
-            response: Generated response
-            sources: List of retrieved sources
+    def synthesize(self, query: str, ctx: str) -> str:
+        try:
+            if not ctx.strip():
+                self.logger.warning("Insufficient context to generate response")
+                return "Insufficient context retrieved to answer reliably."
 
-        Returns:
-            List of citation dictionaries
-        """
-        citations = []
-        
-        # Look for patterns that might indicate citations
-        # This is a simplified approach - in production, this would be more sophisticated
-        for i, source in enumerate(sources):
-            # Check if source content appears in response (simplified)
-            source_snippet = source.document.content[:100]  # First 100 chars
-            if source_snippet.lower() in response.lower():
-                citations.append({
-                    "source_id": source.document.id,
-                    "rank": source.rank,
-                    "similarity_score": source.score,
-                    "excerpt_used": source_snippet
-                })
-        
-        return citations
+            # Implement token budgeting to prevent overly long contexts
+            max_context_length = 4000  # Adjust based on model limits
+            if len(ctx) > max_context_length:
+                ctx = ctx[:max_context_length]
+                self.logger.warning(f"Context truncated to {max_context_length} characters")
+
+            response = f"Answer based on retrieved context:\n\n{ctx}\n\n(Question: {query})"
+            self.logger.debug(f"Generated response for query: {query[:50]}...")
+            return response
+        except Exception as e:
+            self.logger.error(f"Error synthesizing response: {e}", exc_info=True)
+            return f"Error generating response: {str(e)}"
 
 
 class RAGQueryProcessor:
-    """
-    Main class for processing RAG queries with advanced features.
-    """
-    
-    def __init__(self, rag_pipeline: RAGPipeline):
-        """
-        Initialize the RAG query processor.
-
-        Args:
-            rag_pipeline: RAG pipeline instance to use for processing
-        """
-        self.rag_pipeline = rag_pipeline
+    def __init__(self, retriever: HybridRetriever):
+        self.retriever = retriever
         self.classifier = QueryClassifier()
-        self.expander = QueryExpander()
-        self.response_generator = ResponseGenerator(model_name=rag_pipeline.config.generator_model)
-        self.citation_extractor = CitationExtractor()
+        self.rewriter = QueryRewriter()
+        self.citations = CitationBuilder()
+        self.synth = ResponseSynthesizer()
         self.logger = logging.getLogger(self.__class__.__name__)
-    
-    async def process_query(self, query: str, top_k: int = 5) -> QueryProcessingResult:
-        """
-        Process a query through the RAG system with advanced features.
 
-        Args:
-            query: Query string to process
-            top_k: Number of documents to retrieve
+    async def process(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        user_permissions: Optional[Dict[str, str]] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        allowed_doc_ids: Optional[set[str]] = None,
+    ) -> QueryProcessingResult:
+        t0 = time.time()
+        self.logger.info(f"Processing query: {query[:100]}...")
 
-        Returns:
-            QueryProcessingResult with response and metadata
-        """
-        start_time = time.time()
-        
-        # Classify the query
-        classification_result = self.classifier.classify_query(query)
-        
-        # Expand the query if needed
-        expanded_query = self.expander.expand_query(query)
-        
-        # Retrieve relevant documents
-        retrieval_results = self.rag_pipeline.retrieve(expanded_query, top_k=top_k)
-        
-        # Generate response based on retrieved context
-        if retrieval_results:
-            context = "\n\n".join([
-                f"Document {result.rank}: {result.document.content}" 
-                for result in retrieval_results
-            ])
-        else:
-            context = ""
-        
-        response = self.response_generator.generate_response(
-            query, context, max_new_tokens=self.rag_pipeline.config.max_new_tokens
-        )
-        
-        # Extract citations
-        citations = self.citation_extractor.extract_citations(response, retrieval_results)
-        
-        # Calculate confidence score based on various factors
-        confidence_score = self._calculate_confidence_score(
-            retrieval_results, classification_result.confidence
-        )
-        
-        # Calculate processing time
-        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-        
-        # Prepare metadata
-        metadata = {
-            "query_type": classification_result.query_type.value,
-            "classification_confidence": classification_result.confidence,
-            "expanded_query": expanded_query,
-            "retrieval_count": len(retrieval_results),
-            "processing_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "model_used": self.rag_pipeline.config.generator_model
-        }
-        
-        return QueryProcessingResult(
-            query=query,
-            response=response,
-            sources=retrieval_results,
-            query_type=classification_result.query_type,
-            processing_time_ms=processing_time,
-            confidence_score=confidence_score,
-            citations=citations,
-            metadata=metadata
-        )
-    
-    def _calculate_confidence_score(self, retrieval_results: List[RetrievalResult], 
-                                  classification_confidence: float) -> float:
-        """
-        Calculate a confidence score for the response based on various factors.
+        try:
+            cls = self.classifier.classify(query)
+            rewritten = self.rewriter.rewrite(query)
 
-        Args:
-            retrieval_results: Retrieved documents and scores
-            classification_confidence: Confidence in query classification
+            opts = QueryOptions(
+                top_k=top_k,
+                prefilter_k=max(50, top_k * 10),
+                user_permissions=user_permissions or {},
+                filters=filters or {},
+                allowed_doc_ids=allowed_doc_ids,
+            )
 
-        Returns:
-            Confidence score between 0 and 1
-        """
-        if not retrieval_results:
-            return 0.1  # Low confidence if no results
-        
-        # Calculate average score of retrieved documents
-        avg_score = sum(r.score for r in retrieval_results) / len(retrieval_results)
-        
-        # Calculate score based on top-ranked document
-        top_score = retrieval_results[0].score
-        
-        # Combine factors for final confidence
-        # Weight classification confidence and retrieval scores
-        confidence = 0.3 * classification_confidence + 0.4 * top_score + 0.3 * avg_score
-        
-        # Ensure confidence is between 0 and 1
-        return max(0.0, min(1.0, confidence))
-    
-    async def process_complex_query(self, query: str, top_k: int = 5) -> QueryProcessingResult:
-        """
-        Process a complex query that may require multiple steps or reasoning.
+            results = await self.retriever.retrieve(rewritten, opts)
 
-        Args:
-            query: Complex query string to process
-            top_k: Number of documents to retrieve
+            # Assemble context safely (truncate)
+            ctx_parts = []
+            budget_chars = 8000  # safe default, integrate tokenizer in production
+            used = 0
+            for r in results:
+                snippet = r.document.content
+                if used + len(snippet) > budget_chars:
+                    snippet = snippet[: max(0, budget_chars - used)]
+                ctx_parts.append(f"[{r.rank}] {r.document.id}: {snippet}")
+                used += len(snippet)
+                if used >= budget_chars:
+                    break
 
-        Returns:
-            QueryProcessingResult with response and metadata
-        """
-        # For now, use the same processing as simple queries
-        # In a more advanced implementation, this would handle multi-step reasoning
-        return await self.process_query(query, top_k)
+            context = "\n\n".join(ctx_parts)
+            response = self.synth.synthesize(query, context)
+            cits = self.citations.build(results)
+            conf = _confidence(results, cls.confidence)
 
+            dt = (time.time() - t0) * 1000.0
+            meta = {
+                "query_type": cls.query_type.value,
+                "classification_confidence": cls.confidence,
+                "rewritten_query": rewritten,
+                "retrieval_count": len(results),
+                "processing_time_ms": dt,
+                "hit_sources": [r.source for r in results],
+                "query_hash": hash(query),  # For monitoring without exposing raw query
+            }
 
-class QueryRouter:
-    """
-    Routes queries to appropriate processing handlers based on type.
-    """
-    
-    def __init__(self, rag_pipeline: RAGPipeline):
-        self.processor = RAGQueryProcessor(rag_pipeline)
-        self.logger = logging.getLogger(self.__class__.__name__)
-    
-    async def route_and_process(self, query: str, top_k: int = 5) -> QueryProcessingResult:
-        """
-        Route the query to appropriate processor based on its type.
-
-        Args:
-            query: Query string to process
-            top_k: Number of documents to retrieve
-
-        Returns:
-            QueryProcessingResult with response and metadata
-        """
-        # Classify the query first
-        classification_result = self.processor.classifier.classify_query(query)
-        
-        # Route based on query type
-        if classification_result.query_type in [QueryType.COMPLEX_REASONING, QueryType.ANALYTICAL]:
-            # Use complex processing for reasoning queries
-            result = await self.processor.process_complex_query(query, top_k)
-        else:
-            # Use standard processing for other query types
-            result = await self.processor.process_query(query, top_k)
-        
-        return result
-
-
-# Global instance of query router
-query_router: Optional[QueryRouter] = None
-
-
-def initialize_query_router(rag_pipeline: RAGPipeline):
-    """
-    Initialize the global query router.
-
-    Args:
-        rag_pipeline: RAG pipeline instance to use
-    """
-    global query_router
-    query_router = QueryRouter(rag_pipeline)
-
-
-__all__ = [
-    "QueryType", "QueryClassificationResult", "QueryProcessingResult",
-    "QueryClassifier", "QueryExpander", "ResponseGenerator", 
-    "CitationExtractor", "RAGQueryProcessor", "QueryRouter",
-    "initialize_query_router", "query_router"
-]
+            result = QueryProcessingResult(query, response, results, cls.query_type, dt, conf, cits, meta)
+            self.logger.info(f"Query processed successfully in {dt:.2f}ms, retrieved {len(results)} results")
+            return result
+        except Exception as e:
+            dt = (time.time() - t0) * 1000.0
+            self.logger.error(f"Error processing query '{query[:50]}...': {e}", exc_info=True)
+            # Return error result
+            error_meta = {
+                "query_type": QueryType.UNCERTAIN.value,
+                "classification_confidence": 0.0,
+                "rewritten_query": query,
+                "retrieval_count": 0,
+                "processing_time_ms": dt,
+                "error": str(e),
+                "query_hash": hash(query),  # For monitoring without exposing raw query
+            }
+            return QueryProcessingResult(
+                query=query,
+                response=f"Error processing query: {str(e)}",
+                sources=[],
+                query_type=QueryType.UNCERTAIN,
+                processing_time_ms=dt,
+                confidence_score=0.0,
+                citations=[],
+                metadata=error_meta
+            )

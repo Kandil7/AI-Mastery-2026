@@ -157,8 +157,15 @@ class Logger:
     
     def flush(self):
         """Flush any buffered log entries."""
-        # Implementation would depend on specific handlers
-        pass
+        # Best-effort flush: if handlers expose a `flush` attribute, call it.
+        for handler in self.handlers:
+            try:
+                flush_fn = getattr(handler, "flush", None)
+                if callable(flush_fn):
+                    flush_fn()
+            except Exception:
+                # Never raise from flush; observability must not break the app
+                continue
 
 
 class MetricsCollector:
@@ -418,10 +425,17 @@ class ObservabilityManager:
         if not self.enabled["tracing"] or self.tracer is None:
             # Return a dummy context that doesn't do anything
             class DummyContext:
-                def __enter__(ctx_self): return ctx_self
-                def __exit__(ctx_self, *args): pass
-                def set_result(ctx_self, *args, **kwargs): pass
-                def add_property(ctx_self, *args, **kwargs): pass
+                def __enter__(ctx_self): 
+                    return ctx_self
+                def __exit__(ctx_self, exc_type, exc, tb):
+                    # Propagate exceptions by returning False
+                    return False
+                def set_result(ctx_self, *args, **kwargs):
+                    # No-op placeholder to mirror real context API
+                    return None
+                def add_property(ctx_self, *args, **kwargs):
+                    # No-op placeholder to mirror real context API
+                    return None
             return DummyContext()
         
         trace_id = self.tracer.start_span(operation)

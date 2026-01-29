@@ -1,0 +1,77 @@
+name: ai-mastery-2026
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.10
+  - pip
+  # Scientific computing
+  - numpy
+  - pandas
+  - scipy
+  # Machine learning
+  - scikit-learn
+  - pytorch
+  - torchvision
+  - torchaudio
+  - transformers
+  - tokenizers
+  # Deep learning
+  - tensorflow
+  - keras
+  # API development
+  - fastapi
+  - uvicorn
+  - pydantic
+  # Vector databases
+  - faiss-cpu
+  - hnswlib
+  - pgvector
+  - qdrant-client
+  - weaviate-client
+  # Data processing
+  - datasets
+  - accelerate
+  # Testing
+  - pytest
+  - pytest-cov
+  - pytest-asyncio
+  # Utilities
+  - tqdm
+  - python-dotenv
+  - requests
+  - pyyaml
+  - pypdf
+  # Code quality
+  - black
+  - mypy
+  - flake8
+  - isort
+  # Visualization
+  - matplotlib
+  - seaborn
+  - plotly
+  # Performance optimization
+  - numba
+  # Web UI
+  - streamlit
+  # Database
+  - psycopg2
+  - sqlalchemy
+  # Monitoring
+  - prometheus-client
+  # Jupyter
+  - jupyter
+  - notebook
+  - ipykernel
+  - pip:
+      # LLM and NLP
+      - langchain>=0.0.200
+      - openai>=1.0.0
+      - anthropic>=0.25.0
+      - sentence-transformers>=2.2.0
+      - rank-bm25>=0.2.2
+      # ML extras
+      - torchdiffeq>=0.2.0
+      # Evaluation
+      - ragas>=0.1.0

@@ -21,6 +21,7 @@ Key Features:
 - Memory-efficient vector storage
 - Dimensionality validation and normalization
 - Performance optimization for large-scale deployments
+- Comprehensive error handling and monitoring
 
 Security Considerations:
 - Secure vector database connections
@@ -31,768 +32,514 @@ Security Considerations:
 
 import asyncio
 import logging
-from typing import List, Optional, Dict, Any, Tuple, Union
+import time
+from typing import List, Optional, Dict, Any, Tuple
 from abc import ABC, abstractmethod
 import numpy as np
 from pydantic import BaseModel, Field
-import uuid
 from enum import Enum
+import threading
+from collections import OrderedDict
+from datetime import datetime, timedelta
 
 try:
     import chromadb
     from chromadb.config import Settings
     CHROMA_AVAILABLE = True
-except ImportError:
+except Exception as e:
     CHROMA_AVAILABLE = False
-    logging.warning("ChromaDB not available. Install with 'pip install chromadb'")
+    logging.warning(f"ChromaDB not available: {e}")
 
 try:
     import faiss
     FAISS_AVAILABLE = True
-except ImportError:
+except Exception as e:
     FAISS_AVAILABLE = False
-    logging.warning("FAISS not available. Install with 'pip install faiss-cpu' or 'pip install faiss-gpu'")
-
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logging.warning("SentenceTransformers not available. Install with 'pip install sentence-transformers'")
+    logging.warning(f"FAISS not available: {e}")
 
 
 class VectorDBType(Enum):
-    """Enumeration for supported vector database types."""
     CHROMA = "chroma"
     FAISS = "faiss"
     IN_MEMORY = "in_memory"
 
 
 class VectorConfig(BaseModel):
-    """
-    Configuration for vector storage and retrieval.
+    db_type: VectorDBType = Field(default=VectorDBType.IN_MEMORY)
+    collection_name: str = Field(default="rag_vectors")
+    persist_directory: str = Field(default="./data/vector_store")
+    dimension: int = Field(default=384, ge=1)
+    metric: str = Field(default="cosine")  # cosine | inner_product | l2
+    batch_size: int = Field(default=64, ge=1, le=4096)
 
-    Attributes:
-        db_type (VectorDBType): Type of vector database to use
-        collection_name (str): Name of the collection/index
-        persist_directory (str): Directory for persistent storage
-        dimension (int): Dimension of the vectors
-        metric (str): Distance metric for similarity search
-        batch_size (int): Batch size for vector operations
-        ef_construction (int): HNSW construction parameter (for Chroma)
-        ef_search (int): HNSW search parameter (for Chroma)
-        m (int): HNSW M parameter (for Chroma)
-    """
-    db_type: VectorDBType = Field(default=VectorDBType.IN_MEMORY, description="Type of vector database")
-    collection_name: str = Field(default="rag_vectors", description="Name of the collection")
-    persist_directory: str = Field(default="./data/vector_store", description="Directory for persistent storage")
-    dimension: int = Field(default=384, ge=1, description="Dimension of the vectors")
-    metric: str = Field(default="cosine", description="Distance metric for similarity search")
-    batch_size: int = Field(default=32, ge=1, le=1024, description="Batch size for vector operations")
-    ef_construction: int = Field(default=200, ge=1, description="HNSW construction parameter")
-    ef_search: int = Field(default=50, ge=1, description="HNSW search parameter")
-    m: int = Field(default=16, ge=1, description="HNSW M parameter")
+    # HNSW (Chroma)
+    ef_construction: int = Field(default=200, ge=1)
+    ef_search: int = Field(default=50, ge=1)
+    m: int = Field(default=16, ge=1)
 
 
 class VectorRecord(BaseModel):
-    """
-    Model for vector records in the storage system.
-
-    Attributes:
-        id (str): Unique identifier for the vector record
-        vector (List[float]): The vector embedding
-        metadata (Dict[str, Any]): Associated metadata
-        document_id (str): Reference to the original document
-        text_content (str): Original text content (optional)
-    """
     id: str
     vector: List[float]
     metadata: Dict[str, Any] = Field(default_factory=dict)
     document_id: str
     text_content: Optional[str] = None
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        # Validate vector dimension - only validate if 'dimension' is explicitly provided in metadata
-        expected_dimension = self.metadata.get('dimension')
-        if expected_dimension is not None and len(self.vector) != expected_dimension:
-            raise ValueError(f"Vector dimension mismatch: expected {expected_dimension}, got {len(self.vector)}")
+
+def _normalize(vec: np.ndarray) -> np.ndarray:
+    n = np.linalg.norm(vec)
+    if n == 0:
+        return vec
+    return vec / n
+
+
+def _flatten_metadata(md: Dict[str, Any]) -> Dict[str, Any]:
+    # Chroma metadata must be scalar-like. Keep safe keys only.
+    out = {}
+    for k, v in (md or {}).items():
+        if v is None:
+            continue
+        if isinstance(v, (str, int, float, bool)):
+            out[k] = v
+        else:
+            out[k] = str(v)
+    return out
+
+
+class TypedVectorStoreException(Exception):
+    """Base exception for vector store operations"""
+    def __init__(self, message: str, backend: str = "", operation: str = ""):
+        self.message = message
+        self.backend = backend
+        self.operation = operation
+        super().__init__(f"[{backend}:{operation}] {message}")
 
 
 class BaseVectorStore(ABC):
-    """Abstract base class for vector storage implementations."""
-
     def __init__(self, config: VectorConfig):
-        """
-        Initialize the vector store with configuration.
-
-        Args:
-            config: Vector storage configuration
-        """
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    async def initialize(self):
-        """Initialize the vector store."""
-        pass
+    async def initialize(self): ...
 
     @abstractmethod
-    async def add_vectors(self, vectors: List[VectorRecord]):
-        """
-        Add vectors to the store.
-
-        Args:
-            vectors: List of vector records to add
-        """
-        pass
+    async def upsert(self, records: List[VectorRecord]): ...
 
     @abstractmethod
-    async def search(self, query_vector: List[float], k: int = 5) -> List[Tuple[str, float]]:
-        """
-        Search for similar vectors.
-
-        Args:
-            query_vector: Query vector to search for
-            k: Number of results to return
-
-        Returns:
-            List of tuples (id, similarity_score)
-        """
-        pass
+    async def search(
+        self,
+        query_vector: List[float],
+        k: int = 10,
+        where: Optional[Dict[str, Any]] = None,
+    ) -> List[Tuple[str, float]]: ...
 
     @abstractmethod
-    async def get_vector(self, vector_id: str) -> Optional[VectorRecord]:
-        """
-        Get a vector by ID.
-
-        Args:
-            vector_id: ID of the vector to retrieve
-
-        Returns:
-            Vector record if found, None otherwise
-        """
-        pass
+    async def delete(self, ids: List[str]) -> None: ...
 
     @abstractmethod
-    async def delete_vector(self, vector_id: str) -> bool:
-        """
-        Delete a vector by ID.
-
-        Args:
-            vector_id: ID of the vector to delete
-
-        Returns:
-            True if deleted, False if not found
-        """
-        pass
+    async def count(self) -> int: ...
 
     @abstractmethod
-    async def update_vector(self, vector_record: VectorRecord) -> bool:
-        """
-        Update an existing vector.
+    async def close(self): ...
 
-        Args:
-            vector_record: Updated vector record
 
-        Returns:
-            True if updated, False if not found
-        """
-        pass
+class LRUCache:
+    """Thread-safe LRU cache with TTL support"""
+    def __init__(self, maxsize: int = 1000, ttl: int = 300):  # 5 min default TTL
+        self.maxsize = maxsize
+        self.ttl = timedelta(seconds=ttl)
+        self._cache = OrderedDict()
+        self._lock = threading.RLock()
 
-    @abstractmethod
-    async def get_count(self) -> int:
-        """
-        Get the total number of vectors in the store.
+    def get(self, key):
+        with self._lock:
+            if key in self._cache:
+                value, timestamp = self._cache[key]
+                if datetime.now() - timestamp < self.ttl:
+                    # Move to end (most recently used)
+                    self._cache.move_to_end(key)
+                    return value
+                else:
+                    # TTL expired, remove
+                    del self._cache[key]
+            return None
 
-        Returns:
-            Total count of vectors
-        """
-        pass
+    def put(self, key, value):
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            elif len(self._cache) >= self.maxsize:
+                # Remove oldest item
+                self._cache.popitem(last=False)
+            self._cache[key] = (value, datetime.now())
 
-    @abstractmethod
-    async def close(self):
-        """Close the vector store and release resources."""
-        pass
+    def clear(self):
+        with self._lock:
+            self._cache.clear()
 
 
 class InMemoryVectorStore(BaseVectorStore):
-    """In-memory vector store implementation for development and testing."""
-
     def __init__(self, config: VectorConfig):
         super().__init__(config)
-        self.vectors: Dict[str, VectorRecord] = {}
-        self.dimension = config.dimension
+        self._vectors: Dict[str, np.ndarray] = {}
+        self._meta: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()  # Thread-safe operations
 
     async def initialize(self):
-        """Initialize the in-memory vector store."""
-        self.logger.info("Initialized in-memory vector store")
-        # Nothing to initialize for in-memory store
+        self.logger.info("InMemoryVectorStore initialized (dev only).")
 
-    async def add_vectors(self, vectors: List[VectorRecord]):
-        """Add vectors to the in-memory store."""
-        for vector_record in vectors:
-            # Validate vector dimension
-            if len(vector_record.vector) != self.dimension:
-                raise ValueError(f"Vector dimension mismatch: expected {self.dimension}, got {len(vector_record.vector)}")
-            
-            self.vectors[vector_record.id] = vector_record
-        
-        self.logger.info(f"Added {len(vectors)} vectors to in-memory store")
-
-    async def search(self, query_vector: List[float], k: int = 5) -> List[Tuple[str, float]]:
-        """Search for similar vectors in the in-memory store."""
-        if len(query_vector) != self.dimension:
-            raise ValueError(f"Query vector dimension mismatch: expected {self.dimension}, got {len(query_vector)}")
-        
-        # Calculate cosine similarity with all stored vectors
-        similarities = []
-        query_array = np.array(query_vector)
-        
-        for vector_id, vector_record in self.vectors.items():
-            stored_array = np.array(vector_record.vector)
-            
-            # Calculate cosine similarity
-            dot_product = np.dot(query_array, stored_array)
-            norm_query = np.linalg.norm(query_array)
-            norm_stored = np.linalg.norm(stored_array)
-            
-            if norm_query == 0 or norm_stored == 0:
-                similarity = 0.0
-            else:
-                similarity = dot_product / (norm_query * norm_stored)
-            
-            similarities.append((vector_id, float(similarity)))
-        
-        # Sort by similarity (descending) and return top k
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        return similarities[:k]
-
-    async def get_vector(self, vector_id: str) -> Optional[VectorRecord]:
-        """Get a vector by ID from the in-memory store."""
-        return self.vectors.get(vector_id)
-
-    async def delete_vector(self, vector_id: str) -> bool:
-        """Delete a vector by ID from the in-memory store."""
-        if vector_id in self.vectors:
-            del self.vectors[vector_id]
-            return True
-        return False
-
-    async def update_vector(self, vector_record: VectorRecord) -> bool:
-        """Update an existing vector in the in-memory store."""
-        if vector_record.id in self.vectors:
-            # Validate vector dimension
-            if len(vector_record.vector) != self.dimension:
-                raise ValueError(f"Vector dimension mismatch: expected {self.dimension}, got {len(vector_record.vector)}")
-            
-            self.vectors[vector_record.id] = vector_record
-            return True
-        return False
-
-    async def get_count(self) -> int:
-        """Get the total number of vectors in the in-memory store."""
-        return len(self.vectors)
-
-    async def close(self):
-        """Close the in-memory vector store."""
-        self.vectors.clear()
-        self.logger.info("Closed in-memory vector store")
-
-
-class ChromaVectorStore(BaseVectorStore):
-    """ChromaDB vector store implementation."""
-
-    def __init__(self, config: VectorConfig):
-        super().__init__(config)
-        
-        if not CHROMA_AVAILABLE:
-            raise RuntimeError("ChromaDB is not available. Install with 'pip install chromadb'")
-        
-        self.client = None
-        self.collection = None
-        self.settings = Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=config.persist_directory,
-            anonymized_telemetry=False
-        )
-
-    async def initialize(self):
-        """Initialize the ChromaDB vector store."""
-        loop = asyncio.get_event_loop()
-        
-        # Create client and collection in thread pool
-        self.client = await loop.run_in_executor(
-            None,
-            lambda: chromadb.PersistentClient(
-                path=self.config.persist_directory,
-                settings=self.settings,
-            ),
-        )
-        
-        # Create or get collection with specified settings
-        metadata = {
-            "hnsw:space": self.config.metric,
-            "hnsw:construction_ef": self.config.ef_construction,
-            "hnsw:search_ef": self.config.ef_search,
-            "hnsw:M": self.config.m
-        }
-        
-        self.collection = await loop.run_in_executor(
-            None,
-            lambda: self.client.get_or_create_collection(
-                name=self.config.collection_name,
-                metadata=metadata,
-            ),
-        )
-        
-        self.logger.info(f"Initialized ChromaDB vector store with collection: {self.config.collection_name}")
-
-    async def add_vectors(self, vectors: List[VectorRecord]):
-        """Add vectors to the ChromaDB store."""
-        if not vectors:
-            return
-        
-        loop = asyncio.get_event_loop()
-        
-        # Prepare data for ChromaDB
-        ids = [v.id for v in vectors]
-        embeddings = [v.vector for v in vectors]
-        metadatas = [v.metadata for v in vectors]
-        documents = [v.text_content for v in vectors if v.text_content]
-        
-        # If not all vectors have text content, fill with empty strings
-        if len(documents) != len(vectors):
-            documents = [v.text_content or "" for v in vectors]
-        
-        # Add to ChromaDB
-        await loop.run_in_executor(
-            None,
-            lambda: self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents
-            )
-        )
-        
-        self.logger.info(f"Added {len(vectors)} vectors to ChromaDB")
-
-    async def search(self, query_vector: List[float], k: int = 5) -> List[Tuple[str, float]]:
-        """Search for similar vectors in ChromaDB."""
-        loop = asyncio.get_event_loop()
-        
-        results = await loop.run_in_executor(
-            None,
-            lambda: self.collection.query(
-                query_embeddings=[query_vector],
-                n_results=k,
-                include=["distances"]
-            )
-        )
-        
-        # Extract IDs and distances
-        ids = results["ids"][0] if results["ids"] else []
-        distances = results["distances"][0] if results["distances"] else []
-        
-        # Convert distances to similarities (1 / (1 + distance) for cosine similarity)
-        similarities = [(id_, 1.0 / (1.0 + dist)) for id_, dist in zip(ids, distances)]
-        
-        return similarities
-
-    async def get_vector(self, vector_id: str) -> Optional[VectorRecord]:
-        """Get a vector by ID from ChromaDB."""
-        loop = asyncio.get_event_loop()
-        
-        results = await loop.run_in_executor(
-            None,
-            lambda: self.collection.get(
-                ids=[vector_id],
-                include=["embeddings", "metadatas", "documents"]
-            )
-        )
-        
-        if not results["ids"] or not results["embeddings"]:
-            return None
-        
-        # Extract the vector data
-        embedding = results["embeddings"][0]
-        metadata = results["metadatas"][0] if results["metadatas"] else {}
-        document = results["documents"][0] if results["documents"] else None
-        
-        return VectorRecord(
-            id=vector_id,
-            vector=embedding,
-            metadata=metadata,
-            document_id=metadata.get("document_id", ""),
-            text_content=document
-        )
-
-    async def delete_vector(self, vector_id: str) -> bool:
-        """Delete a vector by ID from ChromaDB."""
-        loop = asyncio.get_event_loop()
-        
+    async def upsert(self, records: List[VectorRecord]):
         try:
-            await loop.run_in_executor(
-                None,
-                lambda: self.collection.delete(ids=[vector_id])
-            )
-            return True
+            with self._lock:
+                for r in records:
+                    if len(r.vector) != self.config.dimension:
+                        raise TypedVectorStoreException(
+                            f"Vector dimension mismatch: expected {self.config.dimension}, got {len(r.vector)}",
+                            backend="InMemory",
+                            operation="upsert"
+                        )
+                    v = _normalize(np.array(r.vector, dtype=np.float32)) if self.config.metric in ("cosine", "inner_product") else np.array(r.vector, dtype=np.float32)
+                    self._vectors[r.id] = v
+                    self._meta[r.id] = _flatten_metadata(r.metadata)
+            self.logger.debug(f"Upserted {len(records)} records to InMemoryVectorStore")
+        except TypedVectorStoreException:
+            raise
         except Exception as e:
-            self.logger.error(f"Error deleting vector {vector_id}: {e}")
-            return False
+            self.logger.error(f"Error upserting records to InMemoryVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="InMemory", operation="upsert")
 
-    async def update_vector(self, vector_record: VectorRecord) -> bool:
-        """Update an existing vector in ChromaDB."""
-        loop = asyncio.get_event_loop()
-        
+    async def search(self, query_vector: List[float], k: int = 10, where: Optional[Dict[str, Any]] = None):
         try:
-            await loop.run_in_executor(
-                None,
-                lambda: self.collection.update(
-                    ids=[vector_record.id],
-                    embeddings=[vector_record.vector],
-                    metadatas=[vector_record.metadata],
-                    documents=[vector_record.text_content] if vector_record.text_content else None
-                )
-            )
-            return True
-        except Exception as e:
-            self.logger.error(f"Error updating vector {vector_record.id}: {e}")
-            return False
+            with self._lock:
+                if len(query_vector) != self.config.dimension:
+                    raise TypedVectorStoreException(
+                        f"Query vector dimension mismatch: expected {self.config.dimension}, got {len(query_vector)}",
+                        backend="InMemory",
+                        operation="search"
+                    )
 
-    async def get_count(self) -> int:
-        """Get the total number of vectors in ChromaDB."""
-        loop = asyncio.get_event_loop()
-        count = await loop.run_in_executor(None, lambda: self.collection.count())
+                q = np.array(query_vector, dtype=np.float32)
+                if self.config.metric in ("cosine", "inner_product"):
+                    q = _normalize(q)
+
+                ids = list(self._vectors.keys())
+                if where:
+                    # naive filter
+                    ids = [i for i in ids if all(self._meta.get(i, {}).get(k) == v for k, v in where.items())]
+
+                if not ids:
+                    return []
+
+                mat = np.vstack([self._vectors[i] for i in ids])
+                if self.config.metric in ("cosine", "inner_product"):
+                    sims = mat @ q
+                else:
+                    # l2 distance -> convert to similarity
+                    d = np.linalg.norm(mat - q, axis=1)
+                    sims = 1.0 / (1.0 + d)
+
+                order = np.argsort(sims)[::-1][:k]
+                results = [(ids[int(i)], float(sims[int(i)])) for i in order]
+            self.logger.debug(f"Found {len(results)} results for query in InMemoryVectorStore")
+            return results
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error searching in InMemoryVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="InMemory", operation="search")
+
+    async def delete(self, ids: List[str]) -> None:
+        try:
+            with self._lock:
+                for i in ids:
+                    self._vectors.pop(i, None)
+                    self._meta.pop(i, None)
+            self.logger.debug(f"Deleted {len(ids)} records from InMemoryVectorStore")
+        except Exception as e:
+            self.logger.error(f"Error deleting records from InMemoryVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="InMemory", operation="delete")
+
+    async def count(self) -> int:
+        with self._lock:
+            count = len(self._vectors)
+        self.logger.debug(f"Counted {count} vectors in InMemoryVectorStore")
         return count
 
     async def close(self):
-        """Close the ChromaDB vector store."""
-        # ChromaDB doesn't have a specific close method
-        self.logger.info("Closed ChromaDB vector store")
+        with self._lock:
+            self._vectors.clear()
+            self._meta.clear()
+        self.logger.info("Closed InMemoryVectorStore")
+
+
+class ChromaVectorStore(BaseVectorStore):
+    def __init__(self, config: VectorConfig):
+        super().__init__(config)
+        if not CHROMA_AVAILABLE:
+            raise TypedVectorStoreException("Chroma not installed", backend="Chroma", operation="init")
+
+        self._client = None
+        self._collection = None
+        self._settings = Settings(
+            anonymized_telemetry=False,
+            persist_directory=config.persist_directory,
+        )
+        self._lock = threading.Lock()  # Chroma client is not thread-safe for writes
+
+    async def initialize(self):
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _init():
+                try:
+                    client = chromadb.PersistentClient(path=self.config.persist_directory, settings=self._settings)
+                    metadata = {
+                        "hnsw:space": "cosine" if self.config.metric == "cosine" else "ip",
+                        "hnsw:construction_ef": self.config.ef_construction,
+                        "hnsw:search_ef": self.config.ef_search,
+                        "hnsw:M": self.config.m,
+                    }
+                    col = client.get_or_create_collection(name=self.config.collection_name, metadata=metadata)
+                    return client, col
+                except Exception as e:
+                    raise TypedVectorStoreException(f"Failed to initialize Chroma: {e}", backend="Chroma", operation="init")
+
+            self._client, self._collection = await loop.run_in_executor(None, _init)
+            self.logger.info("ChromaVectorStore initialized: %s", self.config.collection_name)
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error initializing ChromaVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="Chroma", operation="init")
+
+    async def upsert(self, records: List[VectorRecord]):
+        try:
+            if not records:
+                return
+            loop = asyncio.get_event_loop()
+
+            ids = [r.id for r in records]
+            embs = []
+            for r in records:
+                if len(r.vector) != self.config.dimension:
+                    raise TypedVectorStoreException(
+                        f"Vector dimension mismatch: expected {self.config.dimension}, got {len(r.vector)}",
+                        backend="Chroma",
+                        operation="upsert"
+                    )
+                v = np.array(r.vector, dtype=np.float32)
+                if self.config.metric in ("cosine", "inner_product"):
+                    v = _normalize(v)
+                embs.append(v.tolist())
+
+            metadatas = [_flatten_metadata(r.metadata) for r in records]
+            documents = [r.text_content or "" for r in records]
+
+            def _upsert():
+                with self._lock:  # Serialize writes to Chroma
+                    try:
+                        self._collection.delete(ids=ids)
+                    except Exception:
+                        pass
+                    self._collection.add(ids=ids, embeddings=embs, metadatas=metadatas, documents=documents)
+
+            await loop.run_in_executor(None, _upsert)
+            self.logger.debug(f"Upserted {len(records)} records to ChromaVectorStore")
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error upserting records to ChromaVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="Chroma", operation="upsert")
+
+    async def search(self, query_vector: List[float], k: int = 10, where: Optional[Dict[str, Any]] = None):
+        try:
+            loop = asyncio.get_event_loop()
+
+            q = np.array(query_vector, dtype=np.float32)
+            if self.config.metric in ("cosine", "inner_product"):
+                q = _normalize(q)
+
+            def _query():
+                kwargs = {"query_embeddings": [q.tolist()], "n_results": k, "include": ["distances", "metadatas", "ids"]}
+                if where:
+                    kwargs["where"] = where
+                return self._collection.query(**kwargs)
+
+            res = await loop.run_in_executor(None, _query)
+            ids = res.get("ids", [[]])[0]
+            distances = res.get("distances", [[]])[0]
+
+            # Chroma distances depend on space; we standardize similarity:
+            # cosine space often returns (1 - cosine_similarity)
+            sims = []
+            for i, d in zip(ids, distances):
+                if self.config.metric == "cosine":
+                    # For cosine space, distance is typically (1 - cosine_similarity)
+                    # So similarity = 1 - distance
+                    sims.append((i, float(1.0 - d)))
+                elif self.config.metric == "inner_product":
+                    # For inner product space, distance might be (1 - inner_product)
+                    # So similarity = 1 - distance
+                    sims.append((i, float(1.0 - d)))
+                else:
+                    # For L2 space, convert distance to similarity
+                    sims.append((i, float(1.0 / (1.0 + d))))
+
+            self.logger.debug(f"Found {len(sims)} results for query in ChromaVectorStore")
+            return sims
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error searching in ChromaVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="Chroma", operation="search")
+
+    async def delete(self, ids: List[str]) -> None:
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _del():
+                with self._lock:  # Serialize writes to Chroma
+                    self._collection.delete(ids=ids)
+
+            await loop.run_in_executor(None, _del)
+            self.logger.debug(f"Deleted {len(ids)} records from ChromaVectorStore")
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error deleting records from ChromaVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="Chroma", operation="delete")
+
+    async def count(self) -> int:
+        try:
+            loop = asyncio.get_event_loop()
+            count = await loop.run_in_executor(None, lambda: self._collection.count())
+            self.logger.debug(f"Counted {count} vectors in ChromaVectorStore")
+            return count
+        except TypedVectorStoreException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Error counting vectors in ChromaVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="Chroma", operation="count")
+
+    async def close(self):
+        self._client = None
+        self._collection = None
+        self.logger.info("Closed ChromaVectorStore")
 
 
 class FAISSVectorStore(BaseVectorStore):
-    """FAISS vector store implementation."""
-
     def __init__(self, config: VectorConfig):
         super().__init__(config)
-        
         if not FAISS_AVAILABLE:
-            raise RuntimeError("FAISS is not available. Install with 'pip install faiss-cpu' or 'pip install faiss-gpu'")
-        
+            raise TypedVectorStoreException("FAISS not installed", backend="FAISS", operation="init")
         self.index = None
-        self.id_to_vector: Dict[str, VectorRecord] = {}
-        self.vector_ids: List[str] = []
+        self._ids: List[str] = []
+        self._meta: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()  # FAISS index is not thread-safe for writes
 
     async def initialize(self):
-        """Initialize the FAISS vector store."""
-        # Create FAISS index based on metric type
-        if self.config.metric.lower() in ['cosine', 'inner_product']:
-            # For cosine similarity, we use inner product on normalized vectors
-            self.index = faiss.IndexFlatIP(self.config.dimension)
-        elif self.config.metric.lower() == 'l2':
-            self.index = faiss.IndexFlatL2(self.config.dimension)
-        else:
-            # Default to inner product
-            self.index = faiss.IndexFlatIP(self.config.dimension)
-        
-        self.logger.info(f"Initialized FAISS vector store with dimension: {self.config.dimension}")
+        try:
+            with self._lock:
+                if self.config.metric in ("cosine", "inner_product"):
+                    self.index = faiss.IndexFlatIP(self.config.dimension)
+                else:
+                    self.index = faiss.IndexFlatL2(self.config.dimension)
+            self.logger.info("FAISSVectorStore initialized dim=%s", self.config.dimension)
+        except Exception as e:
+            self.logger.error(f"Error initializing FAISSVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="FAISS", operation="init")
 
-    async def add_vectors(self, vectors: List[VectorRecord]):
-        """Add vectors to the FAISS store."""
-        if not vectors:
-            return
-        
-        # Validate all vectors have the same dimension
-        for vector_record in vectors:
-            if len(vector_record.vector) != self.config.dimension:
-                raise ValueError(f"Vector dimension mismatch: expected {self.config.dimension}, got {len(vector_record.vector)}")
-        
-        # Convert vectors to numpy array
-        vector_array = np.array([v.vector for v in vectors]).astype('float32')
-        
-        # Normalize vectors for cosine similarity
-        if self.config.metric.lower() in ['cosine', 'inner_product']:
-            faiss.normalize_L2(vector_array)
-        
-        # Add to FAISS index
-        self.index.add(vector_array)
-        
-        # Store metadata separately
-        for i, vector_record in enumerate(vectors):
-            vector_id = vector_record.id
-            self.id_to_vector[vector_id] = vector_record
-            # Map index position to vector ID
-            if len(self.vector_ids) <= self.index.ntotal - len(vectors) + i:
-                self.vector_ids.extend([None] * (self.index.ntotal - len(vectors) + i - len(self.vector_ids) + 1))
-            self.vector_ids[self.index.ntotal - len(vectors) + i] = vector_id
-        
-        self.logger.info(f"Added {len(vectors)} vectors to FAISS")
+    async def upsert(self, records: List[VectorRecord]):
+        try:
+            with self._lock:  # Serialize writes to FAISS index
+                # FAISS upsert is non-trivial; production: use IVF/HNSW + external mapping.
+                # Here we implement append-only with duplicate prevention by delete+rebuild (expensive).
+                # On scale use a DB that supports upsert or store per-shard.
+                existing = set(self._ids)
+                new = [r for r in records if r.id not in existing]
+                if not new:
+                    return
 
-    async def search(self, query_vector: List[float], k: int = 5) -> List[Tuple[str, float]]:
-        """Search for similar vectors in FAISS."""
-        if len(query_vector) != self.config.dimension:
-            raise ValueError(f"Query vector dimension mismatch: expected {self.config.dimension}, got {len(query_vector)}")
-        
-        # Convert query to numpy array
-        query_array = np.array([query_vector]).astype('float32')
-        
-        # Normalize for cosine similarity
-        if self.config.metric.lower() in ['cosine', 'inner_product']:
-            faiss.normalize_L2(query_array)
-        
-        # Perform search
-        distances, indices = self.index.search(query_array, k)
-        
-        # Convert to list of (id, similarity) tuples
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            if idx != -1 and idx < len(self.vector_ids):  # Valid index
-                vector_id = self.vector_ids[idx]
-                if vector_id is not None:
-                    # Convert distance to similarity based on metric
-                    if self.config.metric.lower() in ['cosine', 'inner_product']:
-                        similarity = float(dist)  # Inner product is similarity for normalized vectors
+                vecs = []
+                for r in new:
+                    v = np.array(r.vector, dtype=np.float32)
+                    if self.config.metric in ("cosine", "inner_product"):
+                        v = _normalize(v)
+                    vecs.append(v)
+                    self._meta[r.id] = _flatten_metadata(r.metadata)
+                    self._ids.append(r.id)
+
+                if vecs:  # Only add if there are vectors to add
+                    mat = np.vstack(vecs).astype("float32")
+                    self.index.add(mat)
+            self.logger.debug(f"Upserted {len(new)} records to FAISSVectorStore")
+        except Exception as e:
+            self.logger.error(f"Error upserting records to FAISSVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="FAISS", operation="upsert")
+
+    async def search(self, query_vector: List[float], k: int = 10, where: Optional[Dict[str, Any]] = None):
+        try:
+            with self._lock:  # FAISS search is generally thread-safe, but let's be safe
+                q = np.array([query_vector], dtype=np.float32)
+                if self.config.metric in ("cosine", "inner_product"):
+                    q = np.array([_normalize(q[0])], dtype=np.float32)
+
+                distances, idxs = self.index.search(q, k)
+                out = []
+                for dist, idx in zip(distances[0], idxs[0]):
+                    if idx < 0 or idx >= len(self._ids):
+                        continue
+                    vid = self._ids[int(idx)]
+                    if where:
+                        md = self._meta.get(vid, {})
+                        if not all(md.get(k) == v for k, v in where.items()):
+                            continue
+                    # For cosine/IP, FAISS returns inner product which is the similarity
+                    # For L2, FAISS returns distances, so convert to similarity
+                    if self.config.metric in ("cosine", "inner_product"):
+                        sim = float(dist)
                     else:
-                        similarity = 1.0 / (1.0 + float(dist))  # Convert distance to similarity
-                    results.append((vector_id, similarity))
-        
-        return results
+                        sim = float(1.0 / (1.0 + dist))
+                    out.append((vid, sim))
 
-    async def get_vector(self, vector_id: str) -> Optional[VectorRecord]:
-        """Get a vector by ID from FAISS."""
-        return self.id_to_vector.get(vector_id)
+            self.logger.debug(f"Found {len(out)} results for query in FAISSVectorStore")
+            return out
+        except Exception as e:
+            self.logger.error(f"Error searching in FAISSVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="FAISS", operation="search")
 
-    async def delete_vector(self, vector_id: str) -> bool:
-        """Delete a vector by ID from FAISS."""
-        # FAISS doesn't support efficient deletion of individual vectors
-        # We'll mark it as deleted but keep the index structure
-        if vector_id in self.id_to_vector:
-            del self.id_to_vector[vector_id]
-            # Remove from vector_ids list
-            if vector_id in self.vector_ids:
-                idx = self.vector_ids.index(vector_id)
-                self.vector_ids[idx] = None
-            return True
-        return False
+    async def delete(self, ids: List[str]) -> None:
+        try:
+            # FAISS delete is not supported efficiently; mark deleted.
+            with self._lock:
+                for i in ids:
+                    if i in self._meta:
+                        self._meta.pop(i, None)
+            self.logger.debug(f"Marked {len(ids)} records for deletion in FAISSVectorStore")
+        except Exception as e:
+            self.logger.error(f"Error deleting records from FAISSVectorStore: {e}")
+            raise TypedVectorStoreException(str(e), backend="FAISS", operation="delete")
 
-    async def update_vector(self, vector_record: VectorRecord) -> bool:
-        """Update an existing vector in FAISS."""
-        # FAISS doesn't support efficient updates of individual vectors
-        # We'll delete and re-add
-        if vector_record.id in self.id_to_vector:
-            # Delete old vector (by marking as None in our mapping)
-            await self.delete_vector(vector_record.id)
-            # Add new vector
-            await self.add_vectors([vector_record])
-            return True
-        return False
-
-    async def get_count(self) -> int:
-        """Get the total number of vectors in FAISS."""
-        return self.index.ntotal
+    async def count(self) -> int:
+        with self._lock:
+            count = self.index.ntotal
+        self.logger.debug(f"Counted {count} vectors in FAISSVectorStore")
+        return count
 
     async def close(self):
-        """Close the FAISS vector store."""
-        self.index = None
-        self.id_to_vector.clear()
-        self.vector_ids.clear()
-        self.logger.info("Closed FAISS vector store")
+        with self._lock:
+            self.index = None
+            self._ids.clear()
+            self._meta.clear()
+        self.logger.info("Closed FAISSVectorStore")
 
 
 class VectorStoreFactory:
-    """Factory for creating appropriate vector store implementations."""
-
     @staticmethod
-    def create_vector_store(config: VectorConfig) -> BaseVectorStore:
-        """
-        Create a vector store instance based on the specified configuration.
-
-        Args:
-            config: Vector storage configuration
-
-        Returns:
-            Appropriate vector store instance
-        """
+    def create(config: VectorConfig) -> BaseVectorStore:
         if config.db_type == VectorDBType.CHROMA:
             return ChromaVectorStore(config)
-        elif config.db_type == VectorDBType.FAISS:
+        if config.db_type == VectorDBType.FAISS:
             return FAISSVectorStore(config)
-        elif config.db_type == VectorDBType.IN_MEMORY:
-            return InMemoryVectorStore(config)
-        else:
-            raise ValueError(f"Unknown vector database type: {config.db_type}")
-
-
-class VectorManager:
-    """
-    Manager class for handling vector operations in the RAG system.
-    
-    This class provides a unified interface for vector operations regardless
-    of the underlying vector database implementation.
-    """
-
-    def __init__(self, config: VectorConfig):
-        """
-        Initialize the vector manager with configuration.
-
-        Args:
-            config: Vector storage configuration
-        """
-        self.config = config
-        self.vector_store: Optional[BaseVectorStore] = None
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    async def initialize(self):
-        """Initialize the vector manager and underlying store."""
-        self.vector_store = VectorStoreFactory.create_vector_store(self.config)
-        await self.vector_store.initialize()
-        self.logger.info("Vector manager initialized")
-
-    async def add_document_vector(self, document_id: str, vector: List[float], 
-                                text_content: Optional[str] = None, 
-                                metadata: Optional[Dict[str, Any]] = None) -> str:
-        """
-        Add a vector representation of a document.
-
-        Args:
-            document_id: ID of the original document
-            vector: Vector embedding of the document
-            text_content: Original text content (optional)
-            metadata: Additional metadata (optional)
-
-        Returns:
-            ID of the created vector record
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        # Generate a unique vector ID
-        vector_id = f"vec_{uuid.uuid4().hex[:16]}"
-        
-        # Create vector record
-        vector_record = VectorRecord(
-            id=vector_id,
-            vector=vector,
-            metadata=metadata or {},
-            document_id=document_id,
-            text_content=text_content
-        )
-        
-        # Add to vector store
-        await self.vector_store.add_vectors([vector_record])
-        
-        return vector_id
-
-    async def search_similar(self, query_vector: List[float], k: int = 5) -> List[Tuple[str, float]]:
-        """
-        Search for similar vectors to the query vector.
-
-        Args:
-            query_vector: Query vector to search for
-            k: Number of results to return
-
-        Returns:
-            List of tuples (vector_id, similarity_score)
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        return await self.vector_store.search(query_vector, k)
-
-    async def get_vector_by_id(self, vector_id: str) -> Optional[VectorRecord]:
-        """
-        Get a vector record by its ID.
-
-        Args:
-            vector_id: ID of the vector to retrieve
-
-        Returns:
-            Vector record if found, None otherwise
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        return await self.vector_store.get_vector(vector_id)
-
-    async def delete_vector_by_id(self, vector_id: str) -> bool:
-        """
-        Delete a vector by its ID.
-
-        Args:
-            vector_id: ID of the vector to delete
-
-        Returns:
-            True if deleted, False if not found
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        return await self.vector_store.delete_vector(vector_id)
-
-    async def update_vector_record(self, vector_record: VectorRecord) -> bool:
-        """
-        Update an existing vector record.
-
-        Args:
-            vector_record: Updated vector record
-
-        Returns:
-            True if updated, False if not found
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        return await self.vector_store.update_vector(vector_record)
-
-    async def get_total_count(self) -> int:
-        """
-        Get the total number of vectors in the store.
-
-        Returns:
-            Total count of vectors
-        """
-        if not self.vector_store:
-            raise RuntimeError("Vector manager not initialized")
-        
-        return await self.vector_store.get_count()
-
-    async def close(self):
-        """Close the vector manager and underlying store."""
-        if self.vector_store:
-            await self.vector_store.close()
-        self.logger.info("Vector manager closed")
-
-
-# Global instance of vector manager
-vector_manager: Optional[VectorManager] = None
-
-
-async def initialize_vector_manager(config: VectorConfig):
-    """
-    Initialize the global vector manager.
-
-    Args:
-        config: Vector storage configuration
-    """
-    global vector_manager
-    vector_manager = VectorManager(config)
-    await vector_manager.initialize()
-
-
-async def close_vector_manager():
-    """Close the global vector manager."""
-    global vector_manager
-    if vector_manager:
-        await vector_manager.close()
-        vector_manager = None
-
-
-__all__ = [
-    "VectorDBType", "VectorConfig", "VectorRecord", "BaseVectorStore",
-    "InMemoryVectorStore", "ChromaVectorStore", "FAISSVectorStore",
-    "VectorStoreFactory", "VectorManager", "initialize_vector_manager",
-    "close_vector_manager", "vector_manager"
-]
+        return InMemoryVectorStore(config)

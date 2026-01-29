@@ -2,11 +2,20 @@
 
 ## Executive Summary
 
-**Problem**: A SaaS company was experiencing 15% monthly churn rate, resulting in $2M annual revenue loss.
+**Problem**: A SaaS company faced 15% monthly churn, causing $2M annual revenue loss.
 
-**Solution**: Built an ML-powered churn prediction system that identifies at-risk customers 30 days in advance.
+**Solution**: Built an ML churn predictor that flags at-risk customers 30 days ahead.
 
-**Impact**: Reduced churn from 15% → 9%, saving $800K annually.
+**Impact**: Reduced churn from 15% -> 9%, saving ~$800K annually and lifting retained MRR by ~6%.
+
+**System design snapshot** (full design in `docs/system_design_solutions/06_churn_prediction.md`):
+- SLOs: p99 <150 ms; feature freshness <30 minutes; batch scoring done by 06:00 UTC.
+- Scale: ~120M usage events/day across ~12k customers; ~450 at-risk accounts flagged monthly.
+- Cost guardrails: < $0.002 per online score; batch pipeline < $65/day all-in.
+- Data quality gates: schema contracts via Great Expectations; Airflow fails on drift or
+  volume anomalies.
+- Reliability: blue/green deploys with 24h shadow traffic; auto rollback if AUC drops >5%
+  or alerts spike.
 
 ---
 
@@ -55,6 +64,12 @@ team_growth = new_users_last_30d - churned_users__last_30d
 
 **Total Features**: 47 engineered features
 
+### Data contracts and quality gates
+- Schemas for usage, billing, and support tables are versioned and backward-compatible (no drops).
+- Great Expectations checks: null ratios, unexpected categories, row-count deltas +/-15%.
+- Late-arriving data handled with a T-2 day watermark; partitions reprocessed if completeness <99%.
+- Backfills once per month with audit trail; feature store versions features with lineage tags.
+
 ---
 
 ## Model Development
@@ -65,7 +80,7 @@ team_growth = new_users_last_30d - churned_users__last_30d
 |-------|-----------|--------|-----|---------|-------|
 | Logistic Regression | 0.62 | 0.71 | 0.66 | 0.78 | Fast, interpretable |
 | Random Forest | 0.68 | 0.74 | 0.71 | 0.83 | Feature importance clear |
-| XGBoost | **0.73** | **0.79** | **0.76** | **0.87** | ✅ **Selected** |
+| XGBoost | **0.73** | **0.79** | **0.76** | **0.87** | **Selected** |
 | Neural Network | 0.70 | 0.76 | 0.73 | 0.85 | Harder to explain |
 
 **Selected Model**: XGBoost
@@ -88,7 +103,7 @@ best_params = {
 
 ### Cross-Validation
 - **Strategy**: Time-series split (respects temporal nature)
-- **Validation AUC**: 0.86 ± 0.02
+- **Validation AUC**: 0.86 +/- 0.02
 - **Test AUC**: 0.87
 
 ---
@@ -98,10 +113,12 @@ best_params = {
 ### Architecture
 
 ```
-Customer DB → Feature Pipeline (Airflow) → Redis Feature Store
-                                                 ↓
-                                    Scoring Service (FastAPI)
-                                                 ↓
+Customer DB -> Feature Pipeline (Airflow) -> Redis Feature Store
+                                               |
+                                               v
+                                   Scoring Service (FastAPI)
+                                               |
+                                               v
                               CRM (Salesforce) + Alert Dashboard
 ```
 
@@ -144,6 +161,22 @@ async def predict_churn(customer_id: int):
 - Medium risk (0.35-0.7): Automated personalized email + feature recommendations
 - Low risk (<0.35): Monitor
 
+### Operational SLOs and runbook
+- p99 online scoring latency <150 ms; FastAPI autoscaled to keep CPU <60%.
+- Feature freshness target <30 minutes; requests return 503 if feature timestamp is stale.
+- Batch SLA: daily DAG finishes by 06:00 UTC; auto-reruns if failure occurs before 04:00 UTC.
+- Runbook highlights:
+  - Late partitions: pause scoring for affected tenants, backfill T-1, notify CS via Slack.
+  - Redis evictions: fallback to on-demand feature compute and warm caches for top 5% accounts.
+  - Salesforce API rate limit: enqueue tasks to SQS and trickle once limits reset.
+
+### Observability and drift control
+- Metrics: AUC/PR by cohort, feature freshness lag, batch completeness, intervention send rate.
+- Alerts: page if AUC_7d < baseline - 0.05 or feature null ratio jumps >5%; Slack if p95 latency
+  >120 ms.
+- Deployment safety: shadow for 24h, then blue/green; rollback on KPI regression or alert fatigue
+  >2x baseline.
+
 ---
 
 ## Results & Impact
@@ -152,11 +185,21 @@ async def predict_churn(customer_id: int):
 
 **Precision-Recall Trade-off**:
 - At threshold 0.35: 73% precision, 79% recall
-- **Interpretation**: Of 100 flagged customers, 73 actually would churn; we catch 79% of all churners
+- **Interpretation**: Of 100 flagged customers, 73 churn; we catch 79% of all churners.
 
 **Monthly Predictions**:
 - ~450 customers flagged as at-risk
 - Customer success team reaches out to all within 48 hours
+
+### Experiment evidence (A/B)
+
+| Experiment | Variant | Retained MRR uplift | Save rate | Notes |
+|------------|---------|---------------------|-----------|-------|
+| Outreach channel | Email vs Phone | +3.2% | +4.8 pts | Phone wins for accounts >$500 MRR |
+| Incentive | Discount vs Enablement | +0.9% | +1.5 pts | Enablement cheaper; kept as default |
+| Threshold | 0.35 vs 0.45 | - | -2.1 pts | 0.35 preserved to protect recall |
+
+Guardrails: NPS delta > -1 allowed; support ticket load capped at +5% during tests.
 
 ### Business Impact (6 months post-launch)
 
@@ -170,8 +213,14 @@ async def predict_churn(customer_id: int):
 **Revenue Calculation**:
 - Prevented churns: ~360 customers/year (30/month)
 - Avg MRR per customer: $150
-- Annual impact: 360 × $150 × 12 = **$648K** saved
+- Annual impact: 360 x $150 x 12 = **$648K** saved
 - With LTV multiplier (avg stays 12 months): **$800K**
+
+### Security and compliance
+- PII fields tokenized at ingestion; feature store holds hashed customer IDs and non-PII aggregates.
+- RBAC: data eng (write), data sci (train/promote), CS dashboards read-only via API gateway.
+- Audit logs for predictions and interventions; GDPR/CCPA deletions propagate within 30 days.
+- Retention: raw events 180 days; derived aggregates 2 years with storage lifecycle policies.
 
 ### Feature Importance (Top 10)
 
@@ -225,7 +274,7 @@ async def predict_churn(customer_id: int):
 ### What Worked
 
 1. **Feature Engineering > Model Selection**
-   - Moving from 15 raw features → 47 engineered features improved AUC by 0.12
+   - Moving from 15 raw features -> 47 engineered features improved AUC by 0.12
    - Behavioral trends (7-day vs 30-day) more predictive than point-in-time stats
 
 2. **Time-Series Validation Critical**
@@ -281,7 +330,8 @@ def create_behavioral_features(user_events: pd.DataFrame, window_days: int = 30)
                                    / window_days)
     
     # Feature usage breadth
-    features_used = window_events[window_events['event_type'].str.contains('feature_')]['event_type'].nunique()
+    feature_mask = window_events['event_type'].str.contains('feature_')
+    features_used = window_events[feature_mask]['event_type'].nunique()
     features['feature_breadth'] = features_used / 50  # 50 total features in product
     
     # Trend analysis (last 7d vs previous 7d)
@@ -351,8 +401,11 @@ This churn prediction system demonstrates end-to-end ML engineering:
 - **Production**: Daily batch scoring with Airflow + FastAPI
 - **Impact**: $800K annual revenue saved, 40% churn reduction
 
-**Key Takeaway**: Success driven by feature engineering and business alignment, not model complexity.
+**Key takeaway**: Feature engineering and business alignment mattered more than model complexity.
+
+Architecture and ops blueprint: `docs/system_design_solutions/06_churn_prediction.md`.
 
 ---
 
-**Contact**: For implementation details, see `src/ml/churn_prediction.py` and `notebooks/case_studies/churn_prediction.ipynb`
+**Contact**: Implementation details in `src/ml/churn_prediction.py`.
+Notebooks: `notebooks/case_studies/churn_prediction.ipynb`

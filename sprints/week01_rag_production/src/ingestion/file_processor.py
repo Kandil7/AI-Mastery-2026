@@ -114,7 +114,7 @@ class FileUploadRequest(BaseModel):
             raise ValueError("Filename contains invalid characters")
         return v
 
-    @validator('file_size')
+    @field_validator('file_size')
     def validate_file_size(cls, v):
         """Validate file size (max 50MB)."""
         max_size = 50 * 1024 * 1024  # 50MB

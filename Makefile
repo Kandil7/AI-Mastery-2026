@@ -4,6 +4,23 @@
 install:
 	pip install -r requirements.txt
 
+# Conda environment setup (full)
+conda-setup:
+	conda env create -n ai-mastery-2026 -f environment.full.yml || conda env update -n ai-mastery-2026 -f environment.full.yml --prune
+
+# Venv environment setup (full)
+venv-setup:
+	python -m venv .venv
+	. .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+
+# Register Jupyter kernel
+jupyter:
+	python -m ipykernel install --user --name ai-mastery-2026 --display-name "AI-Mastery-2026"
+
+# Quick import smoke test
+test-smoke:
+	python -c "import numpy, torch, fastapi; print('deps ok')"
+
 # Run tests
 test:
 	pytest tests/ -v
@@ -72,4 +89,4 @@ docker-stop:
 docker-logs:
 	docker-compose logs -f
 
-.PHONY: install test test-cov lint format docker-build docker-run run docs clean benchmark benchmark-save run-prod format-check docker-stop docker-logs
+.PHONY: install conda-setup venv-setup jupyter test-smoke test test-cov lint format docker-build docker-run run docs clean benchmark benchmark-save run-prod format-check docker-stop docker-logs

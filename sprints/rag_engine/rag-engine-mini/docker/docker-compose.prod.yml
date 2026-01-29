@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  # =============================================================================
+  # API Server (Hardened)
+  # =============================================================================
+  api:
+    image: rag-engine-mini:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: rag_api_prod
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=prod
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+psycopg://postgres:${DB_PASSWORD}@postgres:5432/rag
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_HOST=qdrant
+      - LLM_BACKEND=${LLM_BACKEND:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  # =============================================================================
+  # Celery Worker (Hardened)
+  # =============================================================================
+  worker:
+    image: rag-engine-mini:latest
+    container_name: rag_worker_prod
+    restart: always
+    command: celery -A src.workers.celery_app worker --loglevel=INFO -Q indexing --concurrency=4
+    environment:
+      - ENV=prod
+      - DATABASE_URL=postgresql+psycopg://postgres:${DB_PASSWORD}@postgres:5432/rag
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_HOST=qdrant
+    depends_on:
+      - api
+
+  # =============================================================================
+  # Database & Cache (Persistent)
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: rag_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: rag
+    volumes:
+      - pg_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rag_redis_prod
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag_qdrant_prod
+    restart: always
+    volumes:
+      - qdrant_data_prod:/qdrant/storage
+
+volumes:
+  pg_data_prod:
+  redis_data_prod:
+  qdrant_data_prod:
