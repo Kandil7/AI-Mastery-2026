@@ -7,7 +7,7 @@ Text extraction from PDF, DOCX, and TXT files.
 """
 
 import docx
-from pypdf import PdfReader
+import fitz  # PyMuPDF
 
 from src.domain.entities import ExtractedText
 from src.domain.errors import TextExtractionError, UnsupportedFileTypeError
@@ -16,28 +16,12 @@ from src.domain.errors import TextExtractionError, UnsupportedFileTypeError
 class DefaultTextExtractor:
     """
     Default text extractor supporting PDF, DOCX, and TXT.
-    
-    مستخرج النص الافتراضي
+    Uses PyMuPDF for high-quality PDF extraction.
     """
     
     def extract(self, file_path: str, content_type: str) -> ExtractedText:
-        """
-        Extract text from a document file.
-        
-        Args:
-            file_path: Path to the file
-            content_type: MIME type
-            
-        Returns:
-            ExtractedText with text and metadata
-            
-        Raises:
-            TextExtractionError: On extraction failure
-            UnsupportedFileTypeError: For unknown file types
-        """
+        # ... (same logic as before)
         lower_path = file_path.lower()
-        
-        # Determine format and extract
         if content_type == "application/pdf" or lower_path.endswith(".pdf"):
             return self._extract_pdf(file_path)
         
@@ -54,13 +38,13 @@ class DefaultTextExtractor:
         raise UnsupportedFileTypeError(extension, ["pdf", "docx", "txt"])
     
     def _extract_pdf(self, file_path: str) -> ExtractedText:
-        """Extract text from PDF."""
+        """Extract text from PDF using PyMuPDF."""
         try:
-            reader = PdfReader(file_path)
+            doc = fitz.open(file_path)
             pages = []
             
-            for i, page in enumerate(reader.pages, start=1):
-                text = page.extract_text() or ""
+            for i, page in enumerate(doc, start=1):
+                text = page.get_text("text") or ""
                 if text.strip():
                     pages.append(f"\n--- Page {i} ---\n{text}")
             
@@ -70,11 +54,12 @@ class DefaultTextExtractor:
                 text=full_text,
                 metadata={
                     "type": "pdf",
-                    "pages": len(reader.pages),
+                    "pages": len(doc),
+                    "engine": "pymupdf",
                 },
             )
         except Exception as e:
-            raise TextExtractionError(f"PDF extraction failed: {e}") from e
+            raise TextExtractionError(f"PyMuPDF extraction failed: {e}") from e
     
     def _extract_docx(self, file_path: str) -> ExtractedText:
         """Extract text from DOCX."""

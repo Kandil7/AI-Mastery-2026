@@ -37,11 +37,11 @@ class PostgresChunkDedupRepo:
         tenant_id: TenantId,
         chunk_hash: str,
         text: str,
+        parent_id: str | None = None,
+        chunk_context: str | None = None,
     ) -> str:
         """
         Upsert a chunk to the store (deduplicated by hash).
-        
-        Returns existing chunk_id if hash exists, otherwise creates new.
         """
         with SessionLocal() as db:
             # Check if exists
@@ -52,6 +52,8 @@ class PostgresChunkDedupRepo:
             existing = db.execute(stmt).scalar_one_or_none()
             
             if existing:
+                # Optional: Update parent/context if they changed?
+                # For simplicity, we assume same hash = same chunk.
                 return existing
             
             # Create new
@@ -62,6 +64,8 @@ class PostgresChunkDedupRepo:
                     user_id=tenant_id.value,
                     chunk_hash=chunk_hash,
                     text=text,
+                    parent_id=parent_id,
+                    chunk_context=chunk_context,
                 )
             )
             

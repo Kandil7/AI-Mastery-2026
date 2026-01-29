@@ -54,6 +54,14 @@ class ChunkStoreRow(Base):
     chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     
+    # Hierarchical / Contextual retrieval (Stage 2)
+    parent_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("chunk_store.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    chunk_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
     # Full-text search vector (GENERATED in migration)
     # Note: This column is GENERATED ALWAYS AS (to_tsvector('simple', text)) STORED
     tsv: Mapped[object] = mapped_column(TSVECTOR, nullable=True)

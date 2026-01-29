@@ -136,3 +136,40 @@ def truncate_to_tokens(
     except Exception:
         # Fallback to character-based
         return text[:max_tokens * 4]
+def chunk_hierarchical(
+    text: str,
+    spec: ChunkSpec | None = None,
+) -> List[dict]:
+    """
+    Split text into parent chunks, then each parent into child chunks.
+    
+    Args:
+        text: Full document text
+        spec: Specification with parent_size and child_size
+        
+    Returns:
+        List of dicts: [{"child_text": "...", "parent_text": "..."}]
+        
+    قرار التصميم: تقطيع هرمي لربط البحث الدقيق بالسياق العريض
+    """
+    if spec is None:
+        spec = ChunkSpec(strategy="hierarchical")
+    
+    # 1. Create parent chunks
+    parent_spec = ChunkSpec(max_tokens=spec.parent_size, overlap_tokens=spec.overlap_tokens)
+    parent_texts = chunk_text_token_aware(text, parent_spec)
+    
+    results = []
+    
+    for p_text in parent_texts:
+        # 2. Split each parent into children
+        child_spec = ChunkSpec(max_tokens=spec.child_size, overlap_tokens=spec.overlap_tokens // 2)
+        child_texts = chunk_text_token_aware(p_text, child_spec)
+        
+        for c_text in child_texts:
+            results.append({
+                "child_text": c_text,
+                "parent_text": p_text,
+            })
+            
+    return results

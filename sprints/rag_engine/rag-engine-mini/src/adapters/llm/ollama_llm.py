@@ -85,6 +85,46 @@ class OllamaLLM:
         except Exception as e:
             raise LLMError(f"Ollama error: {e}") from e
 
+    def generate_stream(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 700,
+    ) -> any:  # Generator
+        """
+        Stream completion from Ollama API.
+        
+        توليد الرد بشكل متدفق من Ollama
+        """
+        import json
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self._base_url}/api/generate",
+                json={
+                    "model": self._model,
+                    "prompt": prompt,
+                    "stream": True,  # Enable streaming
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                    },
+                },
+                timeout=self._timeout,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        data = json.loads(line)
+                        if "response" in data:
+                            yield data["response"]
+                        if data.get("done", False):
+                            break
+                            
+        except Exception as e:
+            raise LLMError(f"Ollama streaming error: {e}") from e
+
 
 class OllamaChat:
     """

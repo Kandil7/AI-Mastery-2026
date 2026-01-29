@@ -30,25 +30,36 @@ class PostgresChunkTextReader:
         chunk_ids: Sequence[str],
     ) -> dict[str, str]:
         """
-        Get texts for multiple chunk IDs.
-        
-        Uses ANY() for efficient batch lookup.
+        Get texts for multiple chunk IDs, fetching parents and adding context.
         """
         if not chunk_ids:
             return {}
         
         with SessionLocal() as db:
+            # Stage 2: Join with parent if exists and fetch doc summary context
+            query = sql_text("""
+                SELECT 
+                    c.id, 
+                    COALESCE(p.text, c.text) as content,
+                    c.chunk_context
+                FROM chunk_store c
+                LEFT JOIN chunk_store p ON c.parent_id = p.id
+                WHERE c.user_id = :user_id
+                  AND c.id = ANY(:ids)
+            """)
+            
             rows = db.execute(
-                sql_text("""
-                    SELECT id, text
-                    FROM chunk_store
-                    WHERE user_id = :user_id
-                      AND id = ANY(:ids)
-                """),
+                query,
                 {
                     "user_id": tenant_id.value,
                     "ids": list(chunk_ids),
                 },
             ).all()
             
-            return {cid: txt for cid, txt in rows}
+            results = {}
+            for cid, content, ctx in rows:
+                # Prepend document context (Contextual Retrieval)
+                final_text = f"[Context: {ctx}]\n\n{content}" if ctx else content
+                results[cid] = final_text
+                
+            return results

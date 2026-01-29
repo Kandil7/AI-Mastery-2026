@@ -76,3 +76,31 @@ class OpenAILLM:
                 raise LLMRateLimitError() from e
             
             raise LLMError(f"OpenAI error: {e}") from e
+
+    def generate_stream(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 700,
+    ) -> any:  # Returns a generator for FastAPI StreamingResponse
+        """
+        Stream completion from OpenAI Chat API.
+        
+        توليد الرد بشكل متدفق من OpenAI
+        """
+        try:
+            stream = self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            raise LLMError(f"OpenAI streaming error: {e}") from e
