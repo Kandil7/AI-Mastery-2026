@@ -565,6 +565,8 @@ Educational notebooks that import from `src/` instead of reimplementing:
 | [03_hybrid_search_and_rerank.ipynb](./notebooks/03_hybrid_search_and_rerank.ipynb) | Hybrid retrieval deep dive | الغوص العميق في الاسترجاع الهجين |
 | [04_evaluation_and_monitoring.ipynb](./notebooks/04_evaluation_and_monitoring.ipynb) | Faithfulness & Relevancy | تقييم الدقة والملاءمة |
 | [05_agentic_and_graph_rag.ipynb](./notebooks/05_agentic_and_graph_rag.ipynb) | Self-Correction & Graphs | التصحيح الذاتي والرسوم البيانية |
+| [06_multimodal_unstructured.ipynb](./notebooks/06_multimodal_unstructured.ipynb) | Tables & Images | التعامل مع الجداول والصور |
+| [07_autonomous_routing_and_web.ipynb](./notebooks/07_autonomous_routing_and_web.ipynb) | Autonomous Agent Ops | العمليات الذاتية للوكيل الذكي |
 
 ---
 

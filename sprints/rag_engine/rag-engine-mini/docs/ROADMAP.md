@@ -21,13 +21,14 @@
 
 ## 🔴 Level 4: Multi-Modal Mastery (Stage 4)
 *   **Concepts**: Structural Table Analysis, Vision-to-Text descriptors.
-*   **Milestone**: Search for a chart by its description even though the text isn't in the page.
+*   **Milestone**: Run `06_multimodal_unstructured.ipynb`. Search for a chart by its description.
 *   **Study**: [Multi-Modal & Tables](./docs/deep-dives/stage-4-multimodal.md).
 
 ## 🔥 Level 5: Autonomous Operations (Stage 5)
 *   **Concepts**: Semantic Routing, Web Search Fallback, PII Redaction.
-*   **Milestone**: System handles "Hello" without database search and searches the web for live facts.
+*   **Milestone**: Run `07_autonomous_routing_and_web.ipynb`. See system redact PII in real-time.
 *   **Study**: [Autonomous Agent](./docs/deep-dives/stage-5-autonomy.md).
+
 
 ## 🚀 The Future (Final Boss and Beyond)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
