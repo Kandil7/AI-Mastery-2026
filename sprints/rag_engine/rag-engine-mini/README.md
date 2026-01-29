@@ -97,7 +97,8 @@ Most RAG tutorials show you the basics: embed → store → search → generate.
 | ⚡ **Async Indexing** | Celery workers for heavy processing | عمال Celery للمعالجة الثقيلة |
 | 📈 **Observability** | Prometheus metrics + Structured logging | مقاييس Prometheus + سجلات منظمة |
 | 🎨 **Demo UI** | Built-in Gradio frontend for testing | واجهة Gradio تجريبية للاختبار |
-| 🧪 **Eval Script** | Retrieval quality evaluation script | سكربت تقييم جودة الاسترجاع |
+| 🧪 **Eval Script** | RAGAS & Retrieval quality evaluation | سكربت تقييم جودة الاسترجاع |
+| 🎓 **Mastery Journey** | **[10-Level AI Engineering Course](./docs/MASTERY_JOURNEY.md)** | **دورة هندسة الذكاء الاصطناعي الكاملة** |
 | 🔄 **Query Expansion** | Multi-query generation for better recall | توليد استعلامات متعددة لاستدعاء أفضل |
 
 ---

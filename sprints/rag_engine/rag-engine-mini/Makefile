@@ -145,19 +145,37 @@ seed:
 	python scripts/seed_user.py
 	@echo "✅ Demo user created"
 
+eval-ragas:
+	@echo "🧪 Running RAGAS evaluation..."
+	python scripts/evaluate_ragas.py
+
+generate-testset:
+	@echo "🔄 Generating synthetic testset..."
+	python scripts/generate_synthetic_testset.py --input data/samples/sample_doc.txt
+
 # =============================================================================
 # Docker / دوكر
 # =============================================================================
-
-docker-up:
-	@echo "🐳 Starting Docker services..."
-	docker compose -f docker/docker-compose.yml up -d
-	@echo "✅ Services started"
 
 docker-down:
 	@echo "🐳 Stopping Docker services..."
 	docker compose -f docker/docker-compose.yml down
 	@echo "✅ Services stopped"
+
+## 🚀 Production Deployment
+prod-check:
+	@echo "🔍 Running production readiness audit..."
+	PYTHONPATH=. python scripts/check_prod_readiness.py
+
+prod-up:
+	@echo "🚀 Deploying Production Stack..."
+	docker compose -f docker/docker-compose.prod.yml up -d
+	@echo "✅ Production stack is rising"
+
+prod-down:
+	@echo "🛑 Stopping Production Stack..."
+	docker compose -f docker/docker-compose.prod.yml down
+	@echo "✅ Production stack stopped"
 
 docker-logs:
 	@echo "📜 Docker logs..."
