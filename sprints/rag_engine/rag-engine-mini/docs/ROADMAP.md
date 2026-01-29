@@ -24,11 +24,16 @@
 *   **Milestone**: Search for a chart by its description even though the text isn't in the page.
 *   **Study**: [Multi-Modal & Tables](./docs/deep-dives/stage-4-multimodal.md).
 
-## 🚀 The Future (Stage 5 and Beyond)
-*   **Semantic Router**: Dynamic path selection based on intent.
-*   **Web Search Integration**: Merging local knowledge with live reality.
-*   **Autonomous Agents**: LLMs that use multiple tools to solve a complex query.
-*   **Privacy Layer**: Automatic PII masking before external calls.
+## 🔥 Level 5: Autonomous Operations (Stage 5)
+*   **Concepts**: Semantic Routing, Web Search Fallback, PII Redaction.
+*   **Milestone**: System handles "Hello" without database search and searches the web for live facts.
+*   **Study**: [Autonomous Agent](./docs/deep-dives/stage-5-autonomy.md).
+
+## 🚀 The Future (Final Boss and Beyond)
+*   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
+*   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
+*   **Privacy Layer**: Integrated Zero-Knowledge proofs for data.
+ernal calls.
 
 ---
 

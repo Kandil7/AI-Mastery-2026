@@ -189,6 +189,15 @@ def get_container() -> dict:
     # Vision Service (Stage 4)
     from src.application.services.vision_service import VisionService
     vision_service = VisionService(llm=llm)
+
+    # Stage 5: Autonomy & Optimization
+    from src.application.services.semantic_router import SemanticRouterService
+    from src.application.services.privacy_guard import PrivacyGuardService
+    from src.adapters.tools.web_search import TavilySearchAdapter
+    
+    semantic_router = SemanticRouterService(llm=llm)
+    privacy_guard = PrivacyGuardService()
+    search_tool = TavilySearchAdapter(api_key=settings.tavily_api_key or "")
     
     # =========================================================================
     # Use cases
@@ -210,6 +219,9 @@ def get_container() -> dict:
         llm=llm,
         query_expansion_service=query_expansion_service,
         self_critique=self_critique_service,
+        router=semantic_router,
+        privacy=privacy_guard,
+        search_tool=search_tool,
     )
     
     # =========================================================================
@@ -245,6 +257,8 @@ def get_container() -> dict:
         # Services
         "graph_extractor": graph_extractor_service,
         "vision_service": vision_service,
+        "router": semantic_router,
+        "privacy": privacy_guard,
         
         # Use cases
         "upload_use_case": upload_use_case,

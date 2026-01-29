@@ -119,12 +119,14 @@ class Settings(BaseSettings):
     chunk_overlap_tokens: int = Field(default=50, ge=0, le=500)
     chunk_encoding: str = Field(default="cl100k_base", description="tiktoken encoding")
     
-    # =========================================================================
     # File Upload / رفع الملفات
     # =========================================================================
     upload_dir: str = Field(default="./uploads")
     max_upload_mb: int = Field(default=20, ge=1, le=100)
     allowed_extensions: str = Field(default="pdf,docx,txt")
+    
+    # Web Search (Stage 5)
+    tavily_api_key: str | None = Field(default=None)
     
     @property
     def allowed_extensions_list(self) -> list[str]:

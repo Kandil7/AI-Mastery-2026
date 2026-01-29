@@ -68,9 +68,12 @@ class AskQuestionHybridUseCase:
         llm: LLMPort,
         query_expansion_service: object | None = None,
         self_critique: object | None = None,
+        router: object | None = None,
+        privacy: object | None = None,
+        search_tool: object | None = None,
     ) -> None:
         """
-        Initialize with all required ports.
+        Initialize with all required ports and Stage 5 services.
         """
         self._embeddings = cached_embeddings
         self._vector = vector_store
@@ -80,19 +83,30 @@ class AskQuestionHybridUseCase:
         self._llm = llm
         self._expansion = query_expansion_service
         self._critique = self_critique
+        self._router = router
+        self._privacy = privacy
+        self._search = search_tool
     
     def execute(self, request: AskHybridRequest) -> Answer:
         """
-        Execute the hybrid RAG pipeline with Self-Correction loop.
-        
-        Args:
-            request: Question request with parameters
-            
-        Returns:
-            Answer with text and source chunk IDs
+        Execute the hybrid RAG pipeline with Stage 5 Autonomy (Routing & Privacy).
         """
-        # Step 1: Initial Retrieval
-        reranked = self.execute_retrieval_only(
+        # Step 0: Privacy Guard (Redaction)
+        original_question = request.question
+        if self._privacy:
+            request.question = self._privacy.redact(request.question) # type: ignore
+        
+        # Step 1: Semantic Routing
+        if self._router:
+            from src.application.services.semantic_router import QueryIntent
+            intent = self._router.route(request.question) # type: ignore
+            
+            if intent == QueryIntent.CHITCHAT:
+                answer_text = self._llm.generate(f"Respond politely to: {request.question}")
+                return Answer(text=answer_text, sources=[])
+        
+        # Step 2: Initial Retrieval
+        reranked = list(self.execute_retrieval_only(
             tenant_id=TenantId(request.tenant_id),
             question=request.question,
             document_id=request.document_id,
@@ -101,15 +115,28 @@ class AskQuestionHybridUseCase:
             fused_limit=request.fused_limit,
             rerank_top_n=request.rerank_top_n,
             expand_query=request.expand_query,
-        )
+        ))
         
-        # Step 2: Grade Retrieval (Self-RAG)
+        # Step 3: Grade Retrieval & Web Fallback (Stage 5)
         if self._critique:
             grade = self._critique.grade_retrieval(request.question, reranked) # type: ignore
             
-            # If irrelevant and we haven't expanded yet, try expanding
-            if grade == "irrelevant" and not request.expand_query:
-                reranked = self.execute_retrieval_only(
+            # Fallback to Web Search if irrelevant and we have a tool
+            if grade == "irrelevant" and self._search:
+                log.info("triggering_web_search", query=request.question)
+                web_results = self._search.search(request.question) # type: ignore
+                
+                # Convert web results to Source Chunks
+                web_chunks = [
+                    Chunk(id=f"web_{i}", tenant_id=TenantId("web"), document_id=None, 
+                          text=f"[{r['title']}]({r['url']})\n{r['content']}")
+                    for i, r in enumerate(web_results)
+                ]
+                reranked = web_chunks if web_chunks else reranked
+
+            elif grade == "irrelevant" and not request.expand_query:
+                # Try expansion if no web search available
+                reranked = list(self.execute_retrieval_only(
                     tenant_id=TenantId(request.tenant_id),
                     question=request.question,
                     document_id=request.document_id,
@@ -117,10 +144,10 @@ class AskQuestionHybridUseCase:
                     k_kw=request.k_kw,
                     fused_limit=request.fused_limit,
                     rerank_top_n=request.rerank_top_n,
-                    expand_query=True, # Force expansion on retry
-                )
+                    expand_query=True,
+                ))
         
-        # Step 3: Generation & Hallucination Check
+        # Step 4: Generation & Hallucination Check
         prompt = build_rag_prompt(request.question, reranked)
         answer_text = self._llm.generate(prompt, temperature=0.1)
         
@@ -128,10 +155,14 @@ class AskQuestionHybridUseCase:
             grade = self._critique.grade_answer(request.question, answer_text, reranked) # type: ignore
             
             if grade == "hallucination":
-                # Try once more with strict instruction
-                strict_prompt = prompt + "\n\nCRITICAL: Use ONLY the provided context. If the answer is not in context, say 'I don't know'."
+                strict_prompt = prompt + "\n\nSTRICT: Answer ONLY using provided facts."
                 answer_text = self._llm.generate(strict_prompt, temperature=0.0)
         
+        # Step 5: Restore Privacy (De-redaction)
+        if self._privacy:
+            answer_text = self._privacy.restore(answer_text) # type: ignore
+            self._privacy.clear() # type: ignore
+
         return Answer(
             text=answer_text,
             sources=[c.id for c in reranked],
