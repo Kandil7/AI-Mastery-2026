@@ -1,0 +1,163 @@
+# 🚨 Failure Modes Documentation
+
+This section documents common failure modes in RAG systems and how they're addressed in this repository. Understanding these failures is crucial for building robust RAG applications.
+
+## Table of Contents
+
+1. [Low Recall (The "I Don't Know" Problem)](#low-recall)
+2. [Hallucinations](#hallucinations)
+3. [Poor Chunking](#poor-chunking)
+4. [Slow Latency](#slow-latency)
+5. [Bad Re-ranking](#bad-re-ranking)
+
+---
+
+## Low Recall {#low-recall}
+
+### Symptoms
+- Model responds with "I don't know" despite the answer existing in documents
+- Low precision/recall metrics during evaluation
+- Users report missing information that should be available
+
+### Root Causes
+- Suboptimal chunk size (too large or too small)
+- Vector-only retrieval without keyword search
+- Poor embeddings model for the domain
+- Insufficient query expansion
+- Missing hybrid search capabilities
+
+### How We Address It in This Repo
+- **Hybrid Search**: Combines vector search (`qdrant_store.py`) with keyword search (`keyword_store.py`)
+- **Reciprocal Rank Fusion (RRF)**: Implemented in `fusion.py` to effectively combine results
+- **Chunk Overlap**: Configurable overlap in `chunking.py` to preserve context across splits
+- **Query Expansion**: Implemented in `query_expansion.py` to improve retrieval coverage
+
+### Debugging Steps
+1. Check if the relevant information exists in indexed documents
+2. Test vector search alone vs keyword search alone
+3. Adjust chunk size and overlap parameters
+4. Experiment with different embedding models
+5. Enable query expansion for broader coverage
+
+---
+
+## Hallucinations {#hallucinations}
+
+### Symptoms
+- Model generates plausible-sounding but incorrect information
+- Confabulation of facts not present in retrieved context
+- Overconfidence in incorrect answers
+- Fabrication of citations or sources
+
+### Root Causes
+- Over-reliance on LLM's parametric knowledge
+- Poor retrieval quality (irrelevant chunks retrieved)
+- Inadequate prompt engineering
+- Lack of self-correction mechanisms
+- Insufficient grounding in retrieved context
+
+### How We Address It in This Repo
+- **Grounding Checks**: Implemented in `prompt_builder.py` to ensure answers are grounded in retrieved context
+- **Self-Critique**: Available in `self_critique.py` for evaluating answer faithfulness
+- **Guardrails**: Prompt engineering techniques in `prompt-engineering.md` to prevent fabrication
+- **Faithfulness Evaluation**: Built-in metrics to measure hallucination rates
+
+### Debugging Steps
+1. Verify retrieved chunks actually contain relevant information
+2. Check if the prompt properly instructs the LLM to use only provided context
+3. Implement citation requirements in prompts
+4. Use self-correction mechanisms to validate answers
+5. Monitor faithfulness metrics during evaluation
+
+---
+
+## Poor Chunking {#poor-chunking}
+
+### Symptoms
+- Relevant information split across multiple chunks
+- Loss of context and meaning during retrieval
+- Fragmented answers that miss the big picture
+- High retrieval latency due to too many small chunks
+
+### Root Causes
+- Fixed-size chunking without semantic awareness
+- Incorrect chunk size for the document type
+- Ignoring document structure (headers, sections)
+- No overlap between chunks
+- Not preserving context boundaries
+
+### How We Address It in This Repo
+- **Token-Aware Chunking**: Implemented in `chunking.py` with configurable max_tokens
+- **Semantic Boundaries**: Respects document structure and meaning
+- **Configurable Overlap**: Adjustable overlap to preserve context
+- **Multiple Strategies**: Different chunking approaches for different document types
+- **Evaluation Framework**: Tools to test chunk quality and retrieval effectiveness
+
+### Debugging Steps
+1. Review chunk size relative to document complexity
+2. Check if semantic boundaries (paragraphs, sections) are respected
+3. Adjust overlap settings to preserve context
+4. Test different chunking strategies for your document type
+5. Evaluate retrieval quality with different chunking parameters
+
+---
+
+## Slow Latency {#slow-latency}
+
+### Symptoms
+- Long response times (>5 seconds)
+- High API costs due to inefficient processing
+- Poor user experience due to delays
+- Resource exhaustion under load
+
+### Root Causes
+- Unoptimized vector searches
+- Multiple sequential API calls
+- Inefficient re-ranking strategies
+- Lack of caching mechanisms
+- Suboptimal embedding models
+
+### How We Address It in This Repo
+- **Caching**: Implemented at multiple levels (query cache, embedding cache)
+- **Efficient Retrieval**: Optimized database queries and vector search
+- **Batch Processing**: Where possible, processes multiple items together
+- **Resource Management**: Proper connection pooling and cleanup
+- **Performance Monitoring**: Built-in metrics to track latency
+
+### Debugging Steps
+1. Profile the request to identify bottlenecks
+2. Check if caching is properly configured
+3. Optimize embedding model selection for speed vs accuracy
+4. Review database queries and indexes
+5. Implement early termination for expensive operations
+
+---
+
+## Bad Re-ranking {#bad-re-ranking}
+
+### Symptoms
+- Relevant results buried in lower positions
+- Irrelevant results ranked highly
+- No improvement over initial retrieval
+- Degraded answer quality despite good initial retrieval
+
+### Root Causes
+- Inappropriate re-ranking model for domain
+- Computational overhead without quality gain
+- Misconfigured re-ranking parameters
+- Wrong choice between cross-encoder vs LLM re-ranking
+- Poor query-document pair formation
+
+### How We Address It in This Repo
+- **Multiple Options**: Cross-encoder (local) and LLM (cloud) re-ranking options
+- **Configurable**: Easy to enable/disable re-ranking based on needs
+- **Performance Optimized**: Efficient cross-encoder implementation
+- **Fallback Mechanisms**: Graceful degradation when re-ranking fails
+- **Evaluation Tools**: Metrics to measure re-ranking effectiveness
+
+### Debugging Steps
+1. Compare results with and without re-ranking
+2. Test different re-ranking models
+3. Adjust re-ranking depth (number of candidates to re-rank)
+4. Verify query-document pairs are well-formed
+5. Monitor computational overhead vs quality gains

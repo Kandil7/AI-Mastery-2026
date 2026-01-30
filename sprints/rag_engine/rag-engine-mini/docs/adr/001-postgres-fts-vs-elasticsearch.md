@@ -1,30 +1,48 @@
 # ADR-001: Postgres FTS vs Elasticsearch for Keyword Search
 
-## 📝 Context
+## Status
+Accepted
+
+## Context
 To implement **Hybrid Search**, we need a strong Keyword Search (Lexical) component. The industry standard is typically Elasticsearch (or OpenSearch), but our stack already relies on Postgres for relational data.
 
-## 🏗️ Decision
-We decided to use **Postgres Full-Text Search (tsvector)** instead of a dedicated Elasticsearch cluster.
+For our RAG system, we need to decide between:
+- **PostgreSQL Full-Text Search (FTS)**: Leverage existing database
+- **Elasticsearch**: Industry-standard search engine
 
-## 💡 Rationale
+## Decision
+Use PostgreSQL Full-Text Search (FTS) as the keyword search component.
 
-### 1. Operational Complexity
-*   **Elasticsearch**: Requires JVM, large heavy containers, and separate maintenance pipelines. For a "Mini" engine or mid-sized startup, this is massive overhead.
-*   **Postgres**: We already run Postgres for metadata. Adding a `tsvector` column is effectively "free" operationally.
+## Alternatives Considered
+### Elasticsearch
+- Pros: Industry standard, advanced features, superior performance at scale
+- Cons: Additional infrastructure, operational complexity, licensing costs
 
-### 2. Synchronization (The "Dual Write" Problem)
-*   Keeping metadata (Postgres) in sync with Search indices (Elastic) is a notorious source of bugs (data inconsistency).
-*   By using Postgres for *both*, updates are **Atomic**. Transactional integrity is guaranteed out of the box.
+### SQLite with FTS
+- Pros: Lightweight, simple deployment
+- Cons: Limited concurrent access, less robust than Postgres
 
-### 3. Performance
-*   For datasets under ~10 Million chunks, Postgres GIN indexes perform exceptionally well (millisec latency).
-*   Elasticsearch only starts justifying its cost at massive scale (>50M+ docs) or for complex fuzzy/aggregation queries we don't need yet.
+### PostgreSQL FTS (Chosen)
+- Pros: Leverages existing infrastructure, ACID compliance, good performance for medium datasets
+- Cons: Less advanced features than Elasticsearch, scaling limitations
 
-## ⚠️ Consequences
-*   **Pro**: Single "Source of Truth" database.
-*   **Pro**: Simplified Docker Compose and deployment.
-*   **Con**: Less advanced linguistic features (custom analyzers, specific language stemming) compared to Elastic.
-*   **Con**: Scaling writes might be harder eventually, but solving for scale <10M now is premature optimization.
+## Rationale
+1. **Operational Simplicity**: Using existing Postgres infrastructure reduces operational overhead
+2. **Consistency**: Single source of truth for both structured and unstructured data
+3. **Cost-Effectiveness**: No additional licensing or infrastructure costs
+4. **Sufficient Performance**: Adequate for most RAG use cases (< 1M documents)
 
-## ✅ Status
-Accepted & Implemented in `src/adapters/postgres/keyword_store.py`.
+## Consequences
+### Positive
+- Reduced infrastructure complexity
+- Lower operational costs
+- Easier deployment and maintenance
+- Consistent backup and recovery procedures
+
+### Negative
+- Scaling limitations compared to Elasticsearch
+- Fewer advanced search features
+- Potential performance bottlenecks at high scale
+
+## Validation
+This approach has been validated in production systems with 10k-100k documents where the simplicity outweighs the advanced features of Elasticsearch.
