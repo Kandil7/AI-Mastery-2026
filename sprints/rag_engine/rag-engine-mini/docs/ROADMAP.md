@@ -95,6 +95,11 @@
 *   **Milestone**: Run `20_reasoning_models_thinking_loops.ipynb`. Implement a self-correcting logic chain. [COMPLETED ✅]
 *   **Study**: [Reasoning Models & Thinking Loops](./docs/deep-dives/reasoning-models-thinking-loops.md).
 
+## 🧪✨ Level 19: The Data Alchemist (Knowledge Creation)
+*   **Concepts**: Synthetic Data, Evol-Instruct, Knowledge Distillation.
+*   **Milestone**: Run `21_synthetic_data_distillation_mastery.ipynb`. Generate a fine-tuning dataset from scratch. [COMPLETED ✅]
+*   **Study**: [Synthetic Data & Distillation](./docs/deep-dives/synthetic-data-generation.md).
+
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
