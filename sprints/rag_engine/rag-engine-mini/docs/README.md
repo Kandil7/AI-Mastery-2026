@@ -39,9 +39,12 @@ For those who want to understand the "Why" behind the architecture:
 - [**Common RAG Pitfalls**](deep-dives/common-rag-pitfalls.md): Troubleshooting common failures.
 - [**Architecture Patterns**](deep-dives/architecture-patterns.md): Ports, Adapters, and Modularity.
 
-## 🎓 Developer & Educational
-
-- [**Developer Guide**](../docs/developer-guide.md): How to extend the system.
+## 🎓 Educational & Curriculum 🆕
+- [**The Educational Map**](EDUCATIONAL.md): **(Start Here)** A complete guide to using this repo as a learning course.
+- [**Concept ↔ Code Map**](learning-map.md): Where theory meets practice.
+- [**Failure Modes**](failure-modes/01_low_recall.md): Debugging real-world RAG issues.
+- [**Architecture Decisions**](adr/001-postgres-fts-vs-elasticsearch.md): Why we built it this way.
+- [**Developer Guide**](developer-guide.md): How to extend the system.
 - [**Visual Guide**](./VISUAL_GUIDE.md): Flowcharts of Architecture and Data.
 
 - [**Notebooks Index**](../notebooks/): Step-by-step interactive tutorials.
