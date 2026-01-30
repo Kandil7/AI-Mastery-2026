@@ -90,6 +90,11 @@
 *   **Milestone**: Run `19_multimodal_rag_vision_mastery.ipynb`. Perform visual reasoning on a document chart. [COMPLETED ✅]
 *   **Study**: [Multimodal RAG & Vision](./docs/deep-dives/multimodal-rag-vision.md).
 
+## 🧠⚡ Level 18: The Reasoning Architect (The Thinking Machine)
+*   **Concepts**: Test-Time Compute, Thinking Loops, CoT Verification, System 2 AI.
+*   **Milestone**: Run `20_reasoning_models_thinking_loops.ipynb`. Implement a self-correcting logic chain. [COMPLETED ✅]
+*   **Study**: [Reasoning Models & Thinking Loops](./docs/deep-dives/reasoning-models-thinking-loops.md).
+
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
