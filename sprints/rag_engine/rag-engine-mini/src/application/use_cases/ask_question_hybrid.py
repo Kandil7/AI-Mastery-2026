@@ -20,23 +20,32 @@ from src.application.services.hydrate import hydrate_chunk_texts
 from src.application.services.prompt_builder import build_rag_prompt
 from src.application.services.scoring import ScoredChunk
 from src.domain.entities import Answer, Chunk, DocumentId, TenantId
+from src.core.observability import (
+    API_REQUEST_LATENCY,
+    TOKEN_USAGE,
+    EMBEDDING_CACHE_HIT,
+    RETRIEVAL_SCORE,
+    RERANK_DURATION,
+    QUERY_EXPANSION_COUNT,
+)
 
 
 @dataclass
 class AskHybridRequest:
     """Request data for hybrid RAG question."""
+
     tenant_id: str
     question: str
-    
+
     # Optional: restrict to single document (ChatPDF mode)
     document_id: str | None = None
-    
+
     # Retrieval parameters
-    k_vec: int = 30       # Top-K for vector search
-    k_kw: int = 30        # Top-K for keyword search
-    fused_limit: int = 40 # Max after fusion
-    rerank_top_n: int = 8 # Final top results after reranking
-    
+    k_vec: int = 30  # Top-K for vector search
+    k_kw: int = 30  # Top-K for keyword search
+    fused_limit: int = 40  # Max after fusion
+    rerank_top_n: int = 8  # Final top results after reranking
+
     # Advanced features
     expand_query: bool = False  # Use LLM to expand query
 
@@ -44,7 +53,7 @@ class AskHybridRequest:
 class AskQuestionHybridUseCase:
     """
     Use case for answering questions with hybrid retrieval.
-    
+
     Flow:
     1. Expand query (optional)
     2. Embed the question (cached)
@@ -57,7 +66,7 @@ class AskQuestionHybridUseCase:
     9. Generate answer (LLM)
     10. Return answer with sources
     """
-    
+
     def __init__(
         self,
         *,
@@ -87,82 +96,156 @@ class AskQuestionHybridUseCase:
         self._router = router
         self._privacy = privacy
         self._search = search_tool
-    
+
     def execute(self, request: AskHybridRequest) -> Answer:
         """
         Execute the hybrid RAG pipeline with Stage 5 Autonomy (Routing & Privacy).
+        Metrics tracked: API latency, token usage, cache hits, retrieval scores.
         """
-        # Step 0: Privacy Guard (Redaction)
-        original_question = request.question
-        if self._privacy:
-            request.question = self._privacy.redact(request.question) # type: ignore
+        import time
+        start_time = time.time()
         
-        # Step 1: Semantic Routing
-        if self._router:
-            from src.application.services.semantic_router import QueryIntent
-            intent = self._router.route(request.question) # type: ignore
+        try:
+            # Step 0: Privacy Guard (Redaction)
+            original_question = request.question
+            if self._privacy:
+                request.question = self._privacy.redact(request.question)
             
-            if intent == QueryIntent.CHITCHAT:
-                answer_text = self._llm.generate(f"Respond politely to: {request.question}")
-                return Answer(text=answer_text, sources=[])
-        
-        # Step 2: Initial Retrieval
-        reranked = list(self.execute_retrieval_only(
-            tenant_id=TenantId(request.tenant_id),
-            question=request.question,
-            document_id=request.document_id,
-            k_vec=request.k_vec,
-            k_kw=request.k_kw,
-            fused_limit=request.fused_limit,
-            rerank_top_n=request.rerank_top_n,
-            expand_query=request.expand_query,
-        ))
-        
+            # Step 1: Semantic Routing
+            if self._router:
+                from src.application.services.semantic_router import QueryIntent
+                intent = self._router.route(request.question)
+                
+                if intent == QueryIntent.CHITCHAT:
+                    answer_text = self._llm.generate(f"Respond politely to: {request.question}")
+                    API_REQUEST_LATENCY.labels(method="ask", endpoint="/ask").observe(time.time() - start_time)
+                    return Answer(text=answer_text, sources=[])
+            
+            # Step 2: Initial Retrieval
+            reranked = list(self.execute_retrieval_only(
+                tenant_id=TenantId(request.tenant_id),
+                question=request.question,
+                document_id=request.document_id,
+                k_vec=request.k_vec,
+                k_kw=request.k_kw,
+                fused_limit=request.fused_limit,
+                rerank_top_n=request.rerank_top_n,
+                expand_query=request.expand_query,
+            ))
+            
+            # Step 3: Grade Retrieval & Web Fallback (Stage 5)
+            if self._critique:
+                grade = self._critique.grade_retrieval(request.question, reranked)
+                
+                # Fallback to Web Search if irrelevant and we have a tool
+                if grade == "irrelevant" and self._search:
+                    log.info("triggering_web_search", query=request.question)
+                    web_results = self._search.search(request.question)
+                    
+                    # Convert web results to Source Chunks
+                    web_chunks = [
+                        Chunk(id=f"web_{i}", tenant_id=TenantId("web"), document_id=None, 
+                              text=f"[{r['title']}]({r['url']})\n{r['content']}")
+                        for i, r in enumerate(web_results)
+                    ]
+                    reranked = web_chunks if web_chunks else reranked
+
+                elif grade == "irrelevant" and not request.expand_query:
+                    # Try expansion if no web search available
+                    reranked = list(self.execute_retrieval_only(
+                        tenant_id=TenantId(request.tenant_id),
+                        question=request.question,
+                        document_id=request.document_id,
+                        k_vec=request.k_vec,
+                        k_kw=request.k_kw,
+                        fused_limit=request.fused_limit,
+                        rerank_top_n=request.rerank_top_n,
+                        expand_query=True,
+                    ))
+            
+            # Step 4: Generation & Hallucination Check
+            prompt = build_rag_prompt(request.question, reranked)
+            answer_text = self._llm.generate(prompt, temperature=0.1)
+            
+            # Track token usage (estimate based on text length)
+            TOKEN_USAGE.labels(model="default", type="prompt").inc(len(prompt) // 4)
+            TOKEN_USAGE.labels(model="default", type="completion").inc(len(answer_text) // 4)
+            
+            if self._critique:
+                grade = self._critique.grade_answer(request.question, answer_text, reranked)
+                
+                if grade == "hallucination":
+                    strict_prompt = prompt + "\n\nSTRICT: Answer ONLY using provided facts."
+                    answer_text = self._llm.generate(strict_prompt, temperature=0.0)
+                    TOKEN_USAGE.labels(model="default", type="completion").inc(len(answer_text) // 4)
+            
+            # Step 5: Restore Privacy (De-redaction)
+            if self._privacy:
+                answer_text = self._privacy.restore(answer_text)
+                self._privacy.clear()
+
+            API_REQUEST_LATENCY.labels(method="ask", endpoint="/ask").observe(time.time() - start_time)
+            
+            return Answer(
+                text=answer_text,
+                sources=[c.id for c in reranked],
+            )
+        except Exception as e:
+            API_REQUEST_LATENCY.labels(method="ask", endpoint="/ask").observe(time.time() - start_time)
+            raise
+        )
+
         # Step 3: Grade Retrieval & Web Fallback (Stage 5)
         if self._critique:
-            grade = self._critique.grade_retrieval(request.question, reranked) # type: ignore
-            
+            grade = self._critique.grade_retrieval(request.question, reranked)  # type: ignore
+
             # Fallback to Web Search if irrelevant and we have a tool
             if grade == "irrelevant" and self._search:
                 log.info("triggering_web_search", query=request.question)
-                web_results = self._search.search(request.question) # type: ignore
-                
+                web_results = self._search.search(request.question)  # type: ignore
+
                 # Convert web results to Source Chunks
                 web_chunks = [
-                    Chunk(id=f"web_{i}", tenant_id=TenantId("web"), document_id=None, 
-                          text=f"[{r['title']}]({r['url']})\n{r['content']}")
+                    Chunk(
+                        id=f"web_{i}",
+                        tenant_id=TenantId("web"),
+                        document_id=None,
+                        text=f"[{r['title']}]({r['url']})\n{r['content']}",
+                    )
                     for i, r in enumerate(web_results)
                 ]
                 reranked = web_chunks if web_chunks else reranked
 
             elif grade == "irrelevant" and not request.expand_query:
                 # Try expansion if no web search available
-                reranked = list(self.execute_retrieval_only(
-                    tenant_id=TenantId(request.tenant_id),
-                    question=request.question,
-                    document_id=request.document_id,
-                    k_vec=request.k_vec,
-                    k_kw=request.k_kw,
-                    fused_limit=request.fused_limit,
-                    rerank_top_n=request.rerank_top_n,
-                    expand_query=True,
-                ))
-        
+                reranked = list(
+                    self.execute_retrieval_only(
+                        tenant_id=TenantId(request.tenant_id),
+                        question=request.question,
+                        document_id=request.document_id,
+                        k_vec=request.k_vec,
+                        k_kw=request.k_kw,
+                        fused_limit=request.fused_limit,
+                        rerank_top_n=request.rerank_top_n,
+                        expand_query=True,
+                    )
+                )
+
         # Step 4: Generation & Hallucination Check
         prompt = build_rag_prompt(request.question, reranked)
         answer_text = self._llm.generate(prompt, temperature=0.1)
-        
+
         if self._critique:
-            grade = self._critique.grade_answer(request.question, answer_text, reranked) # type: ignore
-            
+            grade = self._critique.grade_answer(request.question, answer_text, reranked)  # type: ignore
+
             if grade == "hallucination":
                 strict_prompt = prompt + "\n\nSTRICT: Answer ONLY using provided facts."
                 answer_text = self._llm.generate(strict_prompt, temperature=0.0)
-        
+
         # Step 5: Restore Privacy (De-redaction)
         if self._privacy:
-            answer_text = self._privacy.restore(answer_text) # type: ignore
-            self._privacy.clear() # type: ignore
+            answer_text = self._privacy.restore(answer_text)  # type: ignore
+            self._privacy.clear()  # type: ignore
 
         return Answer(
             text=answer_text,
@@ -184,14 +267,19 @@ class AskQuestionHybridUseCase:
         """
         Execute only the retrieval and ranking part of the pipeline.
         
+        Metrics tracked: cache hits, retrieval scores (vector/keyword), rerank time.
+        
         If expand_query is True, it generates related queries and searches for all.
         """
+        import time
+        
         # 1. Query Expansion
         queries = [question]
         if expand_query and self._expansion:
             # We cast to avoid type errors in this prototype, 
             # in real code define a protocol for QueryExpansionService
-            queries = self._expansion.expand(question)  # type: ignore
+            queries = self._expansion.expand(question)
+            QUERY_EXPANSION_COUNT.labels(expanded="true").inc()
             
         all_vector_hits: list[ScoredChunk] = []
         all_keyword_hits: list[ScoredChunk] = []
@@ -200,6 +288,13 @@ class AskQuestionHybridUseCase:
             # Step 1: Embed query (cached)
             question_vector = self._embeddings.embed_one(q)
             
+            # Track cache hit/miss (assume embed_one has _was_cached attribute)
+            if hasattr(question_vector, '_was_cached'):
+                if question_vector._was_cached:
+                    EMBEDDING_CACHE_HIT.labels(result="hit").inc()
+                else:
+                    EMBEDDING_CACHE_HIT.labels(result="miss").inc()
+            
             # Step 2: Vector search
             vector_results = self._vector.search_scored(
                 query_vector=question_vector,
@@ -207,6 +302,10 @@ class AskQuestionHybridUseCase:
                 top_k=k_vec,
                 document_id=document_id,
             )
+            
+            # Track retrieval scores for vector search
+            for result in vector_results:
+                RETRIEVAL_SCORE.labels(method="vector").observe(result.score)
             
             # Convert to Chunk objects (no text yet)
             vector_chunks = [
@@ -240,6 +339,10 @@ class AskQuestionHybridUseCase:
                 document_id=document_id,
             )
             
+            # Track keyword hits as perfect matches (score 1.0)
+            for _ in keyword_chunks:
+                RETRIEVAL_SCORE.labels(method="keyword").observe(1.0)
+            
             all_keyword_hits.extend([
                 ScoredChunk(chunk=c, score=1.0)
                 for c in keyword_chunks
@@ -254,19 +357,21 @@ class AskQuestionHybridUseCase:
         
         fused_chunks = [s.chunk for s in fused]
         
-        # 6. Rerank
+        # 6. Rerank with timing
+        rerank_start = time.time()
         reranked = self._reranker.rerank(
             query=question,  # Original question for reranking
             chunks=fused_chunks,
             top_n=rerank_top_n,
         )
+        RERANK_DURATION.labels(method="cross_encoder").observe(time.time() - rerank_start)
         
         return reranked
 
     def execute_stream(self, request: AskHybridRequest) -> any:  # Returns a generator
         """
         Execute streaming hybrid RAG pipeline.
-        
+
         تنفيذ أنبوب RAG الهجين مع التدفق
         """
         # 1. Retrieve and rank chunks
@@ -280,13 +385,13 @@ class AskQuestionHybridUseCase:
             rerank_top_n=request.rerank_top_n,
             expand_query=request.expand_query,
         )
-        
+
         # 2. Build prompt
         prompt = build_rag_prompt(
             question=request.question,
             chunks=reranked,
         )
-        
+
         # 3. Generate answer chunks
         yield from self._llm.generate_stream(
             prompt,
