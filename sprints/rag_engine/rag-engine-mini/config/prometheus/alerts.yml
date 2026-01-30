@@ -1,0 +1,238 @@
+# Prometheus Alert Rules for RAG Engine
+==========================================
+Alert rules for monitoring RAG pipeline health and performance.
+
+قواعل التنبيهات لـ Prometheus لمراقبة RAG Engine
+
+groups:
+  - name: rag_api_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # High error rate
+      - alert: HighAPIErrorRate
+        expr: |
+          rate(rag_api_requests_total{status=~"5.."}[5m]) / rate(rag_api_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: rag_api
+        annotations:
+          summary: "High API error rate (>5%) for 5 minutes"
+          description: "API error rate is {{ $value | humanizePercentage }} for 5 minutes. Investigate errors."
+          
+      # Critical error rate
+      - alert: CriticalAPIErrorRate
+        expr: |
+          rate(rag_api_requests_total{status=~"5.."}[5m]) / rate(rag_api_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: rag_api
+        annotations:
+          summary: "Critical API error rate (>10%) for 2 minutes"
+          description: "API error rate is {{ $value | humanizePercentage }} for 2 minutes. Immediate investigation required!"
+          
+      # High latency
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, rate(rag_api_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          service: rag_api
+        annotations:
+          summary: "High API latency (P95 > 2s) for 5 minutes"
+          description: "P95 latency is {{ $value | humanizeDuration }} for 5 minutes."
+          
+      # Critical latency
+      - alert: CriticalAPILatency
+        expr: |
+          histogram_quantile(0.95, rate(rag_api_request_duration_seconds_bucket[5m])) > 5.0
+        for: 2m
+        labels:
+          severity: critical
+          service: rag_api
+        annotations:
+          summary: "Critical API latency (P95 > 5s) for 2 minutes"
+          description: "P95 latency is {{ $value | humanizeDuration }} for 2 minutes. Immediate action required!"
+
+  - name: rag_retrieval_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # Low retrieval scores
+      - alert: LowRetrievalScore
+        expr: |
+          histogram_quantile(0.5, rate(rag_retrieval_score_bucket{method="vector"}[10m])) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: rag_retrieval
+        annotations:
+          summary: "Low vector search scores (P50 < 0.5) for 10 minutes"
+          description: "Median vector search score is {{ $value }}. Search quality may be degraded."
+          
+      # No retrieval results
+      - alert: NoRetrievalResults
+        expr: |
+          rate(rag_retrieval_score_bucket{method="vector"}[5m]) == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: rag_retrieval
+        annotations:
+          summary: "No vector search results for 2 minutes"
+          description: "Vector search is returning zero results. Check Qdrant connection!"
+
+  - name: rag_cache_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: |
+          rate(rag_embedding_cache_total{result="hit"}[5m]) / rate(rag_embedding_cache_total[5m]) < 0.3
+        for: 10m
+        labels:
+          severity: warning
+          service: rag_cache
+        annotations:
+          summary: "Low cache hit rate (<30%) for 10 minutes"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}. Consider increasing cache size or TTL."
+          
+      # Zero cache hits
+      - alert: NoCacheHits
+        expr: |
+          rate(rag_embedding_cache_total{result="hit"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: rag_cache
+        annotations:
+          summary: "No cache hits for 5 minutes"
+          description: "Cache may be disabled or misconfigured."
+
+  - name: rag_llm_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # High token usage
+      - alert: HighTokenUsage
+        expr: |
+          rate(rag_llm_tokens_total[1h]) > 1000000
+        for: 10m
+        labels:
+          severity: warning
+          service: rag_llm
+        annotations:
+          summary: "High token usage (>1M tokens/hour) for 10 minutes"
+          description: "Token consumption is {{ $value | humanize }} tokens/hour. Monitor LLM costs!"
+          
+      # LLM timeout rate
+      - alert: HighLLMTimeoutRate
+        expr: |
+          rate(rag_api_requests_total{endpoint="/ask", status=~"5.."}[5m]) / rate(rag_api_requests_total{endpoint="/ask"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: rag_llm
+        annotations:
+          summary: "High LLM timeout rate (>10%) for 5 minutes"
+          description: "LLM API timeouts are high. Check API status and rate limits."
+
+  - name: rag_rerank_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # Slow reranking
+      - alert: SlowReranking
+        expr: |
+          histogram_quantile(0.95, rate(rag_rerank_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: rag_rerank
+        annotations:
+          summary: "Slow reranking (P95 > 1s) for 5 minutes"
+          description: "Reranking P95 is {{ $value | humanizeDuration }}. Consider using faster reranker."
+
+  - name: rag_database_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # High database latency
+      - alert: HighDBLatency
+        expr: |
+          histogram_quantile(0.95, rate(pg_stat_statements_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database latency (P95 > 500ms) for 5 minutes"
+          description: "Database P95 is {{ $value | humanizeDuration }}. Check queries and indexes."
+          
+      # Database connection exhaustion
+      - alert: DBConnectionExhaustion
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection pool nearly exhausted (>90%) for 2 minutes"
+          description: "{{ $value | humanizePercentage }} of connections used. Scale pool or optimize queries."
+          
+      # High DB error rate
+      - alert: HighDBErrorRate
+        expr: |
+          rate(pg_stat_database_deadlocks[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "High database deadlock rate (>0.1/s) for 5 minutes"
+          description: "Database deadlocks are occurring. Check query patterns and transactions."
+
+  - name: rag_infrastructure_alerts
+    interval: 30s
+    evaluation_delay: 10s
+    rules:
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes / node_memory_Mem_total_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage (>90%) for 5 minutes"
+          description: "{{ $value | humanizePercentage }} memory used. Check for memory leaks."
+          
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage (>80%) for 5 minutes"
+          description: "CPU usage is {{ $value | humanizePercentage }}. Scale horizontally or optimize code."
+          
+      # Disk space low
+      - alert: LowDiskSpace
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: infrastructure
+        annotations:
+          summary: "Low disk space (<10%) for 5 minutes"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining. Cleanup or scale storage!"
