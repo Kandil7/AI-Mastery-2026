@@ -75,7 +75,12 @@
 *   **Milestone**: Run `16_long_term_memory_and_personalization.ipynb`. Build an AI that remembers your style across sessions. [COMPLETED ✅]
 *   **Study**: [Long-Term Memory Agents](./docs/deep-dives/long-term-memory-agents.md).
 
-## 🚀 Post-Completion: The Future (Next Horizon)
+## 📉 Level 15: The Efficiency Architect (The Grand Finale)
+*   **Concepts**: SLMs (Phi-3, Qwen), Model Quantization (GGUF), Local-First RAG.
+*   **Milestone**: Run `17_slm_quantization_mastery.ipynb`. Benchmark a 4-bit model against its cloud counterpart. [COMPLETED ✅]
+*   **Study**: [SLMs and Quantization](./docs/deep-dives/slms-and-quantization.md).
+
+## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
 *   **Privacy Layer**: Integrated Zero-Knowledge proofs for data.
