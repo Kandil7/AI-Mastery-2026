@@ -85,6 +85,11 @@
 *   **Milestone**: Run `18_raft_fine_tuning_mastery.ipynb`. Generate a RAFT-formatted training sample. [COMPLETED ✅]
 *   **Study**: [RAFT Fine-Tuning for RAG](./docs/deep-dives/raft-fine-tuning-for-rag.md).
 
+## 👁️ Level 17: The Visionary Architect (The Infinite Sight)
+*   **Concepts**: Multimodal RAG, Vision-Language Models (VLMs), Layout-Aware Chunking.
+*   **Milestone**: Run `19_multimodal_rag_vision_mastery.ipynb`. Perform visual reasoning on a document chart. [COMPLETED ✅]
+*   **Study**: [Multimodal RAG & Vision](./docs/deep-dives/multimodal-rag-vision.md).
+
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
