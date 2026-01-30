@@ -80,6 +80,11 @@
 *   **Milestone**: Run `17_slm_quantization_mastery.ipynb`. Benchmark a 4-bit model against its cloud counterpart. [COMPLETED ✅]
 *   **Study**: [SLMs and Quantization](./docs/deep-dives/slms-and-quantization.md).
 
+## 🧪 Level 16: The RAFT Specialist (The Summit)
+*   **Concepts**: Retrieval-Augmented Fine-Tuning, Distractor Inhibition, Dataset Synthesis.
+*   **Milestone**: Run `18_raft_fine_tuning_mastery.ipynb`. Generate a RAFT-formatted training sample. [COMPLETED ✅]
+*   **Study**: [RAFT Fine-Tuning for RAG](./docs/deep-dives/raft-fine-tuning-for-rag.md).
+
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.
