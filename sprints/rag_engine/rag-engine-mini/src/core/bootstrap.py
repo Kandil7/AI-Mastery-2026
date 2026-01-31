@@ -26,23 +26,24 @@ def get_container() -> dict:
     
     هذا هو المكان الوحيد لإنشاء وربط المحولات
     """
-    from src.adapters.llm.openai_llm import OpenAILLM
-    from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
-    from src.adapters.vector.qdrant_store import QdrantVectorStore
-    from src.adapters.rerank.noop_reranker import NoopReranker
-    from src.adapters.cache.redis_cache import RedisCache
-    from src.adapters.filestore.factory import create_file_store
-    from src.adapters.extraction.default_extractor import DefaultTextExtractor
-    from src.adapters.queue.celery_queue import CeleryTaskQueue
-    from src.workers.celery_app import celery_app
-    from src.adapters.persistence.placeholder import PlaceholderUserRepo
-    
-    from src.application.services.embedding_cache import CachedEmbeddings
-    from src.application.use_cases.upload_document import UploadDocumentUseCase
-    from src.application.use_cases.ask_question_hybrid import AskQuestionHybridUseCase
-    from src.application.use_cases.search_documents import SearchDocumentsUseCase
-    from src.application.use_cases.bulk_operations import BulkOperationsUseCase
-    from src.application.use_cases.reindex_document import ReindexDocumentUseCase
+from src.adapters.llm.openai_llm import OpenAILLM
+from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
+from src.adapters.vector.qdrant_store import QdrantVectorStore
+from src.adapters.rerank.noop_reranker import NoopReranker
+from src.adapters.cache.redis_cache import RedisCache
+from src.adapters.filestore.factory import create_file_store
+from src.adapters.extraction.default_extractor import DefaultTextExtractor
+from src.adapters.queue.celery_queue import CeleryTaskQueue
+from src.workers.celery_app import celery_app
+from src.adapters.persistence.placeholder import PlaceholderUserRepo
+
+from src.application.services.embedding_cache import CachedEmbeddings
+from src.application.use_cases.upload_document import UploadDocumentUseCase
+from src.application.use_cases.ask_question_hybrid import AskQuestionHybridUseCase
+from src.application.use_cases.search_documents import SearchDocumentsUseCase
+from src.application.use_cases.bulk_operations import BulkOperationsUseCase
+from src.application.use_cases.reindex_document import ReindexDocumentUseCase
+from src.application.services.i18n import i18nService
     
     # Note: In production, these would be real implementations
     # For now, we use placeholder adapters for some ports
@@ -297,12 +298,17 @@ def get_container() -> dict:
         "router": semantic_router,
         "privacy": privacy_guard,
         
-        # Use cases
-        "upload_use_case": upload_use_case,
-        "ask_hybrid_use_case": ask_hybrid_use_case,
-        "search_documents_use_case": search_documents_use_case,
-        "bulk_operations_use_case": bulk_operations_use_case,
-        "reindex_document_use_case": reindex_document_use_case,
+    # i18n Service (Phase 7)
+    from src.application.services.i18n import i18nService
+
+    i18n_service = i18nService()
+
+    # Use cases
+    "upload_use_case": upload_use_case,
+    "ask_hybrid_use_case": ask_hybrid_use_case,
+    "search_documents_use_case": search_documents_use_case,
+    "bulk_operations_use_case": bulk_operations_use_case,
+    "reindex_document_use_case": reindex_document_use_case,
     }
 
 
