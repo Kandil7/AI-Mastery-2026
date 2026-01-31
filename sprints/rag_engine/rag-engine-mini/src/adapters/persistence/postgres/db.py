@@ -53,3 +53,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_engine():
+    """Return the configured SQLAlchemy engine."""
+    return engine

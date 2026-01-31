@@ -20,16 +20,19 @@ router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
 class CreateSessionRequest(BaseModel):
     """Request to create a chat session."""
+
     title: str | None = Field(default=None, max_length=256)
 
 
 class CreateSessionResponse(BaseModel):
     """Response for session creation."""
+
     session_id: str
 
 
 class SessionInfo(BaseModel):
     """Chat session information."""
+
     session_id: str
     title: str | None
     created_at: str
@@ -37,6 +40,7 @@ class SessionInfo(BaseModel):
 
 class TurnInfo(BaseModel):
     """Chat turn information."""
+
     turn_id: str
     question: str
     answer: str
@@ -46,11 +50,13 @@ class TurnInfo(BaseModel):
 
 class ListSessionsResponse(BaseModel):
     """Response for listing sessions."""
+
     sessions: list[SessionInfo]
 
 
 class GetSessionResponse(BaseModel):
     """Response for getting session with turns."""
+
     session_id: str
     title: str | None
     turns: list[TurnInfo]
@@ -63,24 +69,25 @@ def create_session(
 ) -> CreateSessionResponse:
     """
     Create a new chat session.
-    
+
     إنشاء جلسة محادثة جديدة
     """
     container = get_container()
-    
+
     # Check if chat_repo is available
     if "chat_repo" not in container:
         # Return placeholder for now
         import uuid
+
         return CreateSessionResponse(session_id=str(uuid.uuid4()))
-    
+
     chat_repo = container["chat_repo"]
-    
+
     session_id = chat_repo.create_session(
         tenant_id=TenantId(tenant_id),
         title=body.title,
     )
-    
+
     return CreateSessionResponse(session_id=session_id)
 
 
@@ -91,21 +98,21 @@ def list_sessions(
 ) -> ListSessionsResponse:
     """
     List chat sessions for the authenticated user.
-    
+
     قائمة جلسات المحادثة للمستخدم
     """
     container = get_container()
-    
+
     if "chat_repo" not in container:
         return ListSessionsResponse(sessions=[])
-    
+
     chat_repo = container["chat_repo"]
-    
+
     sessions = chat_repo.list_sessions(
         tenant_id=TenantId(tenant_id),
         limit=limit,
     )
-    
+
     return ListSessionsResponse(
         sessions=[
             SessionInfo(
@@ -126,29 +133,34 @@ def get_session(
 ) -> GetSessionResponse:
     """
     Get a chat session with its turns.
-    
+
     الحصول على جلسة محادثة مع دوراتها
     """
     container = get_container()
-    
+
     if "chat_repo" not in container:
         return GetSessionResponse(
             session_id=session_id,
             title=None,
             turns=[],
         )
-    
+
     chat_repo = container["chat_repo"]
-    
+
+    session = chat_repo.get_session(
+        tenant_id=TenantId(tenant_id),
+        session_id=session_id,
+    )
+
     turns = chat_repo.get_session_turns(
         tenant_id=TenantId(tenant_id),
         session_id=session_id,
         limit=limit,
     )
-    
+
     return GetSessionResponse(
         session_id=session_id,
-        title=None,  # TODO: Get from session
+        title=session.title if session else None,
         turns=[
             TurnInfo(
                 turn_id=t.id,

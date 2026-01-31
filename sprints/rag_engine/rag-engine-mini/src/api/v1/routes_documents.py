@@ -6,13 +6,14 @@ Endpoints for document upload and management.
 نقاط نهاية رفع وإدارة المستندات
 """
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Response
 from pydantic import BaseModel
 
 from src.api.v1.deps import get_tenant_id
 from src.core.bootstrap import get_container
 from src.application.use_cases.upload_document import (
     UploadDocumentRequest,
+    UploadDocumentStreamRequest,
     UploadDocumentUseCase,
 )
 from src.domain.errors import (
@@ -27,11 +28,13 @@ router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 class UploadResponse(BaseModel):
     """Response model for document upload."""
     document_id: str
+    id: str | None = None
     status: str
     message: str = ""
 
 
-@router.post("/upload", response_model=UploadResponse)
+@router.post("", response_model=UploadResponse, status_code=201)
+@router.post("/upload", response_model=UploadResponse, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
     tenant_id: str = Depends(get_tenant_id),
@@ -51,25 +54,30 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
     
-    # Read file data
-    data = await file.read()
-    
     # Get use case from container
     container = get_container()
     use_case: UploadDocumentUseCase = container["upload_use_case"]
     
     try:
-        result = await use_case.execute(
-            UploadDocumentRequest(
+        async def iter_chunks(chunk_size: int = 1024 * 1024):
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+        result = await use_case.execute_stream(
+            UploadDocumentStreamRequest(
                 tenant_id=tenant_id,
                 filename=file.filename,
                 content_type=file.content_type or "application/octet-stream",
-                data=data,
+                data_stream=iter_chunks(),
             )
         )
         
         return UploadResponse(
             document_id=result.document_id.value,
+            id=result.document_id.value,
             status=result.status,
             message=result.message,
         )
@@ -158,7 +166,7 @@ async def list_documents(
     }
 
 
-@router.delete("/{document_id}")
+@router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: str,
     tenant_id: str = Depends(get_tenant_id),
@@ -181,4 +189,4 @@ async def delete_document(
     if not success:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    return {"status": "deleted", "document_id": document_id}
+    return Response(status_code=204)

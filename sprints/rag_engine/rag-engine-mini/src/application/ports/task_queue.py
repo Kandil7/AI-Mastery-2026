@@ -54,3 +54,32 @@ class TaskQueuePort(Protocol):
             ستقوم المهمة بالاستخراج والتقطيع والتضمين والتخزين
         """
         ...
+
+    def enqueue_bulk_upload(
+        self,
+        *,
+        tenant_id: TenantId,
+        files: list[dict],
+    ) -> str:
+        """Enqueue bulk upload task and return task ID."""
+        ...
+
+    def enqueue_bulk_delete(
+        self,
+        *,
+        tenant_id: TenantId,
+        document_ids: list[str],
+    ) -> str:
+        """Enqueue bulk delete task and return task ID."""
+        ...
+
+    def enqueue_merge_pdfs(
+        self,
+        *,
+        tenant_id: TenantId,
+        source_document_ids: list[str],
+        merged_filename: str,
+        target_document_id: str | None = None,
+    ) -> str:
+        """Enqueue PDF merge task and return task ID."""
+        ...

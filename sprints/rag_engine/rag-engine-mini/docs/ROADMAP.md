@@ -80,6 +80,26 @@
 *   **Milestone**: Run `17_slm_quantization_mastery.ipynb`. Benchmark a 4-bit model against its cloud counterpart. [COMPLETED ✅]
 *   **Study**: [SLMs and Quantization](./docs/deep-dives/slms-and-quantization.md).
 
+## 🧪 Level 16: The RAFT Specialist (The Summit)
+*   **Concepts**: Retrieval-Augmented Fine-Tuning, Distractor Inhibition, Dataset Synthesis.
+*   **Milestone**: Run `18_raft_fine_tuning_mastery.ipynb`. Generate a RAFT-formatted training sample. [COMPLETED ✅]
+*   **Study**: [RAFT Fine-Tuning for RAG](./docs/deep-dives/raft-fine-tuning-for-rag.md).
+
+## 👁️ Level 17: The Visionary Architect (The Infinite Sight)
+*   **Concepts**: Multimodal RAG, Vision-Language Models (VLMs), Layout-Aware Chunking.
+*   **Milestone**: Run `19_multimodal_rag_vision_mastery.ipynb`. Perform visual reasoning on a document chart. [COMPLETED ✅]
+*   **Study**: [Multimodal RAG & Vision](./docs/deep-dives/multimodal-rag-vision.md).
+
+## 🧠⚡ Level 18: The Reasoning Architect (The Thinking Machine)
+*   **Concepts**: Test-Time Compute, Thinking Loops, CoT Verification, System 2 AI.
+*   **Milestone**: Run `20_reasoning_models_thinking_loops.ipynb`. Implement a self-correcting logic chain. [COMPLETED ✅]
+*   **Study**: [Reasoning Models & Thinking Loops](./docs/deep-dives/reasoning-models-thinking-loops.md).
+
+## 🧪✨ Level 19: The Data Alchemist (Knowledge Creation)
+*   **Concepts**: Synthetic Data, Evol-Instruct, Knowledge Distillation.
+*   **Milestone**: Run `21_synthetic_data_distillation_mastery.ipynb`. Generate a fine-tuning dataset from scratch. [COMPLETED ✅]
+*   **Study**: [Synthetic Data & Distillation](./docs/deep-dives/synthetic-data-generation.md).
+
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
 *   **Multi-Agent Swarms**: LLMs that coordinate to solve massive research tasks.

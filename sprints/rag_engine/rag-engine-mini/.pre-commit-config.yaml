@@ -1,0 +1,150 @@
+# Pre-commit Configuration
+# ========================
+# Hooks that run before each commit to ensure code quality
+# Run: pip install pre-commit && pre-commit install
+
+إعدادات pre-commit لضمان جودة الكود
+
+default_language_version:
+  python: python3.10
+
+repos:
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        exclude: '\.(md|txt|json)$'
+
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+
+      # Detect large files (> 1MB)
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+
+      # Check YAML syntax
+      - id: check-yaml
+
+      # Check JSON syntax
+      - id: check-json
+
+      # Check for merge conflict markers
+      - id: check-merge-conflict
+
+      # Check for broken symlinks
+      - id: check-symlinks
+
+      # Check for private keys
+      - id: detect-private-key
+
+  # Python formatting
+  - repo: https://github.com/psf/black
+    rev: 24.4.0
+    hooks:
+      - id: black
+        language_version: python3.10
+        args: [--line-length=100]
+
+  # Import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length', '100']
+
+  # Linting with Flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--max-line-length=100', '--ignore=E203,E501,W503']
+        additional_dependencies:
+          - flake8-bandit
+          - flake8-bugbear
+          - flake8-docstrings
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        args: ['--ignore-missing-imports', '--warn-return-any', '--warn-unused-ignores']
+        additional_dependencies: ['types-requests', 'types-redis', 'types-PyYAML']
+
+  # Security with Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-r', 'src/', '-f', 'json', '-o', 'bandit-report.json']
+        pass_filenames: false
+
+  # Prettier for non-Python files
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [yaml, json, markdown]
+        args: ['--write']
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        types: [shell]
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: ['--ignore', 'DL3008']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+
+  # Gitleaks (secret detection)
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+        args: ['--no-banner', '--no-git', '--config', '.gitleaks.toml']
+
+  # Checkov (infrastructure security)
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.2.65
+    hooks:
+      - id: checkov
+        args: ['--framework', 'dockerfile', '--compact']
+        files: Dockerfile*
+
+  # PyTest hooks
+  - repo: https://github.com/mgedmin/pytest-runner
+    rev: v0.6.0
+    hooks:
+      - id: pytest-runner
+        args: ['tests/unit/', '-v', '--tb=short', '-q']
+        additional_dependencies:
+          - pytest
+          - pytest-cov
+          - pytest-asyncio
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

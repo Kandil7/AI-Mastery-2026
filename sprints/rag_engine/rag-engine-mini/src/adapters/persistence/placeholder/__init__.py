@@ -7,6 +7,9 @@ from src.adapters.persistence.placeholder.repos import (
     PlaceholderChunkDedupRepo,
     PlaceholderChunkTextReader,
     PlaceholderKeywordStore,
+    PlaceholderChatRepo,
+    PlaceholderGraphRepo,
+    PlaceholderUserRepo,
 )
 
 __all__ = [
@@ -16,4 +19,7 @@ __all__ = [
     "PlaceholderChunkDedupRepo",
     "PlaceholderChunkTextReader",
     "PlaceholderKeywordStore",
+    "PlaceholderChatRepo",
+    "PlaceholderGraphRepo",
+    "PlaceholderUserRepo",
 ]

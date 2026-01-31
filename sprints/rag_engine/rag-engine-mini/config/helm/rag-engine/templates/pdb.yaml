@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Chart.Name }}-pdb
+  namespace: rag-engine
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable | default 1 }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable | default 0 }}
+  selector:
+    matchLabels:
+      {{- include "common.labels" . | nindent 6 }}

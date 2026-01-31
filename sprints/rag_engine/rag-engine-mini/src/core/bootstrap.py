@@ -12,6 +12,37 @@ from qdrant_client import QdrantClient
 
 from src.core.config import settings
 
+from src.adapters.llm.openai_llm import OpenAILLM
+from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
+from src.adapters.vector.qdrant_store import QdrantVectorStore
+from src.adapters.rerank.noop_reranker import NoopReranker
+from src.adapters.cache.redis_cache import RedisCache
+from src.adapters.filestore.factory import create_file_store
+from src.adapters.extraction.default_extractor import DefaultTextExtractor
+from src.adapters.queue.celery_queue import CeleryTaskQueue
+from src.workers.celery_app import celery_app
+from src.adapters.persistence.placeholder import PlaceholderUserRepo
+
+from src.application.services.embedding_cache import CachedEmbeddings
+from src.application.use_cases.upload_document import UploadDocumentUseCase
+from src.application.use_cases.ask_question_hybrid import AskQuestionHybridUseCase
+from src.application.use_cases.search_documents import SearchDocumentsUseCase
+from src.application.use_cases.bulk_operations import BulkOperationsUseCase
+from src.application.use_cases.reindex_document import ReindexDocumentUseCase
+from src.application.services.i18n import i18nService
+
+# Import the export service and use case
+from src.application.services.export_service import ExportService
+from src.application.use_cases.export_use_case import ExportUseCase
+
+# Import the health check service
+from src.application.services.health_check_service import HealthCheckService
+
+# Import the A/B testing service
+from src.application.services.ab_testing_service import ABTestingService
+ 
+# Note: In production, these would be real implementations
+# For now, we use placeholder adapters for some ports
 
 @lru_cache(maxsize=1)
 def get_container() -> dict:
@@ -26,23 +57,6 @@ def get_container() -> dict:
     
     هذا هو المكان الوحيد لإنشاء وربط المحولات
     """
-    from src.adapters.llm.openai_llm import OpenAILLM
-    from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
-    from src.adapters.vector.qdrant_store import QdrantVectorStore
-    from src.adapters.rerank.cross_encoder import CrossEncoderReranker
-    from src.adapters.rerank.noop_reranker import NoopReranker
-    from src.adapters.cache.redis_cache import RedisCache
-    from src.adapters.filestore.local_store import LocalFileStore
-    from src.adapters.extraction.default_extractor import DefaultTextExtractor
-    from src.adapters.queue.celery_queue import CeleryTaskQueue
-    from src.workers.celery_app import celery_app
-    
-    from src.application.services.embedding_cache import CachedEmbeddings
-    from src.application.use_cases.upload_document import UploadDocumentUseCase
-    from src.application.use_cases.ask_question_hybrid import AskQuestionHybridUseCase
-    
-    # Note: In production, these would be real implementations
-    # For now, we use placeholder adapters for some ports
     
     # =========================================================================
     # Infrastructure adapters
@@ -52,10 +66,7 @@ def get_container() -> dict:
     cache = RedisCache(settings.redis_url)
     
     # File store
-    file_store = LocalFileStore(
-        upload_dir=settings.upload_dir,
-        max_mb=settings.max_upload_mb,
-    )
+    file_store = create_file_store(settings)
     
     # Text extractor
     text_extractor = DefaultTextExtractor()
@@ -132,10 +143,15 @@ def get_container() -> dict:
     # =========================================================================
     
     if settings.rerank_backend == "cross_encoder":
-        reranker = CrossEncoderReranker(
-            model_name=settings.cross_encoder_model,
-            device=settings.cross_encoder_device,
-        )
+        try:
+            from src.adapters.rerank.cross_encoder import CrossEncoderReranker
+
+            reranker = CrossEncoderReranker(
+                model_name=settings.cross_encoder_model,
+                device=settings.cross_encoder_device,
+            )
+        except ModuleNotFoundError:
+            reranker = NoopReranker()
     elif settings.rerank_backend == "llm":
         from src.adapters.rerank.llm_reranker import LLMReranker
         reranker = LLMReranker(llm=llm)
@@ -154,6 +170,7 @@ def get_container() -> dict:
             PostgresChunkTextReader,
             PostgresKeywordStore,
             PostgresChatRepo,
+            PostgresGraphRepo,
         )
         
         document_repo = PostgresDocumentRepo()
@@ -164,6 +181,7 @@ def get_container() -> dict:
         keyword_store = PostgresKeywordStore()
         chat_repo = PostgresChatRepo()
         graph_repo = PostgresGraphRepo()
+        user_repo = PlaceholderUserRepo()
     else:
         # Development: Use in-memory placeholder implementations
         from src.adapters.persistence.placeholder import (
@@ -173,6 +191,8 @@ def get_container() -> dict:
             PlaceholderChunkDedupRepo,
             PlaceholderChunkTextReader,
             PlaceholderKeywordStore,
+            PlaceholderChatRepo,
+            PlaceholderGraphRepo,
         )
         
         document_repo = PlaceholderDocumentRepo()
@@ -181,10 +201,9 @@ def get_container() -> dict:
         chunk_dedup_repo = PlaceholderChunkDedupRepo()
         chunk_text_reader = PlaceholderChunkTextReader()
         keyword_store = PlaceholderKeywordStore()
-        # Chat repo placeholder (inline for now)
-        from src.adapters.persistence.postgres.repo_chat import PostgresChatRepo
-        chat_repo = PostgresChatRepo()  # Still Postgres based but can be mocked
-        graph_repo = PostgresGraphRepo() # Reusing real for now as placeholders are complex
+        chat_repo = PlaceholderChatRepo()
+        graph_repo = PlaceholderGraphRepo()
+        user_repo = PlaceholderUserRepo()
     
     # Query Expansion
     from src.application.services.query_expansion import QueryExpansionService
@@ -211,6 +230,26 @@ def get_container() -> dict:
     privacy_guard = PrivacyGuardService()
     search_tool = TavilySearchAdapter(api_key=settings.tavily_api_key or "")
     
+    # Export Service (added)
+    export_service = ExportService(
+        document_repo=document_repo
+    )
+    export_use_case = ExportUseCase(export_service=export_service)
+    
+    # Health Check Service (added)
+    health_check_service = HealthCheckService(
+        document_repo=document_repo,
+        cache=cache,
+        vector_store=vector_store,
+        llm=llm
+    )
+    
+    # A/B Testing Service (added)
+    ab_test_service = ABTestingService()
+    
+    # i18n Service (Phase 7)
+    i18n_service = i18nService()
+    
     # =========================================================================
     # Use cases
     # =========================================================================
@@ -234,6 +273,22 @@ def get_container() -> dict:
         router=semantic_router,
         privacy=privacy_guard,
         search_tool=search_tool,
+    )
+
+    search_documents_use_case = SearchDocumentsUseCase(
+        document_repo=document_repo,
+    )
+
+    bulk_operations_use_case = BulkOperationsUseCase(
+        upload_use_case=upload_use_case,
+        file_store=file_store,
+        document_repo=document_repo,
+        task_queue=task_queue,
+    )
+
+    reindex_document_use_case = ReindexDocumentUseCase(
+        document_repo=document_repo,
+        task_queue=task_queue,
     )
     
     # =========================================================================
@@ -265,16 +320,25 @@ def get_container() -> dict:
         "chunk_text_reader": chunk_text_reader,
         "chat_repo": chat_repo,
         "graph_repo": graph_repo,
+        "user_repo": user_repo,
 
         # Services
         "graph_extractor": graph_extractor_service,
         "vision_service": vision_service,
         "router": semantic_router,
         "privacy": privacy_guard,
-        
+        "i18n_service": i18n_service,
+        "export_service": export_service,
+        "export_use_case": export_use_case,
+        "health_check_service": health_check_service,
+        "ab_test_service": ab_test_service,
+
         # Use cases
         "upload_use_case": upload_use_case,
         "ask_hybrid_use_case": ask_hybrid_use_case,
+        "search_documents_use_case": search_documents_use_case,
+        "bulk_operations_use_case": bulk_operations_use_case,
+        "reindex_document_use_case": reindex_document_use_case,
     }
 
 

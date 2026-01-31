@@ -1,0 +1,19 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: rag-engine
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/name: {{ .Values.commonLabels.app.kubernetes.io/name }}
+    app.kubernetes.io/instance: {{ .Values.commonLabels.app.kubernetes.io/instance }}
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: 8000
+  {{- end }}
+{{- end }}
