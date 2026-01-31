@@ -90,6 +90,16 @@ class FacetType:
 
 
 @strawberry.type
+class WebhookType:
+    """Webhook GraphQL type."""
+
+    id: strawberry.ID
+    url: str
+    events: List[str]
+    active: bool
+
+
+@strawberry.type
 class HealthCheckType:
     """Health check result GraphQL type."""
 
@@ -896,27 +906,27 @@ class Mutation:
     def upload_document(
         self,
         info,
-        file_content: strawberry.ID,  # File ID from multipart upload
         filename: str,
+        content_type: str,
+        file_content: bytes,
     ) -> DocumentType:
         """
-        Upload a document.
+        Upload and index a new document.
 
-        Args:
-            info: GraphQL execution context
-            file_content: File ID (uploaded via multipart form)
-            filename: Original filename
-
-        Returns:
-            Created document metadata
-
-        رفع مستند باستخدام GraphQL
+        Process:
+        1. Validate file
+        2. Store in configured storage (S3/GCS/Azure/Local)
+        3. Create database record
+        4. Trigger indexing task
+        5. Publish update event
         """
         # Validate inputs
-        if not file_content:
-            raise ValueError("file_content is required")
         if not filename or not filename.strip():
             raise ValueError("filename is required")
+        if not content_type:
+            raise ValueError("content_type is required")
+        if not file_content:
+            raise ValueError("file_content is required")
 
         filename = filename.strip()
 
@@ -929,10 +939,69 @@ class Mutation:
 
         tenant_id = get_tenant_id(request)
 
-        # Get file upload manager from context
-        upload_manager = info.context.get("upload_manager")
-        if not upload_manager:
-            raise RuntimeError("Upload manager not available")
+        # Get file storage from context
+        file_storage = info.context.get("file_storage")
+        if not file_storage:
+            raise RuntimeError("File storage not available")
+
+        # Get document repository from context
+        doc_repo = info.context.get("doc_repo")
+        if not doc_repo:
+            raise RuntimeError("Document repository not available")
+
+        # Get task queue from context
+        task_queue = info.context.get("task_queue")
+        if not task_queue:
+            raise RuntimeError("Task queue not available")
+
+        # Validate file size (max 50MB)
+        file_size = len(file_content)
+        if file_size > 50 * 1024 * 1024:
+            raise ValueError("File size exceeds maximum of 50MB")
+
+        # Store file using configured storage
+        from src.domain.entities import TenantId
+
+        tenant = TenantId(tenant_id)
+        storage_path = file_storage.store_file(
+            tenant_id=tenant_id,
+            filename=filename,
+            content=file_content,
+        )
+
+        # Create document record
+        from src.domain.entities import DocumentId
+
+        document = doc_repo.create(
+            tenant_id=tenant_id,
+            filename=filename,
+            content_type=content_type,
+            storage_path=storage_path,
+            size_bytes=file_size,
+            status="created",
+        )
+
+        # Trigger indexing task
+        from src.workers.tasks import celery_app
+
+        celery_app.send_task(
+            "index_document",
+            kwargs={
+                "tenant_id": tenant_id,
+                "document_id": document.document_id,
+            },
+        )
+
+        # Publish update event (triggers subscriptions)
+        redis_client = info.context.get("redis_client")
+        if redis_client:
+            await redis_client.publish(
+                f"documents:{tenant_id}",
+                document.document_id,
+            )
+
+        # Return document
+        return DocumentType.from_entity(document)
 
         # Get document repository from context
         doc_repo = info.context.get("doc_repo")
@@ -1058,9 +1127,293 @@ class Mutation:
             log.error("Failed to create chat session", error=str(e))
             raise RuntimeError(f"Failed to create chat session: {str(e)}")
 
+    @strawberry.mutation
+    def delete_document(
+        self,
+        info,
+        document_id: strawberry.ID,
+    ) -> bool:
+        """
+        Delete a document and all associated data.
 
-@strawberry.type
-class Subscription:
+        Cascades:
+        - File from storage
+        - Chunks from database
+        - Vectors from vector store
+        - Document record
+
+        Args:
+            info: GraphQL execution context
+            document_id: Document ID to delete
+
+        Returns:
+            True if deleted successfully
+        """
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+        from src.domain.entities import DocumentId
+
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # Get repositories from context
+        doc_repo = info.context.get("doc_repo")
+        chunk_repo = info.context.get("chunk_repo")
+        vector_store = info.context.get("vector_store")
+        file_storage = info.context.get("file_storage")
+
+        if not all([doc_repo, file_storage]):
+            raise RuntimeError("Required repositories not available")
+
+        tenant = TenantId(tenant_id)
+        doc_id = DocumentId(str(document_id))
+
+        try:
+            # Get document details
+            document = doc_repo.find_by_id(doc_id)
+
+            if not document:
+                raise ValueError(f"Document not found: {document_id}")
+
+            # Verify document belongs to tenant
+            if hasattr(document, "tenant_id") and document.tenant_id != tenant:
+                raise ValueError("Document belongs to different tenant")
+
+            # Delete file from storage
+            file_storage.delete_file(document.storage_path)
+
+            # Delete chunks (cascades to vectors)
+            chunk_repo.delete_by_document(doc_id)
+
+            # Delete document record
+            doc_repo.delete(tenant, doc_id)
+
+            log.info("document_deleted", document_id=doc_id, tenant_id=tenant_id)
+
+            return True
+
+        except ValueError as e:
+            log.error("Document validation failed", error=str(e), document_id=doc_id)
+            raise
+        except Exception as e:
+            log.error("Failed to delete document", error=str(e), document_id=doc_id)
+            raise RuntimeError(f"Failed to delete document: {str(e)}")
+
+    @strawberry.mutation
+    def update_document(
+        self,
+        info,
+        document_id: strawberry.ID,
+        filename: Optional[str] = None,
+        status: Optional[DocumentStatus] = None,
+    ) -> DocumentType:
+        """
+        Update document metadata.
+
+        Args:
+            info: GraphQL execution context
+            document_id: Document ID to update
+            filename: Optional new filename
+            status: Optional new status
+
+        Returns:
+            Updated document
+        """
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+        from src.domain.entities import DocumentId
+
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # Get document repository
+        doc_repo = info.context.get("doc_repo")
+        if not doc_repo:
+            raise RuntimeError("Document repository not available")
+
+        tenant = TenantId(tenant_id)
+        doc_id = DocumentId(str(document_id))
+
+        try:
+            # Get existing document
+            document = doc_repo.find_by_id(doc_id)
+
+            if not document:
+                raise ValueError(f"Document not found: {document_id}")
+
+            # Verify document belongs to tenant
+            if hasattr(document, "tenant_id") and document.tenant_id != tenant:
+                raise ValueError("Document belongs to different tenant")
+
+            # Prepare updates
+            updates = {}
+            if filename and filename.strip():
+                updates["filename"] = filename.strip()
+
+            if status:
+                updates["status"] = status.value
+
+            if not updates:
+                raise ValueError("At least one field to update required")
+
+            # Update document
+            updated_doc = doc_repo.update(
+                tenant=tenant,
+                document_id=doc_id,
+                **updates,
+            )
+
+            log.info("document_updated", document_id=doc_id, updates=updates)
+
+            return DocumentType.from_entity(updated_doc)
+
+        except ValueError as e:
+            log.error("Document validation failed", error=str(e), document_id=doc_id)
+            raise
+        except Exception as e:
+            log.error("Failed to update document", error=str(e), document_id=doc_id)
+            raise RuntimeError(f"Failed to update document: {str(e)}")
+
+    @strawberry.mutation
+    def create_webhook(
+        self,
+        info,
+        url: str,
+        events: List[str],
+        secret: str,
+    ) -> WebhookType:
+        """
+        Create a new webhook configuration.
+
+        Args:
+            info: GraphQL execution context
+            url: Webhook endpoint URL
+            events: List of events to subscribe to
+            secret: Secret for HMAC signature verification
+
+        Returns:
+            Created webhook
+        """
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # Validate inputs
+        if not url or not url.strip():
+            raise ValueError("URL is required")
+
+        if not events or len(events) == 0:
+            raise ValueError("At least one event is required")
+
+        if not secret or secret.strip():
+            raise ValueError("Secret is required")
+
+        # Validate URL format
+        from urllib.parse import urlparse
+        parsed = urlparse(url.strip())
+        if not all([parsed.scheme, parsed.netloc]):
+            raise ValueError("Invalid URL format")
+
+        # Validate events
+        valid_events = ["document.created", "document.indexed", "query.completed", "chat.message"]
+        invalid_events = [e for e in events if e not in valid_events]
+
+        if invalid_events:
+            raise ValueError(f"Invalid events: {', '.join(invalid_events)}")
+
+        # Get webhook repository
+        webhook_repo = info.context.get("webhook_repo")
+        if not webhook_repo:
+            raise RuntimeError("Webhook repository not available")
+
+        try:
+            # Create webhook
+            from src.domain.entities import TenantId
+
+            tenant = TenantId(tenant_id)
+            webhook = webhook_repo.create(
+                tenant_id=tenant,
+                url=url.strip(),
+                events=events,
+                secret=secret.strip(),
+            )
+
+            log.info("webhook_created", webhook_id=webhook.webhook_id, tenant_id=tenant_id)
+
+            return WebhookType(
+                id=webhook.webhook_id,
+                url=webhook.url,
+                events=webhook.events,
+                active=webhook.active,
+            )
+
+        except Exception as e:
+            log.error("Failed to create webhook", error=str(e))
+            raise RuntimeError(f"Failed to create webhook: {str(e)}")
+
+    @strawberry.mutation
+    def delete_webhook(
+        self,
+        info,
+        webhook_id: strawberry.ID,
+    ) -> bool:
+        """
+        Delete a webhook configuration.
+
+        Args:
+            info: GraphQL execution context
+            webhook_id: Webhook ID to delete
+
+        Returns:
+            True if deleted successfully
+        """
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # Get webhook repository
+        webhook_repo = info.context.get("webhook_repo")
+        if not webhook_repo:
+            raise RuntimeError("Webhook repository not available")
+
+        tenant = TenantId(tenant_id)
+
+        try:
+            # Delete webhook
+            webhook_repo.delete(
+                tenant_id=tenant,
+                webhook_id=webhook_id,
+            )
+
+            log.info("webhook_deleted", webhook_id=webhook_id, tenant_id=tenant_id)
+
+            return True
+
+        except ValueError as e:
+            log.error("Webhook validation failed", error=str(e), webhook_id=webhook_id)
+            raise
+        except Exception as e:
+            log.error("Failed to delete webhook", error=str(e), webhook_id=webhook_id)
+            raise RuntimeError(f"Failed to delete webhook: {str(e)}")
+
+    @strawberry.type
+    class Subscription:
     """Root subscription type for GraphQL real-time updates."""
 
     @strawberry.subscription
