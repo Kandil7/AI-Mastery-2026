@@ -9,6 +9,7 @@ Services for exporting documents in various formats.
 from typing import List, Dict
 import pandas as pd
 import json
+import io
 
 
 class PDFExportService:
@@ -33,8 +34,9 @@ class PDFExportService:
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import inch
 
-        # Create PDF canvas
-        pdf = canvas.Canvas("output.pdf", pagesize=letter)
+        # Create PDF canvas to BytesIO
+        buffer = io.BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=letter)
 
         # Add title
         pdf.setFont("Helvetica-Bold", 18)
@@ -44,12 +46,24 @@ class PDFExportService:
         y = 9 * inch
         for doc in documents:
             pdf.setFont("Helvetica", 12)
-            pdf.drawString(1 * inch, y, f"• {doc.get('filename', doc.get('id', 'Unknown'))}")
+            filename = doc.get("filename", doc.get("id", "Unknown"))
+            pdf.drawString(1 * inch, y, f"• {filename}")
             y -= 0.3 * inch
 
-        pdf.save()
+            # Add metadata
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(1.5 * inch, y, f"  ID: {doc.get('id', 'N/A')}")
+            y -= 0.2 * inch
+            pdf.drawString(1.5 * inch, y, f"  Status: {doc.get('status', 'N/A')}")
+            y -= 0.2 * inch
 
-        return b""
+            # New page if needed
+            if y < 1 * inch:
+                pdf.showPage()
+                y = 10 * inch
+
+        pdf.save()
+        return buffer.getvalue()
 
 
 class MarkdownExportService:

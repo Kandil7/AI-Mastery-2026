@@ -37,6 +37,15 @@ class QuerySortBy(str, Enum):
     SIZE = "size"
 
 
+class ExperimentStatus(str, Enum):
+    """A/B test experiment status."""
+
+    DRAFT = "draft"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+
+
 @strawberry.type
 class DocumentType:
     """Document GraphQL type."""
@@ -826,6 +835,285 @@ class Query:
                 latency_ms=(time.time() - start_time) * 1000,
                 message=str(e),
             )
+
+
+@strawberry.type
+class ExperimentVariantType:
+    """A/B test variant GraphQL type."""
+
+    id: strawberry.ID
+    name: str
+    allocation: float
+    config: List[str]
+
+
+@strawberry.type
+class ExperimentMetricType:
+    """A/B test metric GraphQL type."""
+
+    metric_name: str
+    metric_value: float
+    recorded_at: datetime
+
+
+@strawberry.type
+class ExperimentType:
+    """A/B test experiment GraphQL type."""
+
+    id: strawberry.ID
+    name: str
+    description: str
+    status: ExperimentStatus
+    created_at: datetime
+    started_at: Optional[datetime]
+    ended_at: Optional[datetime]
+    variants: List[ExperimentVariantType]
+
+
+@strawberry.type
+class ExperimentResultsType:
+    """A/B test results GraphQL type."""
+
+    experiment: ExperimentType
+    metrics: List[ExperimentMetricType]
+    significant: bool
+    summary: str
+
+    @strawberry.field
+    def experiments(
+        self,
+        info,
+        status: Optional[ExperimentStatus] = None,
+        limit: int = 20,
+    ) -> List[ExperimentType]:
+        """
+        Query A/B testing experiments.
+
+        Args:
+            info: GraphQL execution context
+            status: Filter by experiment status (optional)
+            limit: Max results (default: 20)
+
+        Returns:
+            List of experiments
+
+        الاستعلام عن تجارب A/B
+        """
+        # Validate inputs
+        if limit < 1 or limit > 100:
+            raise ValueError("limit must be between 1 and 100")
+
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            return []
+
+        tenant_id = get_tenant_id(request)
+
+        # Get experiment repository from context
+        exp_repo = info.context.get("experiment_repo")
+        if not exp_repo:
+            return []
+
+        # Query experiments
+        experiments = exp_repo.list_experiments(
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+
+        # Convert to GraphQL types
+        result = []
+        for exp in experiments:
+            # Filter by status if provided
+            if status and exp.status != status.value:
+                continue
+
+            # Get variants
+            variants = exp_repo.get_variants(exp.id)
+
+            result.append(
+                ExperimentType(
+                    id=exp.id,
+                    name=exp.name,
+                    description=exp.description,
+                    status=ExperimentStatus(exp.status),
+                    created_at=exp.created_at,
+                    started_at=exp.started_at,
+                    ended_at=exp.ended_at,
+                    variants=[
+                        ExperimentVariantType(
+                            id=var.id,
+                            name=var.name,
+                            allocation=var.allocation,
+                            config=[f"{k}={v}" for k, v in var.config.items()],
+                        )
+                        for var in variants
+                    ],
+                )
+            )
+
+        return result
+
+    @strawberry.field
+    def experiment(
+        self,
+        info,
+        experiment_id: strawberry.ID,
+    ) -> Optional[ExperimentType]:
+        """
+        Get a single A/B testing experiment.
+
+        Args:
+            info: GraphQL execution context
+            experiment_id: Experiment ID to fetch
+
+        Returns:
+            Experiment or None if not found
+
+        الحصول على تجربة A/B واحدة
+        """
+        # Validate input
+        if not experiment_id:
+            raise ValueError("experiment_id is required")
+
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            return None
+
+        tenant_id = get_tenant_id(request)
+
+        # Get experiment repository from context
+        exp_repo = info.context.get("experiment_repo")
+        if not exp_repo:
+            return None
+
+        # Query database
+        exp = exp_repo.get_experiment(str(experiment_id))
+
+        # Check if experiment exists and belongs to tenant
+        if not exp:
+            return None
+
+        # Get variants
+        variants = exp_repo.get_variants(exp.id)
+
+        # Convert to GraphQL type
+        return ExperimentType(
+            id=exp.id,
+            name=exp.name,
+            description=exp.description,
+            status=ExperimentStatus(exp.status),
+            created_at=exp.created_at,
+            started_at=exp.started_at,
+            ended_at=exp.ended_at,
+            variants=[
+                ExperimentVariantType(
+                    id=var.id,
+                    name=var.name,
+                    allocation=var.allocation,
+                    config=[f"{k}={v}" for k, v in var.config.items()],
+                )
+                for var in variants
+            ],
+        )
+
+    @strawberry.field
+    def experiment_results(
+        self,
+        info,
+        experiment_id: strawberry.ID,
+    ) -> Optional[ExperimentResultsType]:
+        """
+        Get A/B test experiment results with statistical analysis.
+
+        Args:
+            info: GraphQL execution context
+            experiment_id: Experiment ID to fetch results for
+
+        Returns:
+            Experiment results or None if not found
+
+        الحصول على نتائج تجربة A/B
+        """
+        # Validate input
+        if not experiment_id:
+            raise ValueError("experiment_id is required")
+
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            return None
+
+        tenant_id = get_tenant_id(request)
+
+        # Get experiment repository from context
+        exp_repo = info.context.get("experiment_repo")
+        if not exp_repo:
+            return None
+
+        # Get experiment
+        exp = exp_repo.get_experiment(str(experiment_id))
+
+        # Check if experiment exists
+        if not exp:
+            return None
+
+        # Get metrics
+        from src.application.services.ab_testing import ABTestingService
+
+        ab_service = info.context.get("ab_testing_service")
+        if not ab_service:
+            return None
+
+        # Analyze results
+        analysis = ab_service.analyze_results(str(experiment_id))
+
+        # Get variants
+        variants = exp_repo.get_variants(exp.id)
+
+        # Convert to GraphQL type
+        experiment_type = ExperimentType(
+            id=exp.id,
+            name=exp.name,
+            description=exp.description,
+            status=ExperimentStatus(exp.status),
+            created_at=exp.created_at,
+            started_at=exp.started_at,
+            ended_at=exp.ended_at,
+            variants=[
+                ExperimentVariantType(
+                    id=var.id,
+                    name=var.name,
+                    allocation=var.allocation,
+                    config=[f"{k}={v}" for k, v in var.config.items()],
+                )
+                for var in variants
+            ],
+        )
+
+        # Convert metrics
+        metrics = [
+            ExperimentMetricType(
+                metric_name=m.get("metric_name", ""),
+                metric_value=m.get("metric_value", 0.0),
+                recorded_at=m.get("recorded_at", datetime.utcnow()),
+            )
+            for m in analysis.get("results", [])
+        ]
+
+        return ExperimentResultsType(
+            experiment=experiment_type,
+            metrics=metrics,
+            significant=analysis.get("significant", False),
+            summary=f"A/B test analysis: {analysis.get('significant', False)}",
+        )
 
 
 @strawberry.type
