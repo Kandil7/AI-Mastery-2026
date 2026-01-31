@@ -259,11 +259,37 @@ def readiness_check() -> dict:
 @router.get("/health/deep")
 def deep_health_check() -> dict:
     """
-    Deep health check for system dependencies.
+    Deep health check for all system dependencies.
+
+    Includes checks for:
+    - PostgreSQL database
+    - Redis cache
+    - Qdrant vector store
+    - LLM provider
+    - File storage
+
+    فحص صحة عميق لجميع تبعيات النظام
     """
+    checks = {
+        "database": _check_postgres_connection(),
+        "redis": _check_redis_connection(),
+        "qdrant": _check_qdrant_connection(),
+        "llm": _check_llm_connection(),
+        "file_storage": _check_file_storage(),
+    }
+
+    # Overall status based on check results
+    statuses = [check["status"] for check in checks.values()]
+
+    if "error" in statuses:
+        overall_status = "error"
+    elif "degraded" in statuses:
+        overall_status = "degraded"
+    else:
+        overall_status = "ok"
+
     return {
-        "status": "ok",
-        "database": "ok",
-        "redis": "ok",
-        "qdrant": "ok",
+        "status": overall_status,
+        "checks": checks,
+        "timestamp": time.time(),
     }
