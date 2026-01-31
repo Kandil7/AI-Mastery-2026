@@ -14,15 +14,15 @@ from src.domain.entities import ChatSession, ChatTurn, TenantId
 class ChatRepoPort(Protocol):
     """
     Port for chat history persistence.
-    
+
     Design Decision: Store chat history for:
     - User experience (continue conversations)
     - Observability (track latency, costs, retrieval quality)
     - Evaluation (golden Q&A for testing)
-    
+
     قرار التصميم: تخزين تاريخ المحادثة للتجربة والمراقبة والتقييم
     """
-    
+
     def create_session(
         self,
         *,
@@ -31,16 +31,16 @@ class ChatRepoPort(Protocol):
     ) -> str:
         """
         Create a new chat session.
-        
+
         Args:
             tenant_id: Owner tenant
             title: Optional session title
-            
+
         Returns:
             New session ID
         """
         ...
-    
+
     def add_turn(
         self,
         *,
@@ -58,7 +58,7 @@ class ChatRepoPort(Protocol):
     ) -> str:
         """
         Add a question-answer turn to a session.
-        
+
         Args:
             tenant_id: Owner tenant
             session_id: Session to add to
@@ -71,12 +71,12 @@ class ChatRepoPort(Protocol):
             llm_ms: LLM latency (ms)
             prompt_tokens: Prompt token count
             completion_tokens: Completion token count
-            
+
         Returns:
             New turn ID
         """
         ...
-    
+
     def get_session_turns(
         self,
         *,
@@ -86,17 +86,17 @@ class ChatRepoPort(Protocol):
     ) -> Sequence[ChatTurn]:
         """
         Get turns for a session.
-        
+
         Args:
             tenant_id: Owner tenant
             session_id: Session to query
             limit: Maximum turns to return
-            
+
         Returns:
             List of turns in chronological order
         """
         ...
-    
+
     def list_sessions(
         self,
         *,
@@ -105,12 +105,54 @@ class ChatRepoPort(Protocol):
     ) -> Sequence[ChatSession]:
         """
         List chat sessions for a tenant.
-        
+
         Args:
             tenant_id: Owner tenant
             limit: Maximum sessions to return
-            
+
         Returns:
             List of sessions (most recent first)
+        """
+        ...
+
+    def update_session_title(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+        title: str,
+    ) -> None:
+        """
+        Update session title.
+
+        Args:
+            tenant_id: Owner tenant
+            session_id: Session to update
+            title: New title
+
+        تحديث عنوان الجلسة
+        """
+        ...
+
+    def update_session_summary(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+        summary: str,
+        topics: list[str] | None = None,
+        sentiment: str | None = None,
+    ) -> None:
+        """
+        Update session summary.
+
+        Args:
+            tenant_id: Owner tenant
+            session_id: Session to update
+            summary: Session summary
+            topics: Optional list of topics
+            sentiment: Optional sentiment (positive/neutral/negative)
+
+        تحديث ملخص الجلسة
         """
         ...

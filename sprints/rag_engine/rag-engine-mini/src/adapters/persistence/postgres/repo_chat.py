@@ -9,7 +9,7 @@ PostgreSQL implementation of ChatRepoPort.
 import uuid
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.adapters.persistence.postgres.db import SessionLocal
 from src.adapters.persistence.postgres.models_chat import ChatSessionRow, ChatTurnRow
@@ -19,10 +19,10 @@ from src.domain.entities import ChatSession, ChatTurn, TenantId
 class PostgresChatRepo:
     """
     PostgreSQL implementation of ChatRepoPort.
-    
+
     تنفيذ PostgreSQL لمنفذ مستودع المحادثات
     """
-    
+
     def create_session(
         self,
         *,
@@ -31,7 +31,7 @@ class PostgresChatRepo:
     ) -> str:
         """Create a new chat session."""
         session_id = str(uuid.uuid4())
-        
+
         with SessionLocal() as db:
             db.add(
                 ChatSessionRow(
@@ -41,9 +41,9 @@ class PostgresChatRepo:
                 )
             )
             db.commit()
-        
+
         return session_id
-    
+
     def add_turn(
         self,
         *,
@@ -61,7 +61,7 @@ class PostgresChatRepo:
     ) -> str:
         """Add a question-answer turn to a session."""
         turn_id = str(uuid.uuid4())
-        
+
         with SessionLocal() as db:
             db.add(
                 ChatTurnRow(
@@ -80,9 +80,9 @@ class PostgresChatRepo:
                 )
             )
             db.commit()
-        
+
         return turn_id
-    
+
     def get_session_turns(
         self,
         *,
@@ -102,7 +102,7 @@ class PostgresChatRepo:
                 .limit(limit)
             )
             rows = db.execute(stmt).scalars().all()
-            
+
             return [
                 ChatTurn(
                     id=row.id,
@@ -121,7 +121,7 @@ class PostgresChatRepo:
                 )
                 for row in rows
             ]
-    
+
     def list_sessions(
         self,
         *,
@@ -137,7 +137,7 @@ class PostgresChatRepo:
                 .limit(limit)
             )
             rows = db.execute(stmt).scalars().all()
-            
+
             return [
                 ChatSession(
                     id=row.id,
@@ -147,3 +147,49 @@ class PostgresChatRepo:
                 )
                 for row in rows
             ]
+
+    def update_session_title(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+        title: str,
+    ) -> None:
+        """Update session title."""
+        with SessionLocal() as db:
+            stmt = (
+                update(ChatSessionRow)
+                .where(
+                    ChatSessionRow.id == session_id,
+                    ChatSessionRow.user_id == tenant_id.value,
+                )
+                .values(title=title)
+            )
+            db.execute(stmt)
+            db.commit()
+
+    def update_session_summary(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+        summary: str,
+        topics: list[str] | None = None,
+        sentiment: str | None = None,
+    ) -> None:
+        """Update session summary."""
+        with SessionLocal() as db:
+            stmt = (
+                update(ChatSessionRow)
+                .where(
+                    ChatSessionRow.id == session_id,
+                    ChatSessionRow.user_id == tenant_id.value,
+                )
+                .values(
+                    summary=summary,
+                    topics=topics,
+                    sentiment=sentiment,
+                )
+            )
+            db.execute(stmt)
+            db.commit()

@@ -603,8 +603,12 @@ Title:"""
         title = title.replace('"', "").replace("'", "")
         title = title[:50]
 
-        # Update session with title (TODO: implement update_session in chat_repo)
-        # chat_repo.update_session_title(tenant_id=tenant, session_id=session_id, title=title)
+        # Update session with title
+        chat_repo.update_session_title(
+            tenant_id=tenant,
+            session_id=session_id,
+            title=title,
+        )
 
         logger.info("chat_title_generated", session_id=session_id, title=title)
 
@@ -711,8 +715,14 @@ Sentiment: [positive/neutral/negative]"""
         if sentiment not in ["positive", "neutral", "negative"]:
             sentiment = "neutral"
 
-        # Update session with summary (TODO: implement update_session in chat_repo)
-        # chat_repo.update_session_summary(tenant_id=tenant, session_id=session_id, summary=...)
+        # Update session with summary
+        chat_repo.update_session_summary(
+            tenant_id=tenant,
+            session_id=session_id,
+            summary=summary,
+            topics=topics,
+            sentiment=sentiment,
+        )
 
         logger.info(
             "chat_summarized",
