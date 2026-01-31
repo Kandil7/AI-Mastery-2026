@@ -13,6 +13,12 @@ from enum import Enum
 
 log = logging.getLogger(__name__)
 
+from src.api.subscriptions.document_subscriptions import (
+    DocumentSubscription,
+    QueryProgressSubscription,
+    ChatUpdateSubscription,
+)
+
 
 class DocumentStatus(str, Enum):
     """Document status enum."""
@@ -1231,6 +1237,16 @@ class Subscription:
                 event_manager.unsubscribe("chat.updated", on_chat_updated)
             except:
                 pass
+
+
+# Combined subscription type
+@strawberry.type
+class Subscription:
+    """All GraphQL subscriptions."""
+
+    document_updates = DocumentSubscription.document_updates
+    query_progress = QueryProgressSubscription.query_progress
+    chat_updates = ChatUpdateSubscription.chat_updates
 
 
 # Schema
