@@ -166,7 +166,13 @@ class FacetedSearchService:
     """
 
     def __init__(self):
-        """Initialize faceted search service."""
+        """
+        Initialize faceted search service.
+
+        This service is stateless - all configuration is provided
+        at method call time. No initialization required.
+        """
+        # Intentional no-op: service doesn't require state initialization
         pass
 
     def compute_facets(

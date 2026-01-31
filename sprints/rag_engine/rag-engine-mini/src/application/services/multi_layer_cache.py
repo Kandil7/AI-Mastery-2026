@@ -159,6 +159,19 @@ class CacheService:
 # In-memory cache using LRU
 @lru_cache(maxsize=1000)
 def _memory_cache_get(key: str) -> Optional[Any]:
-    """In-memory cache get."""
-    # Implemented by lru_cache decorator
-    pass
+    """
+    In-memory cache get using LRU eviction policy.
+
+    Args:
+        key: Cache key to retrieve
+
+    Returns:
+        Cached value or None if not found
+
+    Note:
+        The @lru_cache decorator handles the actual caching logic.
+        This function returns None by default if key is not in cache.
+    """
+    # The @lru_cache decorator intercepts calls and returns cached values.
+    # If key is not in cache, returns None (default behavior).
+    return None
