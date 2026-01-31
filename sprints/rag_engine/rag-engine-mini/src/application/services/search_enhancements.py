@@ -6,10 +6,12 @@ Services for auto-suggest and faceted search.
 خدمات تحسين البحث
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 import logging
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 log = logging.getLogger(__name__)
 
@@ -323,6 +325,50 @@ class AutoSuggestService:
         """
         self._llm = llm_port
         self._repo = document_repo
+        self._query_expansion_service = QueryExpansionService(llm_port, document_repo)
+        self._doc_trie = Trie()
+        self._topic_cache = {}
+        self._cache_ttl = 300  # 5 minutes
+        self._last_trie_build = None
+
+    def _build_document_trie(self, tenant_id: str) -> None:
+        """
+        Build trie from document names for fast autocomplete.
+
+        Build trie periodically or when cache expires.
+
+        بناء trie من أسماء المستندات للإكمال التلقائي السريع
+        """
+        now = datetime.now()
+        if self._last_trie_build:
+            elapsed = (now - self._last_trie_build).total_seconds()
+            if elapsed < self._cache_ttl:
+                return
+
+        try:
+            docs = self._repo.list_documents(
+                tenant_id=tenant_id,
+                limit=500,  # Limit to recent 500 docs for performance
+            )
+
+            # Clear and rebuild trie
+            self._doc_trie = Trie()
+            for doc in docs:
+                filename = doc.filename
+                score = 1.0
+                # Boost score for recently accessed docs
+                if hasattr(doc, "updated_at") and doc.updated_at:
+                    days_since_update = (now - doc.updated_at).total_seconds() / 86400
+                    score = max(0.1, 1.0 - (days_since_update / 365))
+
+                self._doc_trie.insert(filename, score)
+
+            self._last_trie_build = now
+            log.info(
+                "Document trie built", doc_count=len(docs), trie_size=self._doc_trie.get_size()
+            )
+        except Exception as e:
+            log.error("Failed to build document trie", error=str(e))
 
     def get_suggestions(
         self,
@@ -348,68 +394,101 @@ class AutoSuggestService:
 
         query_lower = request.query.lower()
 
+        # Build trie if needed
+        self._build_document_trie(tenant_id)
+
         # 1. Query suggestions (query expansion)
         if not request.types or "query" in request.types:
-            expanded = self._expand_query_suggestions(request.query, limit=request.limit // 2)
-            suggestions.extend(expanded)
-
-        # 2. Document name suggestions
-        if not request.types or "document" in request.types:
-            docs = self._repo.search_by_prefix(
+            expanded = self._query_expansion_service.expand_query(
+                query=request.query,
                 tenant_id=tenant_id,
-                prefix=query_lower,
-                limit=request.limit // 2,
+                num_expansions=request.limit // 2,
             )
-            for i, doc in enumerate(docs):
-                relevance = 1.0 - (i * 0.1)  # Decrease relevance for lower matches
+            # Convert to suggestions with higher relevance
+            for exp_query in expanded[1:]:  # Skip first (original query)
                 suggestions.append(
                     SearchSuggestion(
-                        text=doc["filename"],
-                        type="document",
-                        relevance_score=relevance,
+                        text=exp_query,
+                        type="query",
+                        relevance_score=0.85,
                     )
                 )
 
-        # 3. Topic suggestions (LLM-generated)
+        # 2. Document name suggestions (using trie for faster autocomplete)
+        if not request.types or "document" in request.types:
+            trie_matches = self._doc_trie.autocomplete(
+                prefix=query_lower,
+                limit=request.limit,
+                min_score=0.1,
+            )
+            for doc_name, score in trie_matches:
+                suggestions.append(
+                    SearchSuggestion(
+                        text=doc_name,
+                        type="document",
+                        relevance_score=score,
+                    )
+                )
+
+        # 3. Topic suggestions (LLM-generated, with caching)
         if not request.types or "topic" in request.types:
-            topics = self._generate_topic_suggestions(request.query, limit=request.limit // 2)
-            suggestions.extend(topics)
+            cache_key = f"topic:{query_lower}:{tenant_id}"
+            now = datetime.now()
+
+            # Check cache
+            if cache_key in self._topic_cache:
+                cached_time, cached_topics = self._topic_cache[cache_key]
+                if (now - cached_time).total_seconds() < self._cache_ttl:
+                    suggestions.extend(cached_topics)
+                else:
+                    del self._topic_cache[cache_key]
+
+            # Generate new if not in cache
+            if cache_key not in self._topic_cache:
+                topics = self._generate_topic_suggestions(request.query, limit=request.limit // 2)
+                self._topic_cache[cache_key] = (now, topics)
+                suggestions.extend(topics)
 
         # Sort by relevance and limit
-        suggestions.sort(key=lambda s: s.relevance_score, reverse=True)
+        suggestions.sort(key=lambda s: (s.relevance_score, s.text.lower()), reverse=True)
 
         return suggestions[: request.limit]
-
-    def _expand_query_suggestions(
-        self,
-        query: str,
-        limit: int,
-    ) -> List[SearchSuggestion]:
-        """Generate query expansion suggestions."""
-        # Use simple expansion logic
-        # In production, use QueryExpansionService
-
-        # Placeholder expansions
-        return [
-            SearchSuggestion(text=f"{query} tutorial", type="query", relevance_score=0.9),
-            SearchSuggestion(text=f"how to {query}", type="query", relevance_score=0.8),
-        ]
 
     def _generate_topic_suggestions(
         self,
         query: str,
         limit: int,
     ) -> List[SearchSuggestion]:
-        """Generate topic suggestions using LLM."""
+        """
+        Generate topic suggestions using LLM.
+
+        Uses improved prompt engineering for better results.
+
+        توليد اقتراحات المواضيع باستخدام LLM
+        """
         try:
-            prompt = f"""Generate {limit} topic suggestions related to: {query}
+            prompt = f"""You are a search suggestion assistant for a document retrieval system.
 
-Each suggestion should:
-- Be a concise topic name (2-4 words)
-- Be semantically relevant
-- Be a potential search topic
+Original query: "{query}"
 
-Return ONLY {limit} topics, one per line:"""
+Task: Generate {limit} topic suggestions that would help users find relevant documents.
+
+Requirements:
+1. Each topic must be 2-4 words long
+2. Topics should be semantically related to the query
+3. Topics should represent potential search intents
+4. Focus on concepts and themes, not variations of the same query
+5. Avoid repeating the original query
+
+Examples:
+Query: "machine learning"
+Topics: deep learning, neural networks, data science, model training
+
+Query: "API design"
+Topics: REST architecture, GraphQL, endpoint design, API documentation
+
+Generate {limit} topics related to: "{query}"
+Return ONLY the topics, one per line:"""
 
             response = self._llm.generate(prompt, temperature=0.7)
             topics = [t.strip() for t in response.split("\n") if t.strip()][:limit]
@@ -419,6 +498,93 @@ Return ONLY {limit} topics, one per line:"""
         except Exception as e:
             log.error("Failed to generate topic suggestions", query=query, error=str(e))
             return []
+
+
+# -----------------------------------------------------------------------------
+# Trie Data Structure for Auto-Suggest
+# -----------------------------------------------------------------------------
+
+
+class TrieNode:
+    """Node in a trie data structure for efficient prefix search.
+
+    عقدة في هيكل البيانات trie للبحث المسبع
+    """
+
+    __slots__ = ["children", "is_end", "score"]
+
+    def __init__(self):
+        self.children = defaultdict(TrieNode)
+        self.is_end = False
+        self.score = 0.0
+
+
+class Trie:
+    """
+    Trie data structure for efficient prefix-based auto-suggest.
+
+    هيكل بيانات trie للاقتراح التلقائي الفعال بالبادئات
+    """
+
+    def __init__(self):
+        self.root = TrieNode()
+        self._size = 0
+
+    def insert(self, word: str, score: float = 1.0) -> None:
+        """
+        Insert a word into the trie with optional relevance score.
+
+        أدخل كلمة في trie مع درجة صلة اختيارية
+        """
+        node = self.root
+        for char in word.lower():
+            node = node.children[char]
+        node.is_end = True
+        node.score = score
+        self._size += 1
+
+    def search_prefix(self, prefix: str, limit: int = 10) -> List[tuple[str, float]]:
+        """
+        Search for all words starting with prefix.
+
+        البحث عن جميع الكلمات التي تبدأ بالبادئة
+        """
+        node = self.root
+        for char in prefix.lower():
+            if char not in node.children:
+                return []
+            node = node.children[char]
+
+        # DFS to collect all words from this node
+        results = []
+
+        def dfs(current_node: TrieNode, current_word: str):
+            if len(results) >= limit:
+                return
+            if current_node.is_end:
+                results.append((current_word, current_node.score))
+            for char, child_node in current_node.children.items():
+                dfs(child_node, current_word + char)
+
+        dfs(node, prefix)
+        return results
+
+    def autocomplete(
+        self, prefix: str, limit: int = 10, min_score: float = 0.0
+    ) -> List[tuple[str, float]]:
+        """
+        Get top autocomplete suggestions for a prefix.
+
+        الحصول على أفضل اقتراحات الإكمال التلقائي لبادئة
+        """
+        suggestions = self.search_prefix(prefix, limit * 2)
+        filtered = [(w, s) for w, s in suggestions if s >= min_score]
+        filtered.sort(key=lambda x: (-x[1], x[0]))  # Sort by score desc, name asc
+        return filtered[:limit]
+
+    def get_size(self) -> int:
+        """Get total number of words in trie."""
+        return self._size
 
 
 # -----------------------------------------------------------------------------
