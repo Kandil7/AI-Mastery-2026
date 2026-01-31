@@ -1879,6 +1879,110 @@ class Mutation:
             except:
                 pass
 
+    @strawberry.mutation
+    def create_experiment(
+        self,
+        info,
+        name: str,
+        description: str,
+        variants_input: List[str],
+    ) -> ExperimentType:
+        """
+        Create a new A/B testing experiment.
+
+        Args:
+            info: GraphQL execution context
+            name: Experiment name
+            description: Experiment description
+            variants_input: List of variant configurations (JSON strings)
+
+        Returns:
+            Created experiment
+
+        إنشاء تجربة A/B جديدة
+        """
+        # Validate inputs
+        if not name or not name.strip():
+            raise ValueError("name is required")
+        if not description or not description.strip():
+            raise ValueError("description is required")
+        if not variants_input or len(variants_input) < 2:
+            raise ValueError("at least 2 variants required for A/B test")
+
+        # Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # Get A/B testing service from context
+        ab_service = info.context.get("ab_testing_service")
+        if not ab_service:
+            raise RuntimeError("A/B testing service not available")
+
+        # Parse variant configurations
+        from src.application.services.ab_testing import Variant
+        import json
+
+        variants = []
+        for i, variant_config_str in enumerate(variants_input):
+            try:
+                config = json.loads(variant_config_str)
+                variant = Variant(
+                    id=f"var_{i}",
+                    experiment_id="",
+                    name=config.get("name", f"Variant {i+1}"),
+                    allocation=config.get("allocation", 1.0 / len(variants_input)),
+                    config=config.get("config", {}),
+                )
+                variants.append(variant)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid variant config: {str(e)}")
+
+        # Create experiment
+        try:
+            experiment_id = ab_service.create_experiment(
+                name=name.strip(),
+                description=description.strip(),
+                variants=variants,
+            )
+
+            # Get created experiment
+            from src.application.services.ab_testing import ExperimentStatus
+            exp_repo = info.context.get("experiment_repo")
+            if exp_repo:
+                exp = exp_repo.get_experiment(experiment_id)
+                if exp:
+                    # Get variants
+                    exp_variants = exp_repo.get_variants(exp.id)
+
+                    return ExperimentType(
+                        id=exp.id,
+                        name=exp.name,
+                        description=exp.description,
+                        status=ExperimentStatus(exp.status),
+                        created_at=exp.created_at,
+                        started_at=exp.started_at,
+                        ended_at=exp.ended_at,
+                        variants=[
+                            ExperimentVariantType(
+                                id=var.id,
+                                name=var.name,
+                                allocation=var.allocation,
+                                config=[f"{k}={v}" for k, v in var.config.items()],
+                            )
+                            for var in exp_variants
+                        ],
+                    )
+
+            raise RuntimeError("Failed to retrieve created experiment")
+        except Exception as e:
+            log.error("Failed to create experiment", error=str(e))
+            raise RuntimeError(f"Failed to create experiment: {str(e)}")
+
 
 # Combined subscription type
 @strawberry.type
