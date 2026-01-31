@@ -318,6 +318,7 @@ class SessionManager:
         self,
         session_id: str,
         turns: List[dict[str, str]],
+        tenant_id: TenantId = None,
     ) -> ChatSummary:
         """
         Summarize and close a chat session.
@@ -325,6 +326,7 @@ class SessionManager:
         Args:
             session_id: Chat session ID
             turns: All chat turns in session
+            tenant_id: Owner tenant ID
 
         Returns:
             Session summary
@@ -333,7 +335,15 @@ class SessionManager:
         """
         summary = self._summarizer.summarize_session(turns)
 
-        # TODO: Update session in database with summary
+        if self._chat_repo and tenant_id:
+            self._chat_repo.update_session_summary(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                summary=summary.summary,
+                topics=summary.topics,
+                sentiment=summary.sentiment,
+            )
+
         log.info(
             "Session summarized",
             session_id=session_id,
