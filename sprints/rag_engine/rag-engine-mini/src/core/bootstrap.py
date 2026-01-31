@@ -31,7 +31,7 @@ def get_container() -> dict:
     from src.adapters.vector.qdrant_store import QdrantVectorStore
     from src.adapters.rerank.noop_reranker import NoopReranker
     from src.adapters.cache.redis_cache import RedisCache
-    from src.adapters.filestore.local_store import LocalFileStore
+    from src.adapters.filestore.factory import create_file_store
     from src.adapters.extraction.default_extractor import DefaultTextExtractor
     from src.adapters.queue.celery_queue import CeleryTaskQueue
     from src.workers.celery_app import celery_app
@@ -55,10 +55,7 @@ def get_container() -> dict:
     cache = RedisCache(settings.redis_url)
     
     # File store
-    file_store = LocalFileStore(
-        upload_dir=settings.upload_dir,
-        max_mb=settings.max_upload_mb,
-    )
+    file_store = create_file_store(settings)
     
     # Text extractor
     text_extractor = DefaultTextExtractor()

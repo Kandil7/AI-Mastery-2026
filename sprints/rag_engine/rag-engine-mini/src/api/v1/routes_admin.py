@@ -270,14 +270,19 @@ async def get_worker_status(
 
     حالة العمال
     """
-    # Placeholder stats
-    return WorkerStatusResponse(
-        workers_online=4,
-        workers_processing=2,
-        workers_idle=2,
-        tasks_queue_size=15,
-        tasks_processed=1250,
-    )
+    try:
+        from src.workers.monitoring import get_worker_status as _get_worker_status
+
+        status = _get_worker_status()
+        return WorkerStatusResponse(**status)
+    except Exception:
+        return WorkerStatusResponse(
+            workers_online=0,
+            workers_processing=0,
+            workers_idle=0,
+            tasks_queue_size=0,
+            tasks_processed=0,
+        )
 
 
 @router.post("/cache/flush")

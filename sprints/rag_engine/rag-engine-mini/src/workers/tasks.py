@@ -5,8 +5,10 @@ Background task for document processing pipeline.
 Enhanced for Stage 4: Multi-Modal (Images) & Structural (Tables) RAG.
 """
 
+import asyncio
 import hashlib
 import logging
+import time
 import structlog
 import fitz  # PyMuPDF
 from typing import List, Dict, Any
@@ -15,6 +17,7 @@ from src.workers.celery_app import celery_app
 from src.core.bootstrap import get_container
 from src.domain.entities import TenantId, DocumentId, Chunk, ChunkSpec
 from src.application.services.chunking import chunk_text_token_aware, chunk_hierarchical
+from src.core.observability import CELERY_TASK_COUNT, CELERY_TASK_DURATION
 
 log = structlog.get_logger()
 logger = logging.getLogger(__name__)
@@ -24,6 +27,17 @@ def _chunk_hash(text: str) -> str:
     """Generate SHA256 hash of normalized text."""
     normalized = " ".join(text.split())
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _run_async(coro):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, loop).result()
+    return asyncio.run(coro)
 
 
 @celery_app.task(
@@ -49,6 +63,7 @@ def index_document(
     3. Hierarchical & Contextual linking
     4. Graph Triplet extraction
     """
+    start_time = time.time()
     container = get_container()
 
     document_repo = container["document_repo"]
@@ -172,6 +187,8 @@ def index_document(
         document_repo.set_status(tenant_id=tenant, document_id=doc_id, status="indexed")
         log.info("indexing_complete", chunks=len(chunk_ids_in_order))
 
+        CELERY_TASK_COUNT.labels(task="index_document", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="index_document").observe(time.time() - start_time)
         return {"ok": True, "chunks": len(chunk_ids_in_order), "multi_modal": True}
 
     except Exception as e:
@@ -179,6 +196,8 @@ def index_document(
             tenant_id=tenant, document_id=doc_id, status="failed", error=str(e)
         )
         log.exception("indexing_failed", error=str(e))
+        CELERY_TASK_COUNT.labels(task="index_document", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="index_document").observe(time.time() - start_time)
         raise
 
 
@@ -210,72 +229,83 @@ def bulk_upload_documents(
 
     معالجة رفع مستندات متعددة بالجملة
     """
-    container = get_container()
-    document_reader = container["document_reader"]
-    document_repo = container["document_repo"]
+    start_time = time.time()
+    try:
+        container = get_container()
+        file_store = container["file_store"]
+        document_repo = container["document_repo"]
 
-    tenant = TenantId(tenant_id)
-    results = []
-    success_count = 0
-    failure_count = 0
+        tenant = TenantId(tenant_id)
+        results = []
+        success_count = 0
+        failure_count = 0
 
-    for file_info in files:
-        try:
-            # Store file
-            stored = await document_reader.save_upload(
-                tenant_id=tenant,
-                upload_filename=file_info["filename"],
-                content_type=file_info["content_type"],
-                data=file_info["content"],
-            )
+        for file_info in files:
+            try:
+                # Store file
+                stored = _run_async(
+                    file_store.save_upload(
+                        tenant_id=tenant.value,
+                        upload_filename=file_info["filename"],
+                        content_type=file_info["content_type"],
+                        data=file_info["content"],
+                    )
+                )
 
-            # Create document record
-            file_hash = hashlib.sha256(file_info["content"]).hexdigest()
-            document_id = document_repo.create_document(
-                tenant_id=tenant,
-                stored_file=stored,
-                file_sha256=file_hash,
-            )
+                # Create document record
+                file_hash = hashlib.sha256(file_info["content"]).hexdigest()
+                document_id = document_repo.create_document(
+                    tenant_id=tenant,
+                    stored_file=stored,
+                    file_sha256=file_hash,
+                )
 
-            # Queue indexing task
-            index_document.delay(
-                tenant_id=tenant_id,
-                document_id=document_id.value,
-            )
+                # Queue indexing task
+                index_document.delay(
+                    tenant_id=tenant_id,
+                    document_id=document_id.value,
+                )
 
-            results.append(
-                {
-                    "filename": file_info["filename"],
-                    "document_id": document_id.value,
-                    "status": "queued",
-                }
-            )
-            success_count += 1
+                results.append(
+                    {
+                        "filename": file_info["filename"],
+                        "document_id": document_id.value,
+                        "status": "queued",
+                    }
+                )
+                success_count += 1
 
-        except Exception as e:
-            logger.error(f"Bulk upload failed for {file_info.get('filename')}", error=str(e))
-            results.append(
-                {
-                    "filename": file_info.get("filename", "unknown"),
-                    "status": "failed",
-                    "error": str(e),
-                }
-            )
-            failure_count += 1
+            except Exception as e:
+                logger.error(f"Bulk upload failed for {file_info.get('filename')}", error=str(e))
+                results.append(
+                    {
+                        "filename": file_info.get("filename", "unknown"),
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
+                failure_count += 1
 
-    logger.info(
-        "bulk_upload_complete",
-        total=len(files),
-        success=success_count,
-        failures=failure_count,
-    )
+        logger.info(
+            "bulk_upload_complete",
+            total=len(files),
+            success=success_count,
+            failures=failure_count,
+        )
 
-    return {
-        "total": len(files),
-        "success": success_count,
-        "failures": failure_count,
-        "results": results,
-    }
+        CELERY_TASK_COUNT.labels(task="bulk_upload_documents", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="bulk_upload_documents").observe(time.time() - start_time)
+        return {
+            "total": len(files),
+            "success": success_count,
+            "failures": failure_count,
+            "results": results,
+        }
+    except Exception as e:
+        logger.error("bulk_upload_failed", error=str(e))
+        CELERY_TASK_COUNT.labels(task="bulk_upload_documents", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="bulk_upload_documents").observe(time.time() - start_time)
+        raise
 
 
 @celery_app.task(
@@ -303,64 +333,73 @@ def bulk_delete_documents(
 
     حذف مستندات متعددة بالجملة
     """
-    container = get_container()
-    document_repo = container["document_repo"]
-    vector_store = container["vector_store"]
-    chunk_repo = container["chunk_repo"]
+    start_time = time.time()
+    try:
+        container = get_container()
+        document_repo = container["document_repo"]
+        vector_store = container["vector_store"]
+        chunk_repo = container["chunk_repo"]
 
-    tenant = TenantId(tenant_id)
-    results = []
-    success_count = 0
-    failure_count = 0
+        tenant = TenantId(tenant_id)
+        results = []
+        success_count = 0
+        failure_count = 0
 
-    for doc_id_str in document_ids:
-        try:
-            doc_id = DocumentId(doc_id_str)
+        for doc_id_str in document_ids:
+            try:
+                doc_id = DocumentId(doc_id_str)
 
-            # Delete from vector store
-            vector_store.delete_points(
-                tenant_id=tenant,
-                document_id=doc_id,
-            )
+                # Delete from vector store
+                vector_store.delete_points(
+                    tenant_id=tenant,
+                    document_id=doc_id,
+                )
 
-            # Delete chunks from database
-            chunk_repo.delete_by_document(tenant_id=tenant, document_id=doc_id)
+                # Delete chunks from database
+                chunk_repo.delete_by_document(tenant_id=tenant, document_id=doc_id)
 
-            # Delete document record
-            document_repo.delete_document(tenant_id=tenant, document_id=doc_id)
+                # Delete document record
+                document_repo.delete_document(tenant_id=tenant, document_id=doc_id)
 
-            results.append(
-                {
-                    "document_id": doc_id_str,
-                    "status": "deleted",
-                }
-            )
-            success_count += 1
+                results.append(
+                    {
+                        "document_id": doc_id_str,
+                        "status": "deleted",
+                    }
+                )
+                success_count += 1
 
-        except Exception as e:
-            logger.error(f"Bulk delete failed for {doc_id_str}", error=str(e))
-            results.append(
-                {
-                    "document_id": doc_id_str,
-                    "status": "failed",
-                    "error": str(e),
-                }
-            )
-            failure_count += 1
+            except Exception as e:
+                logger.error(f"Bulk delete failed for {doc_id_str}", error=str(e))
+                results.append(
+                    {
+                        "document_id": doc_id_str,
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
+                failure_count += 1
 
-    logger.info(
-        "bulk_delete_complete",
-        total=len(document_ids),
-        success=success_count,
-        failures=failure_count,
-    )
+        logger.info(
+            "bulk_delete_complete",
+            total=len(document_ids),
+            success=success_count,
+            failures=failure_count,
+        )
 
-    return {
-        "total": len(document_ids),
-        "success": success_count,
-        "failures": failure_count,
-        "results": results,
-    }
+        CELERY_TASK_COUNT.labels(task="bulk_delete_documents", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="bulk_delete_documents").observe(time.time() - start_time)
+        return {
+            "total": len(document_ids),
+            "success": success_count,
+            "failures": failure_count,
+            "results": results,
+        }
+    except Exception as e:
+        logger.error("bulk_delete_failed", error=str(e))
+        CELERY_TASK_COUNT.labels(task="bulk_delete_documents", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="bulk_delete_documents").observe(time.time() - start_time)
+        raise
 
 
 @celery_app.task(
@@ -395,89 +434,101 @@ def merge_pdfs(
     import PyPDF2
     from io import BytesIO
 
-    container = get_container()
-    document_reader = container["document_reader"]
-    document_repo = container["document_repo"]
-    cached_embeddings = container["cached_embeddings"]
+    start_time = time.time()
+    try:
+        container = get_container()
+        file_store = container["file_store"]
+        document_repo = container["document_repo"]
+        document_reader = container["document_reader"]
+        cached_embeddings = container["cached_embeddings"]
 
-    tenant = TenantId(tenant_id)
+        tenant = TenantId(tenant_id)
 
-    # Retrieve source documents
-    source_docs = []
-    for doc_id_str in source_document_ids:
-        doc_id = DocumentId(doc_id_str)
-        stored_file = document_reader.get_stored_file(tenant_id=tenant, document_id=doc_id)
+        # Retrieve source documents
+        source_docs = []
+        for doc_id_str in source_document_ids:
+            doc_id = DocumentId(doc_id_str)
+            stored_file = document_reader.get_stored_file(tenant_id=tenant, document_id=doc_id)
 
-        # Read PDF content
-        with open(stored_file.path, "rb") as f:
-            pdf_reader = PyPDF2.PdfReader(f)
-            source_docs.append(
-                {
-                    "reader": pdf_reader,
-                    "filename": stored_file.filename,
-                }
+            # Read PDF content
+            with open(stored_file.path, "rb") as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                source_docs.append(
+                    {
+                        "reader": pdf_reader,
+                        "filename": stored_file.filename,
+                    }
+                )
+
+        # Create merged PDF
+        merged_writer = PyPDF2.PdfWriter()
+
+        for source in source_docs:
+            for page_num in range(len(source["reader"].pages)):
+                merged_writer.add_page(source["reader"].pages[page_num])
+
+        # Write merged PDF to bytes
+        merged_bytes = BytesIO()
+        merged_writer.write(merged_bytes)
+        merged_content = merged_bytes.getvalue()
+
+        # Store merged file
+        stored = _run_async(
+            file_store.save_upload(
+                tenant_id=tenant.value,
+                upload_filename=merged_filename,
+                content_type="application/pdf",
+                data=merged_content,
             )
-
-    # Create merged PDF
-    merged_writer = PyPDF2.PdfWriter()
-
-    for source in source_docs:
-        for page_num in range(len(source["reader"].pages)):
-            merged_writer.add_page(source["reader"].pages[page_num])
-
-    # Write merged PDF to bytes
-    merged_bytes = BytesIO()
-    merged_writer.write(merged_bytes)
-    merged_content = merged_bytes.getvalue()
-
-    # Store merged file
-    stored = await document_reader.save_upload(
-        tenant_id=tenant,
-        upload_filename=merged_filename,
-        content_type="application/pdf",
-        data=merged_content,
-    )
-
-    # Create or update document
-    file_hash = hashlib.sha256(merged_content).hexdigest()
-
-    if target_document_id:
-        # Update existing document
-        target_id = DocumentId(target_document_id)
-        updated_doc = document_repo.update_document(
-            tenant_id=tenant,
-            document_id=target_id,
-            stored_file=stored,
-            file_sha256=file_hash,
         )
-        merged_document_id = target_document_id
-    else:
-        # Create new document
-        new_id = document_repo.create_document(
-            tenant_id=tenant,
-            stored_file=stored,
-            file_sha256=file_hash,
+
+        # Create or update document
+        file_hash = hashlib.sha256(merged_content).hexdigest()
+
+        if target_document_id:
+            # Update existing document
+            target_id = DocumentId(target_document_id)
+            updated_doc = document_repo.update_document(
+                tenant_id=tenant,
+                document_id=target_id,
+                stored_file=stored,
+                file_sha256=file_hash,
+            )
+            merged_document_id = target_document_id
+        else:
+            # Create new document
+            new_id = document_repo.create_document(
+                tenant_id=tenant,
+                stored_file=stored,
+                file_sha256=file_hash,
+            )
+            merged_document_id = new_id.value
+
+        # Queue indexing task
+        index_document.delay(
+            tenant_id=tenant_id,
+            document_id=merged_document_id,
         )
-        merged_document_id = new_id.value
 
-    # Queue indexing task
-    index_document.delay(
-        tenant_id=tenant_id,
-        document_id=merged_document_id,
-    )
+        logger.info(
+            "pdf_merge_complete",
+            source_count=len(source_document_ids),
+            merged_document_id=merged_document_id,
+        )
 
-    logger.info(
-        "pdf_merge_complete",
-        source_count=len(source_document_ids),
-        merged_document_id=merged_document_id,
-    )
-
-    return {
-        "merged_document_id": merged_document_id,
-        "source_count": len(source_document_ids),
-        "filename": merged_filename,
-        "size_bytes": len(merged_content),
-    }
+        CELERY_TASK_COUNT.labels(task="merge_pdfs", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="merge_pdfs").observe(time.time() - start_time)
+        return {
+            "merged_document_id": merged_document_id,
+            "source_count": len(source_document_ids),
+            "filename": merged_filename,
+            "size_bytes": len(merged_content),
+        }
+    except Exception as e:
+        logger.error("merge_pdfs_failed", error=str(e))
+        CELERY_TASK_COUNT.labels(task="merge_pdfs", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="merge_pdfs").observe(time.time() - start_time)
+        raise
 
 
 @celery_app.task(
@@ -505,6 +556,7 @@ def generate_chat_title(
 
     توليد عنوان لجلسة المحادثة باستخدام LLM
     """
+    start_time = time.time()
     container = get_container()
     chat_repo = container["chat_repo"]
     llm = container["llm"]
@@ -556,10 +608,14 @@ Title:"""
 
         logger.info("chat_title_generated", session_id=session_id, title=title)
 
+        CELERY_TASK_COUNT.labels(task="generate_chat_title", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="generate_chat_title").observe(time.time() - start_time)
         return {"title": title, "status": "success"}
 
     except Exception as e:
         logger.error("chat_title_generation_failed", session_id=session_id, error=str(e))
+        CELERY_TASK_COUNT.labels(task="generate_chat_title", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="generate_chat_title").observe(time.time() - start_time)
         return {"title": "New Chat", "status": "failed", "error": str(e)}
 
 
@@ -588,6 +644,7 @@ def summarize_chat_session(
 
     تلخيص جلسة محادثة مكتملة
     """
+    start_time = time.time()
     container = get_container()
     chat_repo = container["chat_repo"]
     llm = container["llm"]
@@ -665,6 +722,8 @@ Sentiment: [positive/neutral/negative]"""
             sentiment=sentiment,
         )
 
+        CELERY_TASK_COUNT.labels(task="summarize_chat_session", status="success").inc()
+        CELERY_TASK_DURATION.labels(task="summarize_chat_session").observe(time.time() - start_time)
         return {
             "summary": summary,
             "topics": topics,
@@ -675,6 +734,8 @@ Sentiment: [positive/neutral/negative]"""
 
     except Exception as e:
         logger.error("chat_summary_failed", session_id=session_id, error=str(e))
+        CELERY_TASK_COUNT.labels(task="summarize_chat_session", status="failure").inc()
+        CELERY_TASK_DURATION.labels(task="summarize_chat_session").observe(time.time() - start_time)
         return {
             "summary": "Summary generation failed",
             "topics": ["General"],

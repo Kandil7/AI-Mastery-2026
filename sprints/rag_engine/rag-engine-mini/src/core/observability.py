@@ -84,6 +84,24 @@ QUERY_EXPANSION_COUNT = Counter(
     "rag_query_expansion_total", "Total query expansions performed", ["expanded"], registry=registry
 )
 
+# -------------------------------------------------------------------------
+# Celery Task Metrics
+# -------------------------------------------------------------------------
+CELERY_TASK_COUNT = Counter(
+    "rag_celery_tasks_total",
+    "Total number of Celery tasks executed",
+    ["task", "status"],
+    registry=registry,
+)
+
+CELERY_TASK_DURATION = Histogram(
+    "rag_celery_task_duration_seconds",
+    "Celery task duration in seconds",
+    ["task"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0],
+    registry=registry,
+)
+
 # -----------------------------------------------------------------------------
 # System Functions
 # -----------------------------------------------------------------------------

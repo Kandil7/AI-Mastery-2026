@@ -8,7 +8,9 @@ Implementation of file storage using Azure Blob Storage.
 
 import hashlib
 import logging
-from typing import Optional
+import os
+import tempfile
+from typing import Optional, AsyncIterator, Tuple
 
 from azure.storage.blob import BlobServiceClient, ContainerClient
 from azure.core.exceptions import AzureError
@@ -60,7 +62,12 @@ class AzureBlobFileStore:
         # Initialize blob service client
         if connection_string:
             self._blob_service = BlobServiceClient.from_connection_string(connection_string)
-        elif account_url and account_key:
+        elif account_url and account_name and account_key:
+            from azure.core.credentials import AzureNamedKeyCredential
+
+            credential = AzureNamedKeyCredential(account_name, account_key)
+            self._blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+        elif account_url:
             from azure.identity import DefaultAzureCredential
 
             credential = DefaultAzureCredential()
@@ -105,8 +112,6 @@ class AzureBlobFileStore:
 
         حفظ الملف المرفوع في Azure Blob Storage
         """
-        import os
-
         # Check size limit
         if len(data) > self._max_bytes:
             raise FileTooLargeError(len(data), self._max_bytes)
@@ -163,8 +168,6 @@ class AzureBlobFileStore:
 
         حذف ملف من Azure Blob Storage
         """
-        import os
-
         # Parse Azure URI or use path as blob name
         if path.startswith("azure://"):
             # azure://container/blob
@@ -199,8 +202,6 @@ class AzureBlobFileStore:
 
         التحقق من وجود الملف في Azure Blob Storage
         """
-        import os
-
         # Parse Azure URI or use path as blob name
         if path.startswith("azure://"):
             parts = path[8:].split("/", 1)
@@ -233,8 +234,6 @@ class AzureBlobFileStore:
 
         قراءة محتوى الملف من Azure Blob Storage
         """
-        import os
-
         # Parse Azure URI or use path as blob name
         if path.startswith("azure://"):
             parts = path[8:].split("/", 1)
@@ -300,7 +299,6 @@ class AzureBlobFileStore:
 
         إنشاء URL SAS للوصول للملف
         """
-        import os
         from datetime import datetime, timedelta
         from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 
@@ -333,6 +331,80 @@ class AzureBlobFileStore:
         except AzureError as e:
             log.error(f"Failed to generate SAS URL: {e}")
             raise
+
+    async def save_upload_stream(
+        self,
+        *,
+        tenant_id: str,
+        upload_filename: str,
+        content_type: str,
+        data_stream: AsyncIterator[bytes],
+    ) -> Tuple[StoredFile, str]:
+        """
+        Save uploaded file to Azure Blob Storage using a stream.
+
+        Returns stored file and sha256 hash.
+        """
+        import aiofiles
+
+        hasher = hashlib.sha256()
+        total_bytes = 0
+
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
+        tmp_path = tmp_file.name
+        tmp_file.close()
+
+        try:
+            async with aiofiles.open(tmp_path, "wb") as f:
+                async for chunk in data_stream:
+                    if not chunk:
+                        continue
+                    total_bytes += len(chunk)
+                    if total_bytes > self._max_bytes:
+                        raise FileTooLargeError(total_bytes, self._max_bytes)
+                    hasher.update(chunk)
+                    await f.write(chunk)
+
+            file_hash = hasher.hexdigest()[:10]
+            safe_name = upload_filename.replace("/", "_").replace("\\", "_")
+            import time
+
+            timestamp = int(time.time())
+            blob_name = f"{self._prefix}{tenant_id}/{timestamp}_{file_hash}_{safe_name}"
+
+            try:
+                blob_client = self._container_client.get_blob_client(blob_name)
+                with open(tmp_path, "rb") as f:
+                    blob_client.upload_blob(
+                        f,
+                        overwrite=True,
+                        content_settings={"content_type": content_type},
+                        metadata={
+                            "tenant-id": tenant_id,
+                            "original-filename": upload_filename,
+                        },
+                    )
+                log.info(f"File uploaded to Azure Blob: {blob_name}")
+            except AzureError as e:
+                log.error(f"Azure Blob upload failed: {e}")
+                raise RuntimeError(f"Failed to upload to Azure Blob: {str(e)}")
+
+            azure_uri = f"azure://{self._container_name}/{blob_name}"
+            return (
+                StoredFile(
+                    path=azure_uri,
+                    filename=upload_filename,
+                    content_type=content_type,
+                    size_bytes=total_bytes,
+                ),
+                hasher.hexdigest(),
+            )
+        finally:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

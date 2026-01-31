@@ -13,6 +13,7 @@ from src.api.v1.deps import get_tenant_id
 from src.core.bootstrap import get_container
 from src.application.use_cases.upload_document import (
     UploadDocumentRequest,
+    UploadDocumentStreamRequest,
     UploadDocumentUseCase,
 )
 from src.domain.errors import (
@@ -53,20 +54,24 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
     
-    # Read file data
-    data = await file.read()
-    
     # Get use case from container
     container = get_container()
     use_case: UploadDocumentUseCase = container["upload_use_case"]
     
     try:
-        result = await use_case.execute(
-            UploadDocumentRequest(
+        async def iter_chunks(chunk_size: int = 1024 * 1024):
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+        result = await use_case.execute_stream(
+            UploadDocumentStreamRequest(
                 tenant_id=tenant_id,
                 filename=file.filename,
                 content_type=file.content_type or "application/octet-stream",
-                data=data,
+                data_stream=iter_chunks(),
             )
         )
         

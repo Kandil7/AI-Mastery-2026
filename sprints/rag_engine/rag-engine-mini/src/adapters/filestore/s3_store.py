@@ -8,9 +8,8 @@ Implementation of file storage using AWS S3.
 
 import hashlib
 import logging
-from typing import Optional
-
-import aiofiles
+import tempfile
+from typing import Optional, AsyncIterator, Tuple
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -258,6 +257,83 @@ class S3FileStore:
             data=content,
         )
         return stored.path
+
+    async def save_upload_stream(
+        self,
+        *,
+        tenant_id: str,
+        upload_filename: str,
+        content_type: str,
+        data_stream: AsyncIterator[bytes],
+    ) -> Tuple[StoredFile, str]:
+        """
+        Save uploaded file to S3 using a stream.
+
+        Returns stored file and sha256 hash.
+        """
+        import aiofiles
+
+        hasher = hashlib.sha256()
+        total_bytes = 0
+
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
+        tmp_path = tmp_file.name
+        tmp_file.close()
+
+        try:
+            async with aiofiles.open(tmp_path, "wb") as f:
+                async for chunk in data_stream:
+                    if not chunk:
+                        continue
+                    total_bytes += len(chunk)
+                    if total_bytes > self._max_bytes:
+                        raise FileTooLargeError(total_bytes, self._max_bytes)
+                    hasher.update(chunk)
+                    await f.write(chunk)
+
+            file_hash = hasher.hexdigest()[:10]
+            safe_name = upload_filename.replace("/", "_").replace("\\", "_")
+            import time
+
+            timestamp = int(time.time())
+            s3_key = f"{self._prefix}{tenant_id}/{timestamp}_{file_hash}_{safe_name}"
+
+            try:
+                self._s3.upload_file(
+                    Filename=tmp_path,
+                    Bucket=self._bucket_name,
+                    Key=s3_key,
+                    ExtraArgs={
+                        "ContentType": content_type,
+                        "Metadata": {
+                            "tenant-id": tenant_id,
+                            "original-filename": upload_filename,
+                        },
+                    },
+                )
+                log.info(f"File uploaded to S3: {s3_key}")
+            except (BotoCoreError, ClientError) as e:
+                log.error(f"S3 upload failed: {e}")
+                raise RuntimeError(f"Failed to upload to S3: {str(e)}")
+
+            s3_uri = f"s3://{self._bucket_name}/{s3_key}"
+            return (
+                StoredFile(
+                    path=s3_uri,
+                    filename=upload_filename,
+                    content_type=content_type,
+                    size_bytes=total_bytes,
+                ),
+                hasher.hexdigest(),
+            )
+        finally:
+            try:
+                import os
+
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
 
     def generate_presigned_url(
         self,

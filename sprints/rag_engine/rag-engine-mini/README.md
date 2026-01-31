@@ -44,6 +44,21 @@ python scripts/seed_sample_data.py
 make run
 ```
 
+### Configuration
+
+Copy the example config and adjust for your environment:
+
+```bash
+cp .env.example .env
+```
+
+Key settings for file storage and background tasks:
+
+- `FILESTORE_BACKEND`: `local` | `s3` | `gcs` | `azure`
+- `S3_*`, `GCS_*`, `AZURE_*`: Cloud storage credentials and buckets/containers
+- `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`: Redis endpoints for Celery
+- `UPLOAD_DIR`, `MAX_UPLOAD_MB`, `ALLOWED_EXTENSIONS`: Upload limits and local path
+
 ### API Usage
 
 ```bash

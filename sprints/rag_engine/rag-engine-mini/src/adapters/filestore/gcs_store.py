@@ -8,7 +8,8 @@ Implementation of file storage using Google Cloud Storage.
 
 import hashlib
 import logging
-from typing import Optional
+import tempfile
+from typing import Optional, AsyncIterator, Tuple
 
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
@@ -296,6 +297,78 @@ class GCSFileStore:
         except GoogleCloudError as e:
             log.error(f"Failed to generate signed URL: {e}")
             raise
+
+    async def save_upload_stream(
+        self,
+        *,
+        tenant_id: str,
+        upload_filename: str,
+        content_type: str,
+        data_stream: AsyncIterator[bytes],
+    ) -> Tuple[StoredFile, str]:
+        """
+        Save uploaded file to GCS using a stream.
+
+        Returns stored file and sha256 hash.
+        """
+        import aiofiles
+
+        hasher = hashlib.sha256()
+        total_bytes = 0
+
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
+        tmp_path = tmp_file.name
+        tmp_file.close()
+
+        try:
+            async with aiofiles.open(tmp_path, "wb") as f:
+                async for chunk in data_stream:
+                    if not chunk:
+                        continue
+                    total_bytes += len(chunk)
+                    if total_bytes > self._max_bytes:
+                        raise FileTooLargeError(total_bytes, self._max_bytes)
+                    hasher.update(chunk)
+                    await f.write(chunk)
+
+            file_hash = hasher.hexdigest()[:10]
+            safe_name = upload_filename.replace("/", "_").replace("\\", "_")
+            import time
+
+            timestamp = int(time.time())
+            gcs_key = f"{self._prefix}{tenant_id}/{timestamp}_{file_hash}_{safe_name}"
+
+            try:
+                blob = self._bucket.blob(gcs_key)
+                blob.upload_from_filename(tmp_path, content_type=content_type)
+                blob.metadata = {
+                    "tenant-id": tenant_id,
+                    "original-filename": upload_filename,
+                }
+                blob.patch()
+                log.info(f"File uploaded to GCS: {gcs_key}")
+            except GoogleCloudError as e:
+                log.error(f"GCS upload failed: {e}")
+                raise RuntimeError(f"Failed to upload to GCS: {str(e)}")
+
+            gcs_uri = f"gs://{self._bucket_name}/{gcs_key}"
+            return (
+                StoredFile(
+                    path=gcs_uri,
+                    filename=upload_filename,
+                    content_type=content_type,
+                    size_bytes=total_bytes,
+                ),
+                hasher.hexdigest(),
+            )
+        finally:
+            try:
+                import os
+
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

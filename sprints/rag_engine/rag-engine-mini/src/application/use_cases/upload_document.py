@@ -7,6 +7,7 @@ Orchestrates document upload with idempotency.
 """
 
 import hashlib
+from typing import AsyncIterator
 from dataclasses import dataclass
 
 from src.application.ports.document_idempotency import DocumentIdempotencyPort
@@ -23,6 +24,15 @@ class UploadDocumentRequest:
     filename: str
     content_type: str
     data: bytes
+
+
+@dataclass
+class UploadDocumentStreamRequest:
+    """Request data for streaming document upload."""
+    tenant_id: str
+    filename: str
+    content_type: str
+    data_stream: AsyncIterator[bytes]
 
 
 class UploadDocumentUseCase:
@@ -128,6 +138,63 @@ class UploadDocumentUseCase:
         )
         
         # Step 7: Return result
+        return UploadResult(
+            document_id=doc_id,
+            status="queued",
+            message="Document queued for indexing",
+        )
+
+    async def execute_stream(self, request: UploadDocumentStreamRequest) -> UploadResult:
+        """
+        Execute the upload document use case using a byte stream.
+
+        Streams the file to storage, then uses the computed hash for idempotency.
+        """
+        tenant = TenantId(request.tenant_id)
+
+        # Step 1: Stream to storage and compute hash
+        stored, file_sha256 = await self._file_store.save_upload_stream(
+            tenant_id=tenant.value,
+            upload_filename=request.filename,
+            content_type=request.content_type,
+            data_stream=request.data_stream,
+        )
+
+        # Step 2: Check for existing document (idempotency)
+        existing = self._idem.get_by_file_hash(
+            tenant_id=tenant,
+            file_sha256=file_sha256,
+        )
+
+        if existing:
+            # Duplicate found; remove stored file
+            await self._file_store.delete(stored.path)
+            return UploadResult(
+                document_id=existing,
+                status="already_exists",
+                message="Document with same content already indexed",
+            )
+
+        # Step 3: Create document record with hash
+        doc_id = self._idem.create_document_with_hash(
+            tenant_id=tenant,
+            stored_file=stored,
+            file_sha256=file_sha256,
+        )
+
+        # Step 4: Set initial status
+        self._repo.set_status(
+            tenant_id=tenant,
+            document_id=doc_id,
+            status="queued",
+        )
+
+        # Step 5: Enqueue for async indexing
+        self._queue.enqueue_index_document(
+            tenant_id=tenant,
+            document_id=doc_id,
+        )
+
         return UploadResult(
             document_id=doc_id,
             status="queued",

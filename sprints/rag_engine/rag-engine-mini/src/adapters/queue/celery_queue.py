@@ -49,3 +49,58 @@ class CeleryTaskQueue:
             queue="indexing",
         )
         return result.id
+
+    def enqueue_bulk_upload(
+        self,
+        *,
+        tenant_id: TenantId,
+        files: list[dict],
+    ) -> str:
+        """Enqueue bulk upload task."""
+        result = self._app.send_task(
+            "bulk_upload_documents",
+            kwargs={
+                "tenant_id": tenant_id.value,
+                "files": files,
+            },
+            queue="indexing",
+        )
+        return result.id
+
+    def enqueue_bulk_delete(
+        self,
+        *,
+        tenant_id: TenantId,
+        document_ids: list[str],
+    ) -> str:
+        """Enqueue bulk delete task."""
+        result = self._app.send_task(
+            "bulk_delete_documents",
+            kwargs={
+                "tenant_id": tenant_id.value,
+                "document_ids": document_ids,
+            },
+            queue="indexing",
+        )
+        return result.id
+
+    def enqueue_merge_pdfs(
+        self,
+        *,
+        tenant_id: TenantId,
+        source_document_ids: list[str],
+        merged_filename: str,
+        target_document_id: str | None = None,
+    ) -> str:
+        """Enqueue PDF merge task."""
+        result = self._app.send_task(
+            "merge_pdfs",
+            kwargs={
+                "tenant_id": tenant_id.value,
+                "source_document_ids": source_document_ids,
+                "merged_filename": merged_filename,
+                "target_document_id": target_document_id,
+            },
+            queue="indexing",
+        )
+        return result.id

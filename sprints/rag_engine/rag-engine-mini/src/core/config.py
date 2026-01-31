@@ -144,6 +144,30 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=20, ge=1, le=100)
     allowed_extensions: str = Field(default="pdf,docx,txt")
 
+    # File Storage Backend
+    filestore_backend: Literal["local", "s3", "gcs", "azure"] = Field(default="local")
+
+    # S3
+    s3_bucket: str = Field(default="rag-engine-uploads")
+    s3_region: str = Field(default="us-east-1")
+    s3_access_key_id: str | None = Field(default=None)
+    s3_secret_access_key: str | None = Field(default=None)
+    s3_prefix: str = Field(default="uploads/")
+
+    # GCS
+    gcs_bucket: str = Field(default="rag-engine-uploads")
+    gcs_project_id: str | None = Field(default=None)
+    gcs_credentials_path: str | None = Field(default=None)
+    gcs_prefix: str = Field(default="uploads/")
+
+    # Azure Blob Storage
+    azure_container: str = Field(default="rag-engine-uploads")
+    azure_connection_string: str | None = Field(default=None)
+    azure_account_url: str | None = Field(default=None)
+    azure_account_name: str | None = Field(default=None)
+    azure_account_key: str | None = Field(default=None)
+    azure_prefix: str = Field(default="uploads/")
+
     # Web Search (Stage 5)
     tavily_api_key: str | None = Field(default=None)
 

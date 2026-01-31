@@ -38,6 +38,14 @@ class BulkUploadResponse(BaseModel):
     results: list = Field(..., description="Results for each file")
 
 
+class BulkUploadAsyncResponse(BaseModel):
+    """Response model for async bulk upload."""
+
+    operation_id: str = Field(..., description="Operation ID for tracking")
+    task_id: str = Field(..., description="Celery task ID")
+    total_files: int = Field(..., description="Total files queued")
+
+
 class BulkDeleteRequest(BaseModel):
     """Request model for bulk delete."""
 
@@ -179,6 +187,80 @@ async def bulk_upload_documents(
             }
             for r in response.results
         ],
+    )
+
+
+@router.post("/bulk-upload-async", response_model=BulkUploadAsyncResponse)
+async def bulk_upload_documents_async(
+    files: list[UploadFile] = File(...),
+    reason: str = Form(...),
+    tenant_id: str = Depends(get_tenant_id),
+) -> BulkUploadAsyncResponse:
+    """
+    Bulk upload multiple documents via Celery (async).
+
+    Flow:
+    1. Validate file list (count, sizes, types)
+    2. Read file bytes (single pass)
+    3. Enqueue Celery task for bulk upload + indexing
+    4. Return task ID for tracking
+    """
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    if len(files) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 files per bulk upload")
+
+    allowed_types = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+    ]
+
+    for file in files:
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type: {file.content_type}. Allowed: {', '.join(allowed_types)}",
+            )
+
+    raw_contents: list[bytes] = []
+    total_size = 0
+    for file in files:
+        content = await file.read()
+        raw_contents.append(content)
+        total_size += len(content)
+    if total_size > 500 * 1024 * 1024:  # 500MB
+        raise HTTPException(status_code=413, detail="Total upload size exceeds 500MB limit")
+
+    container = get_container()
+    task_queue = container.get("task_queue")
+
+    if not task_queue:
+        raise HTTPException(status_code=501, detail="Task queue not configured")
+
+    files_payload = []
+    for file, content in zip(files, raw_contents):
+        files_payload.append(
+            {
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "content": content,
+            }
+        )
+
+    from datetime import datetime
+
+    operation_id = f"bulk_upload_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    task_id = task_queue.enqueue_bulk_upload(
+        tenant_id=tenant_id,
+        files=files_payload,
+    )
+
+    return BulkUploadAsyncResponse(
+        operation_id=operation_id,
+        task_id=task_id,
+        total_files=len(files),
     )
 
 
