@@ -70,6 +70,7 @@ For those who want to understand the "Why" behind the architecture:
 - [**Export Functionality Demo**](../notebooks/export_functionality_demo.ipynb): Demonstration of the export functionality.
 - [**Health Check Demo**](../notebooks/health_check_demo.ipynb): Demonstration of the health check functionality.
 - [**A/B Testing Demo**](../notebooks/ab_testing_demo.ipynb): Demonstration of the A/B testing functionality.
+- [**i18n Demo**](../notebooks/i18n_demo.ipynb): Demonstration of the internationalization functionality.
 - [**Practical Exercises Guide**](educational/practical_exercises_guide.md): Hands-on exercises to reinforce learning.
 - [**Summary and Next Steps**](educational/summary_and_next_steps.md): Learning summary and guidance for continued growth.
 
@@ -77,6 +78,7 @@ For those who want to understand the "Why" behind the architecture:
 - [**Export Implementation Guide**](learning/implementation/01-export-implementation-guide.md): Complete guide to the export functionality implementation.
 - [**Health Checks Implementation Guide**](learning/observability/05-health-checks-guide.md): Complete guide to the health check functionality implementation.
 - [**A/B Testing Implementation Guide**](learning/implementation/02-ab-testing-implementation-guide.md): Complete guide to the A/B testing functionality implementation.
+- [**i18n Implementation Guide**](learning/i18n/03-i18n-implementation-guide.md): Complete guide to the internationalization functionality implementation.
 
 ### Code Walkthroughs
 - [**Ask Hybrid Use Case**](code-walkthroughs/ask-hybrid-usecase.md): Step-by-step tour of the main use case.

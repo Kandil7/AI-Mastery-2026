@@ -1,6 +1,6 @@
 """
 Chat Enhancement Services
-=========================
+========================
 Services for chat session management and AI-powered features.
 
 خدمات تحسين المحادثة
@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
 import logging
+
+from src.domain.entities import TenantId
 
 log = logging.getLogger(__name__)
 
@@ -265,6 +267,7 @@ class SessionManager:
         self,
         title_generator: ChatTitleGenerator,
         summarizer: ChatSummarizer,
+        chat_repo,
     ):
         """
         Initialize session manager.
@@ -272,15 +275,18 @@ class SessionManager:
         Args:
             title_generator: Title generation service
             summarizer: Chat summarization service
+            chat_repo: Chat repository for persistence
         """
         self._title_gen = title_generator
         self._summarizer = summarizer
+        self._chat_repo = chat_repo
 
     def auto_title_session(
         self,
         session_id: str,
         turns: List[dict[str, str]],
         save_to_db: bool = False,
+        tenant_id: TenantId = None,
     ) -> str:
         """
         Automatically generate and save title for a session.
@@ -289,6 +295,7 @@ class SessionManager:
             session_id: Chat session ID
             turns: Chat turns for title generation
             save_to_db: Whether to save to database (default: False)
+            tenant_id: Owner tenant ID
 
         Returns:
             Generated title
@@ -297,8 +304,12 @@ class SessionManager:
         """
         title = self._title_gen.generate_title(turns)
 
-        if save_to_db:
-            # TODO: Update session in database
+        if save_to_db and self._chat_repo and tenant_id:
+            self._chat_repo.update_session_title(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                title=title,
+            )
             log.info("Session title generated and saved", session_id=session_id, title=title)
 
         return title

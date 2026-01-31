@@ -148,6 +148,30 @@ class PostgresChatRepo:
                 for row in rows
             ]
 
+    def get_session(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+    ) -> ChatSession | None:
+        """Get a chat session by ID."""
+        with SessionLocal() as db:
+            stmt = select(ChatSessionRow).where(
+                ChatSessionRow.id == session_id,
+                ChatSessionRow.user_id == tenant_id.value,
+            )
+            row = db.execute(stmt).scalar_one_or_none()
+
+            if row is None:
+                return None
+
+            return ChatSession(
+                id=row.id,
+                tenant_id=TenantId(row.user_id),
+                title=row.title,
+                created_at=row.created_at,
+            )
+
     def update_session_title(
         self,
         *,

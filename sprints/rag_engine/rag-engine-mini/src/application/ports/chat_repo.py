@@ -115,6 +115,24 @@ class ChatRepoPort(Protocol):
         """
         ...
 
+    def get_session(
+        self,
+        *,
+        tenant_id: TenantId,
+        session_id: str,
+    ) -> ChatSession | None:
+        """
+        Get a chat session by ID.
+
+        Args:
+            tenant_id: Owner tenant
+            session_id: Session ID to retrieve
+
+        Returns:
+            Session or None if not found
+        """
+        ...
+
     def update_session_title(
         self,
         *,
