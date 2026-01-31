@@ -1,7 +1,13 @@
 """
 File Store Factory
-===================
+==================
 Creates file store adapters based on configuration.
+
+Priority:
+1. S3 (if credentials provided)
+2. GCS (if credentials provided)
+3. Azure Blob (if credentials provided)
+4. Local (fallback)
 """
 
 from src.core.config import Settings
@@ -42,7 +48,9 @@ def create_file_store(settings: Settings):
 
     if backend == "gcs":
         if GCSFileStore is None:
-            raise ValueError("GCSFileStore unavailable. Install google-cloud-storage to enable GCS backend.")
+            raise ValueError(
+                "GCSFileStore unavailable. Install google-cloud-storage to enable GCS backend."
+            )
         return GCSFileStore(
             bucket_name=settings.gcs_bucket,
             project_id=settings.gcs_project_id,
@@ -53,7 +61,9 @@ def create_file_store(settings: Settings):
 
     if backend == "azure":
         if AzureBlobFileStore is None:
-            raise ValueError("AzureBlobFileStore unavailable. Install azure-storage-blob to enable Azure backend.")
+            raise ValueError(
+                "AzureBlobFileStore unavailable. Install azure-storage-blob to enable Azure backend."
+            )
         return AzureBlobFileStore(
             container_name=settings.azure_container,
             connection_string=settings.azure_connection_string,
