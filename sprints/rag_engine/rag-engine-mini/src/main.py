@@ -106,6 +106,7 @@ def create_app() -> FastAPI:
             "chat_repo": container.get("chat_repo"),
             "query_history_repo": container.get("query_history_repo"),
             "search_service": container.get("search_documents_use_case"),
+            "ask_hybrid_use_case": container.get("ask_hybrid_use_case"),
         }
 
     graphql_app = GraphQLRouter(

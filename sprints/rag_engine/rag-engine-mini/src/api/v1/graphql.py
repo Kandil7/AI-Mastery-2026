@@ -488,31 +488,69 @@ class Mutation:
     @strawberry.mutation
     def ask_question(
         self,
+        info,
         question: str,
         k: int = 5,
         document_id: Optional[strawberry.ID] = None,
     ) -> AnswerType:
         """
         Ask a question using GraphQL mutation.
-        
+
         Args:
-            question: Question to ask
+            info: GraphQL execution context
+            question: Question to ask (required)
             k: Number of chunks to retrieve (default: 5)
             document_id: Optional document ID for chat mode
-        
+
         Returns:
             Answer with text and sources
-        
+
         طرح سؤال باستخدام GraphQL
         """
-        # TODO: Integrate with ask_question_hybrid use case
+        # 1. Validate inputs
+        if not question or not question.strip():
+            raise ValueError("question is required and cannot be empty")
+
+        if k < 1 or k > 100:
+            raise ValueError("k must be between 1 and 100")
+
+        question = question.strip()
+
+        if len(question) > 2000:
+            raise ValueError("question too long (max 2000 characters)")
+
+        # 2. Get tenant ID from request context
+        from src.api.v1.deps import get_tenant_id
+        request = info.context.get("request")
+        if not request:
+            raise RuntimeError("Request context not available")
+
+        tenant_id = get_tenant_id(request)
+
+        # 3. Get use case from context
+        ask_use_case = info.context.get("ask_hybrid_use_case")
+        if not ask_use_case:
+            raise RuntimeError("Ask use case not available")
+
+        # 4. Execute ask question use case
+        from src.application.use_cases.ask_question_hybrid import AskHybridRequest
+        request_data = AskHybridRequest(
+            tenant_id=tenant_id,
+            question=question,
+            document_id=str(document_id) if document_id else None,
+            rerank_top_n=k,
+        )
+
+        result = ask_use_case.execute(request_data)
+
+        # 5. Convert to GraphQL type
         return AnswerType(
-            text="GraphQL ask not yet implemented",
-            sources=[],
-            retrieval_k=0,
-            embed_ms=None,
-            search_ms=None,
-            llm_ms=None,
+            text=result.text,
+            sources=result.sources,
+            retrieval_k=result.retrieval_k,
+            embed_ms=result.embed_ms,
+            search_ms=result.search_ms,
+            llm_ms=result.llm_ms,
         )
     
     @strawberry.mutation
