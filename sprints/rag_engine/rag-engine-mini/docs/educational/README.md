@@ -1,85 +1,51 @@
-# Educational Layer: RAG Engine Mini
+# Educational Layer Documentation
 
-Welcome to the comprehensive educational layer of the RAG Engine Mini project. This collection of resources is designed to transform you from a RAG beginner to an AI architect capable of designing and implementing production-grade retrieval systems.
+Welcome to the RAG Engine Mini educational layer. This directory contains comprehensive learning resources designed to take you from RAG beginner to AI architect level.
 
-## 📚 About This Educational Layer
+## 📚 Core Educational Resources
 
-The educational layer of RAG Engine Mini consists of multiple interconnected components that work together to provide a complete learning experience:
+- [**AI Engineering Curriculum**](../AI_ENGINEERING_CURRICULUM.md): Complete curriculum from beginner to expert in production-ready RAG systems
+- [**Educational Implementation Guide**](../EDUCATIONAL_IMPLEMENTATION_GUIDE.md): Comprehensive walkthrough connecting theory to implementation
+- [**Educational Layer Guide**](../EDUCATIONAL.md): Navigation map for educational content
 
-- **Theoretical Foundations**: Understanding the mathematics and concepts behind RAG systems
-- **Implementation Details**: How theoretical concepts translate into production code
-- **Practical Exercises**: Hands-on activities to reinforce learning
-- **Extension Guidance**: How to build upon the system for your own needs
-- **Professional Practices**: Industry-standard development approaches
+## 🛣️ Learning Pathways
 
-## 🗺️ Navigation Map
+- [**Complete Learning Pathway**](complete_learning_pathway_guide.md): Structured learning journey from RAG beginner to AI architect
+- [**Atomic Commit Practices**](atomic_commit_practices_guide.md): Following senior engineer standards for commits
+- [**Senior Engineering Git Practices**](senior_engineering_git_practices.md): Advanced git practices for educational contributions
+- [**Extension Development Guide**](extension_development_guide.md): How to extend the RAG Engine while maintaining educational quality
 
-### Learning Pathways
-- [Complete Learning Pathway Guide](complete_learning_pathway_guide.md): Structured journey from beginner to expert with daily schedules and milestones
-- [Practical Exercises Guide](practical_exercises_guide.md): Hands-on activities to reinforce concepts through implementation
+## 🧩 Layer-Specific Guides
 
-### Development Practices
-- [Atomic Commit Practices Guide](atomic_commit_practices_guide.md): Senior engineer standards for making clean, educational commits
-- [Extension Development Guide](extension_development_guide.md): How to extend the system while maintaining educational quality
+- [**Domain Layer Guide**](domain_layer_guide.md): Pure business logic and entities
+- [**Application Layer Guide**](application_layer_guide.md): Use cases and services
+- [**Adapters Layer Guide**](adapters_layer_guide.md): Concrete implementations of external dependencies
+- [**API Layer Guide**](api_layer_guide.md): FastAPI routes and controllers
+- [**Workers Layer Guide**](workers_layer_guide.md): Background processing and task queues
+- [**Complete RAG Pipeline Guide**](complete_rag_pipeline_guide.md): End-to-end system walkthrough
 
-### Synthesis & Completion
-- [Summary and Next Steps](summary_and_next_steps.md): Consolidation of learning and guidance for continued growth
+## 📖 Hands-On Learning
 
-## 🎯 Learning Objectives
+- [**Comprehensive Hands-On Notebook**](../../notebooks/educational/rag_engine_mini_comprehensive_guide.ipynb): Interactive learning notebook covering all system aspects
+- [**Extending RAG Engine Practical Guide**](../../notebooks/educational/extending_rag_engine_practical_guide.ipynb): Practical demonstration of how to extend the system with a custom feature
+- [**Practical Exercises Guide**](practical_exercises_guide.md): Hands-on exercises to reinforce learning
+- [**Summary and Next Steps**](summary_and_next_steps.md): Learning summary and guidance for continued growth
 
-By engaging with these educational materials, you will:
+## 🏆 Mastery Journey
 
-1. **Master RAG Fundamentals**: Understand embedding models, vector search, hybrid retrieval, and re-ranking
-2. **Learn Clean Architecture**: Implement systems with clear separation of concerns using ports and adapters
-3. **Gain Production Experience**: Work with security, observability, performance optimization, and deployment
-4. **Develop Professional Skills**: Practice code reviews, testing, documentation, and collaborative development
-5. **Acquire Extension Capabilities**: Learn to add new features while preserving system integrity
+- [**Mastery Journey**](../MASTERY_JOURNEY.md): Skill tree and graduation requirements for RAG engineering mastery
+- [**Roadmap**](../ROADMAP.md): Journey from "Hello World" to "AI Lead Engineer"
 
-## 🏗️ How to Use This Educational Layer
+## 📋 Architecture Decision Records (ADRs)
 
-### For Beginners
-Start with the [Complete Learning Pathway Guide](complete_learning_pathway_guide.md) which provides a structured approach to learning RAG systems from the ground up.
+- [**PostgreSQL FTS vs Elasticsearch**](../adr/001-postgres-fts-vs-elasticsearch.md): Search backend selection rationale
+- [**RRF vs Weighted Fusion**](../adr/002-rrf-vs-weighted-fusion.md): Ranking algorithm decision
+- [**Cross-Encoder vs LLM Reranking**](../adr/003-cross-encoder-vs-llm-rerank.md): Reranking approach comparison
+- [**Minimal Vector Payload Design**](../adr/004-minimal-vector-payload.md): Storage architecture decision
+- [**Chunk Deduplication Strategy**](../adr/005-chunk-dedup-design.md): Approach to handling duplicate content
 
-### For Practitioners
-Jump to the [Practical Exercises Guide](practical_exercises_guide.md) to apply your knowledge with hands-on implementation challenges.
+## 🛠️ Code Walkthroughs
 
-### For Senior Engineers
-Review the [Atomic Commit Practices Guide](atomic_commit_practices_guide.md) and [Extension Development Guide](extension_development_guide.md) to understand how to contribute effectively to educational projects.
-
-### For Those Completing Their Journey
-Review the [Summary and Next Steps](summary_and_next_steps.md) for consolidation of learning and guidance on continued growth.
-
-## 🧠 Pedagogical Approach
-
-This educational layer follows the "White-Box" philosophy:
-
-1. **Mathematical Foundations**: Understand the theory behind the implementations
-2. **Implementation from Scratch**: See how concepts become production code
-3. **Real-World Application**: Apply knowledge to solve practical problems
-4. **Professional Practices**: Learn industry-standard development workflows
-
-## 📈 Measuring Progress
-
-Each resource includes checkpoints and verification steps to help you assess your understanding. The [Complete Learning Pathway Guide](complete_learning_pathway_guide.md) includes milestone-based progress tracking.
-
-## 🤝 Contributing to the Educational Layer
-
-This educational layer is designed to be extended. When contributing:
-
-1. Maintain the "White-Box" approach by explaining both theory and implementation
-2. Follow the [Atomic Commit Practices Guide](atomic_commit_practices_guide.md) for all contributions
-3. Include practical exercises with verification steps
-4. Connect new content to existing materials for coherence
-5. Preserve the professional tone and educational quality
-
-## 🎓 From Education to Practice
-
-This educational layer is designed not just for learning, but for preparing you to implement production RAG systems in real organizations. Each concept includes discussion of trade-offs, performance considerations, and practical implementation details.
-
-## Next Steps
-
-1. Begin with the [Complete Learning Pathway Guide](complete_learning_pathway_guide.md) if you're new to RAG systems
-2. Jump to the [Practical Exercises Guide](practical_exercises_guide.md) if you prefer hands-on learning
-3. Review the [Summary and Next Steps](summary_and_next_steps.md) if you're consolidating your learning
-
-The RAG Engine Mini educational layer represents a complete foundation for mastering modern RAG systems. Use it to build expertise that you can apply to solve real-world problems with AI systems.
+- [**Ask Hybrid Use Case**](../code-walkthroughs/ask-hybrid-usecase.md): Step-by-step tour of the main use case
+- [**Document Ingestion Process**](../code-walkthroughs/document-ingestion.md): Complete walkthrough of document processing pipeline
+- [**Embedding Generation & Caching**](../code-walkthroughs/embedding-generation-caching.md): How embeddings are created and cached efficiently
