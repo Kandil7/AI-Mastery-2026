@@ -8,7 +8,7 @@ JSON Web Token generation and validation.
 
 import time
 import uuid
-from typing import Final, TypedDict
+from typing import Final, TypedDict, Literal
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
@@ -321,10 +321,6 @@ def get_jwt_provider() -> JWTProvider:
     """Get global JWT provider instance."""
     global _jwt_provider
     if _jwt_provider is None:
-        secret = (
-            settings.jwt_secret_key
-            if hasattr(settings, "jwt_secret_key")
-            else "dev-secret-change-in-production"
-        )
+        secret = settings.jwt_secret_key or "dev-secret-change-in-production"
         _jwt_provider = JWTProvider(secret_key=secret)
     return _jwt_provider

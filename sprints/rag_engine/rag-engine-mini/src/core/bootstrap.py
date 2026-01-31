@@ -36,10 +36,14 @@ def get_container() -> dict:
     from src.adapters.extraction.default_extractor import DefaultTextExtractor
     from src.adapters.queue.celery_queue import CeleryTaskQueue
     from src.workers.celery_app import celery_app
+    from src.adapters.persistence.placeholder import PlaceholderUserRepo
     
     from src.application.services.embedding_cache import CachedEmbeddings
     from src.application.use_cases.upload_document import UploadDocumentUseCase
     from src.application.use_cases.ask_question_hybrid import AskQuestionHybridUseCase
+    from src.application.use_cases.search_documents import SearchDocumentsUseCase
+    from src.application.use_cases.bulk_operations import BulkOperationsUseCase
+    from src.application.use_cases.reindex_document import ReindexDocumentUseCase
     
     # Note: In production, these would be real implementations
     # For now, we use placeholder adapters for some ports
@@ -154,6 +158,7 @@ def get_container() -> dict:
             PostgresChunkTextReader,
             PostgresKeywordStore,
             PostgresChatRepo,
+            PostgresGraphRepo,
         )
         
         document_repo = PostgresDocumentRepo()
@@ -164,6 +169,7 @@ def get_container() -> dict:
         keyword_store = PostgresKeywordStore()
         chat_repo = PostgresChatRepo()
         graph_repo = PostgresGraphRepo()
+        user_repo = PlaceholderUserRepo()
     else:
         # Development: Use in-memory placeholder implementations
         from src.adapters.persistence.placeholder import (
@@ -173,6 +179,8 @@ def get_container() -> dict:
             PlaceholderChunkDedupRepo,
             PlaceholderChunkTextReader,
             PlaceholderKeywordStore,
+            PlaceholderChatRepo,
+            PlaceholderGraphRepo,
         )
         
         document_repo = PlaceholderDocumentRepo()
@@ -181,10 +189,9 @@ def get_container() -> dict:
         chunk_dedup_repo = PlaceholderChunkDedupRepo()
         chunk_text_reader = PlaceholderChunkTextReader()
         keyword_store = PlaceholderKeywordStore()
-        # Chat repo placeholder (inline for now)
-        from src.adapters.persistence.postgres.repo_chat import PostgresChatRepo
-        chat_repo = PostgresChatRepo()  # Still Postgres based but can be mocked
-        graph_repo = PostgresGraphRepo() # Reusing real for now as placeholders are complex
+        chat_repo = PlaceholderChatRepo()
+        graph_repo = PlaceholderGraphRepo()
+        user_repo = PlaceholderUserRepo()
     
     # Query Expansion
     from src.application.services.query_expansion import QueryExpansionService
@@ -235,6 +242,22 @@ def get_container() -> dict:
         privacy=privacy_guard,
         search_tool=search_tool,
     )
+
+    search_documents_use_case = SearchDocumentsUseCase(
+        document_repo=document_repo,
+    )
+
+    bulk_operations_use_case = BulkOperationsUseCase(
+        upload_use_case=upload_use_case,
+        file_store=file_store,
+        document_repo=document_repo,
+        task_queue=task_queue,
+    )
+
+    reindex_document_use_case = ReindexDocumentUseCase(
+        document_repo=document_repo,
+        task_queue=task_queue,
+    )
     
     # =========================================================================
     # Build container
@@ -265,6 +288,7 @@ def get_container() -> dict:
         "chunk_text_reader": chunk_text_reader,
         "chat_repo": chat_repo,
         "graph_repo": graph_repo,
+        "user_repo": user_repo,
 
         # Services
         "graph_extractor": graph_extractor_service,
@@ -275,6 +299,9 @@ def get_container() -> dict:
         # Use cases
         "upload_use_case": upload_use_case,
         "ask_hybrid_use_case": ask_hybrid_use_case,
+        "search_documents_use_case": search_documents_use_case,
+        "bulk_operations_use_case": bulk_operations_use_case,
+        "reindex_document_use_case": reindex_document_use_case,
     }
 
 

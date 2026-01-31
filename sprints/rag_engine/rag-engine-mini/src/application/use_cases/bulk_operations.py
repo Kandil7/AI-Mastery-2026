@@ -15,7 +15,7 @@ from datetime import datetime
 from src.application.ports.document_repo import DocumentRepoPort
 from src.application.use_cases.upload_document import UploadDocumentRequest, UploadDocumentUseCase
 from src.application.ports.file_store import FileStorePort
-from src.domain.entities import TenantId
+from src.domain.entities import TenantId, DocumentId
 
 
 @dataclass
@@ -160,8 +160,14 @@ class BulkOperationsUseCase:
             ]:
                 raise ValueError(f"Invalid content type: {content_type}")
 
-        # Check file sizes
-        total_size = sum([len(f.read()) for f in files])
+        # Check file sizes without consuming streams
+        total_size = 0
+        for f in files:
+            current = f.tell()
+            f.seek(0, io.SEEK_END)
+            size = f.tell()
+            f.seek(current)
+            total_size += size
         if total_size > 500 * 1024 * 1024:  # 500MB
             raise ValueError("Total upload size exceeds 500MB limit")
 

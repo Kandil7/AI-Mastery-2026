@@ -25,13 +25,16 @@ from src.domain.entities import TenantId
 class SearchDocumentsRequest:
     """Request data for document search."""
 
+    tenant_id: str
     query: str
     filters: Optional[SearchFilter] = None
     sort_order: Optional[SortOrder] = SortOrder.CREATED_DESC
     limit: int = 100
     offset: int = 0
+    allow_empty: bool = False
 
 
+@dataclass
 class SearchDocumentsResponse:
     """Response data for document search."""
 
@@ -84,7 +87,7 @@ class SearchDocumentsUseCase:
         self._repo = document_repo
         self._search_strategy = search_strategy
 
-    def _validate_query(self, query: str) -> None:
+    def _validate_query(self, query: str, allow_empty: bool = False) -> None:
         """
         Validate search query.
 
@@ -96,6 +99,8 @@ class SearchDocumentsUseCase:
         """
         # Check if query is empty
         if not query or not query.strip():
+            if allow_empty and query == "":
+                return
             raise ValueError("Search query cannot be empty")
 
         # Check if query is too long (potential DoS)
@@ -107,7 +112,7 @@ class SearchDocumentsUseCase:
         if ";" in query.lower() and "drop" in query.lower():
             raise ValueError("Search query contains potentially dangerous patterns")
 
-    def _apply_sort(self, results: list, sort_order: SortOrder) -> list:
+    def _apply_sort(self, results: list[SearchResult], sort_order: SortOrder) -> list[SearchResult]:
         """
         Apply sorting to search results.
 
@@ -119,20 +124,20 @@ class SearchDocumentsUseCase:
             Sorted list of search results
         """
         if sort_order == SortOrder.CREATED_ASC:
-            return sorted(results, key=lambda r: r.get("created_at", ""))
+            return sorted(results, key=lambda r: r.created_at)
         elif sort_order == SortOrder.CREATED_DESC:
-            return sorted(results, key=lambda r: r.get("created_at", ""), reverse=True)
+            return sorted(results, key=lambda r: r.created_at, reverse=True)
         elif sort_order == SortOrder.FILENAME_ASC:
-            return sorted(results, key=lambda r: r.get("filename", "").lower())
+            return sorted(results, key=lambda r: r.filename.lower())
         elif sort_order == SortOrder.FILENAME_DESC:
-            return sorted(results, key=lambda r: r.get("filename", "").lower(), reverse=True)
+            return sorted(results, key=lambda r: r.filename.lower(), reverse=True)
         elif sort_order == SortOrder.SIZE_ASC:
-            return sorted(results, key=lambda r: r.get("size_bytes", 0))
+            return sorted(results, key=lambda r: r.size_bytes)
         elif sort_order == SortOrder.SIZE_DESC:
-            return sorted(results, key=lambda r: r.get("size_bytes", 0), reverse=True)
+            return sorted(results, key=lambda r: r.size_bytes, reverse=True)
         else:
             # Default: Created DESC
-            return sorted(results, key=lambda r: r.get("created_at", ""), reverse=True)
+            return sorted(results, key=lambda r: r.created_at, reverse=True)
 
     def execute(self, request: SearchDocumentsRequest) -> SearchDocumentsResponse:
         """
@@ -148,33 +153,43 @@ class SearchDocumentsUseCase:
             ValueError: If query is invalid
         """
         # Step 1: Validate query
-        self._validate_query(request.query)
+        self._validate_query(request.query, allow_empty=request.allow_empty)
 
-        # Step 2: Set default search strategy if not provided
-        if self._search_strategy is None:
-            from src.adapters.persistence.postgres.db import get_engine
+        tenant = TenantId(request.tenant_id)
 
-            self._search_strategy = PostgresFTSSearch(
-                db_engine=get_engine(),
-                table_name="documents",
+        # Step 2: Prefer repository search if available
+        if hasattr(self._repo, "search_documents"):
+            search_results = self._repo.search_documents(
+                tenant_id=tenant,
+                query=request.query,
+                filters=request.filters,
+                sort_order=request.sort_order,
+                limit=request.limit,
+                offset=request.offset,
+            ).results
+        else:
+            # Step 3: Set default search strategy if not provided
+            if self._search_strategy is None:
+                from src.adapters.persistence.postgres.db import get_engine
+
+                self._search_strategy = PostgresFTSSearch(
+                    db_engine=get_engine(),
+                    table_name="documents",
+                )
+
+            # Execute search with filters
+            search_results = self._search_strategy.search(
+                query=request.query,
+                tenant_id=tenant,
+                limit=request.limit,
+                filters=request.filters,
             )
-
-        # Step 3: Execute search with filters
-        search_results = self._search_strategy.search(
-            query=request.query,
-            tenant_id=TenantId("default_tenant"),  # From auth middleware
-            limit=request.limit,
-            filters=request.filters,
-        )
 
         # Step 4: Sort results
         sorted_results = self._apply_sort(search_results, request.sort_order)
 
         # Step 5: Get total count (for pagination)
-        total = self._repo.count_documents(
-            tenant_id=TenantId("default_tenant"),
-            filters=request.filters,
-        )
+        total = self._repo.count_documents(tenant_id=tenant, filters=request.filters)
 
         # Step 6: Build pagination metadata
         has_next = (request.offset + request.limit) < total

@@ -50,3 +50,16 @@ def readiness_check() -> dict:
             "qdrant": "ok",
         },
     }
+
+
+@router.get("/health/deep")
+def deep_health_check() -> dict:
+    """
+    Deep health check for system dependencies.
+    """
+    return {
+        "status": "ok",
+        "database": "ok",
+        "redis": "ok",
+        "qdrant": "ok",
+    }

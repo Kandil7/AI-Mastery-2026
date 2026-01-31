@@ -466,54 +466,6 @@ class HybridDocumentSearch:
         )
 
         # Step 2: Vector search (content semantic match)
-        # Note: Vector search would search chunk content, not document metadata
-        # For document search, we might skip this or use a different strategy
-        vec_results = []  # Placeholder for vector search of docs
-
-        # Step 3: RRF fusion
-        from src.application.services.fusion import rrf_fusion
-        from src.application.services.scoring import ScoredChunk
-
-        # Convert FTS results to ScoredChunk format
-        fts_scored = [
-            ScoredChunk(
-                chunk={"id": r.document_id, "filename": r.filename},
-                score=r.chunks_count,  # Use chunk count as relevance score
-            )
-            for r in fts_results
-        ]
-
-        vec_scored = [
-            ScoredChunk(
-                chunk={"id": r.document_id, "filename": r.filename},
-                score=0.0,  # Placeholder for vector results
-            )
-            for r in vec_results
-        ]
-
-        # Merge using RRF
-        fused = rrf_fusion(
-            fts_hits=fts_scored,
-            keyword_hits=vec_scored,
-            out_limit=limit,
-            k=60,  # Standard RRF constant
-        )
-
-        # Convert back to SearchResult format
-        search_results = []
-        for s in fused:
-            chunk = s.chunk
-            search_results.append(
-                SearchResult(
-                    document_id=chunk["id"],
-                    filename=chunk.get("filename", ""),
-                    status=chunk.get("status", ""),
-                    size_bytes=chunk.get("size_bytes", 0),
-                    content_type=chunk.get("content_type", ""),
-                    created_at=chunk.get("created_at", ""),
-                    chunks_count=chunk.get("chunks_count", 0),
-                    matches_filters=[],
-                )
-            )
-
-        return search_results
+        # Note: Vector search would search chunk content, not document metadata.
+        # Until a doc-level vector index exists, return FTS results only.
+        return fts_results

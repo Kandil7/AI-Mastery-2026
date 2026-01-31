@@ -8,6 +8,8 @@ from src.adapters.persistence.postgres.repo_users import UserLookupRepo
 from src.adapters.persistence.postgres.repo_chunks import PostgresChunkDedupRepo
 from src.adapters.persistence.postgres.keyword_store import PostgresKeywordStore
 from src.adapters.persistence.postgres.chunk_text_reader import PostgresChunkTextReader
+from src.adapters.persistence.postgres.repo_chat import PostgresChatRepo
+from src.adapters.persistence.postgres.repo_graph import PostgresGraphRepo
 
 __all__ = [
     "Base",
@@ -22,4 +24,6 @@ __all__ = [
     "PostgresChunkDedupRepo",
     "PostgresKeywordStore",
     "PostgresChunkTextReader",
+    "PostgresChatRepo",
+    "PostgresGraphRepo",
 ]

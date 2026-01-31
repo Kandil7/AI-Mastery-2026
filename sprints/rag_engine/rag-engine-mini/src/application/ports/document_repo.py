@@ -6,7 +6,7 @@ Interface for document metadata persistence.
 منفذ مستودع المستندات
 """
 
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, Any
 
 from src.domain.entities import DocumentId, DocumentStatus, StoredFile, TenantId
 
@@ -115,5 +115,23 @@ class DocumentRepoPort(Protocol):
             
         Returns:
             True if deleted, False if not found
+        """
+        ...
+
+    def count_documents(
+        self,
+        *,
+        tenant_id: TenantId,
+        filters: Any | None = None,
+    ) -> int:
+        """
+        Count documents for a tenant.
+
+        Args:
+            tenant_id: Owner tenant
+            filters: Optional filters (search-specific)
+
+        Returns:
+            Total count
         """
         ...

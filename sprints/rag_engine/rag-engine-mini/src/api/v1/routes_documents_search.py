@@ -6,8 +6,9 @@ Document endpoints with advanced search and pagination.
 نقاط نهاية المستندات - بحث متقدم
 """
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field, Optional
+from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from src.api.v1.deps import get_tenant_id
 from src.application.use_cases.search_documents import (
@@ -141,6 +142,7 @@ async def search_documents_advanced(
 
     # Build search request
     search_request = SearchDocumentsRequest(
+        tenant_id=tenant_id,
         query=request.query,
         filters=filters,
         sort_order=request.sort or SortOrder.CREATED_DESC,
@@ -167,6 +169,52 @@ async def search_documents_advanced(
         results=[
             {
                 "document_id": r.document_id,
+                "id": r.document_id,
+                "filename": r.filename,
+                "status": r.status,
+                "size_bytes": r.size_bytes,
+                "content_type": r.content_type,
+                "created_at": r.created_at,
+                "chunks_count": r.chunks_count,
+                "matches_filters": r.matches_filters,
+            }
+            for r in response.results
+        ],
+    )
+
+
+@router.get("/search", response_model=AdvancedSearchResponse)
+async def search_documents_simple(
+    query: str = Query(..., min_length=1, max_length=1000),
+    tenant_id: str = Depends(get_tenant_id),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+) -> AdvancedSearchResponse:
+    search_request = SearchDocumentsRequest(
+        tenant_id=tenant_id,
+        query=query,
+        filters=SearchFilter(),
+        sort_order=SortOrder.CREATED_DESC,
+        limit=limit,
+        offset=offset,
+    )
+
+    container = get_container()
+    use_case = container.get("search_documents_use_case")
+    if not use_case:
+        raise HTTPException(status_code=501, detail="Search documents use case not configured")
+
+    response = use_case.execute(search_request)
+    return AdvancedSearchResponse(
+        total=response.total,
+        limit=response.limit,
+        offset=response.offset,
+        has_next=response.has_next,
+        has_prev=response.has_prev,
+        results=[
+            {
+                "document_id": r.document_id,
+                "id": r.document_id,
                 "filename": r.filename,
                 "status": r.status,
                 "size_bytes": r.size_bytes,
@@ -205,9 +253,11 @@ async def get_search_facets(
 
     # Get all documents (with reasonable limit for facets)
     search_request = SearchDocumentsRequest(
+        tenant_id=tenant_id,
         query="",  # Empty query to get all
         limit=10000,  # High limit for facets
         offset=0,
+        allow_empty=True,
     )
 
     response = use_case.execute(search_request)

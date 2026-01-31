@@ -12,7 +12,8 @@ from src.core.config import settings
 
 
 async def get_tenant_id(
-    api_key: str = Header(..., alias="X-API-KEY"),
+    api_key: str | None = Header(None, alias="X-API-KEY"),
+    authorization: str | None = Header(None, alias="Authorization"),
 ) -> str:
     """
     Extract tenant_id from API key header.
@@ -27,18 +28,21 @@ async def get_tenant_id(
     
     استخراج معرف المستأجر من رأس مفتاح API
     """
-    if not api_key or len(api_key) < 8:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API key",
-        )
+    token = api_key
+    if not token and authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+
+    if not token or len(token) < 8:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
     
     # In production: look up in database
     # user_lookup_repo.get_user_id_by_api_key(api_key)
     
     # For now, use API key as tenant_id directly
     # This is fine for development/demos
-    return api_key
+    return token
 
 
 def get_api_key_header_name() -> str:

@@ -14,6 +14,10 @@ from src.application.use_cases.register_user import (
     RegisterUserRequest,
     RegisterUserResponse,
 )
+from src.application.use_cases.login_user import (
+    LoginUserUseCase,
+    LoginUserRequest,
+)
 from src.core.bootstrap import get_container
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -85,27 +89,11 @@ async def register_user(
     تسجيل مستخدم جديد
     """
     container = get_container()
+    user_repo = container.get("user_repo")
+    if not user_repo:
+        raise HTTPException(status_code=501, detail="User repository not configured")
 
-    # Check if use case is wired (will be in next step)
-    # For now, implement basic response
-    from src.application.use_cases.register_user import RegisterUserUseCase, SimpleEmailValidator
-    from src.application.ports.user_repo import UserRepoPort
-
-    # Placeholder repo (will be implemented with Postgres)
-    class PlaceholderUserRepo:
-        def create_user(self, *, email: str, hashed_password: str) -> str:
-            import uuid
-
-            return str(uuid.uuid4())
-
-        def email_exists(self, *, email: str) -> bool:
-            return False
-
-    # Create use case
-    use_case = RegisterUserUseCase(
-        user_repo=PlaceholderUserRepo(),
-        email_validator=SimpleEmailValidator(),
-    )
+    use_case = RegisterUserUseCase(user_repo=user_repo)
 
     # Execute registration
     try:
@@ -143,12 +131,26 @@ async def login_user(
 
     تسجيل الدخول للمستخدم
     """
-    # Placeholder implementation
-    # Will be implemented in Step 1.4
-    raise HTTPException(
-        status_code=501,
-        detail="Login endpoint not yet implemented (Step 1.4)",
-    )
+    container = get_container()
+    user_repo = container.get("user_repo")
+    if not user_repo:
+        raise HTTPException(status_code=501, detail="User repository not configured")
+
+    use_case = LoginUserUseCase(user_repo=user_repo)
+    try:
+        result = use_case.execute(
+            LoginUserRequest(email=request.email, password=request.password)
+        )
+        return LoginResponse(
+            access_token=result.access_token,
+            refresh_token=result.refresh_token,
+            token_type="Bearer",
+            expires_in=15 * 60,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 @router.post("/refresh")

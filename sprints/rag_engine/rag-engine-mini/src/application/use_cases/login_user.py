@@ -15,7 +15,7 @@ from src.adapters.security.jwt_provider import get_jwt_provider
 from src.core.config import settings
 
 
-@runtime_checkable
+@dataclass
 class LoginUserRequest:
     """Request data for user login."""
 

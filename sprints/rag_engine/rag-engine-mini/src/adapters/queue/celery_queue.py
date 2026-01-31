@@ -32,6 +32,7 @@ class CeleryTaskQueue:
         *,
         tenant_id: TenantId,
         document_id: DocumentId,
+        **kwargs,
     ) -> str:
         """
         Enqueue document for indexing.
@@ -43,6 +44,7 @@ class CeleryTaskQueue:
             kwargs={
                 "tenant_id": tenant_id.value,
                 "document_id": document_id.value,
+                **kwargs,
             },
             queue="indexing",
         )

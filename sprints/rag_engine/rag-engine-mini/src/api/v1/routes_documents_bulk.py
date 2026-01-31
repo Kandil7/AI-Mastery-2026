@@ -32,6 +32,7 @@ class BulkUploadResponse(BaseModel):
 
     operation_id: str = Field(..., description="Operation ID for tracking")
     total_files: int = Field(..., description="Total files uploaded")
+    uploaded: int = Field(..., description="Alias for total files uploaded")
     succeeded: int = Field(..., description="Successful uploads")
     failed: int = Field(..., description="Failed uploads")
     results: list = Field(..., description="Results for each file")
@@ -65,6 +66,7 @@ class BulkDeleteResponse(BaseModel):
 
 
 @router.post("/bulk-upload", response_model=BulkUploadResponse)
+@router.post("/bulk", response_model=BulkUploadResponse)
 async def bulk_upload_documents(
     files: list[UploadFile] = File(...),
     reason: str = Form(...),
@@ -116,13 +118,15 @@ async def bulk_upload_documents(
                 detail=f"Unsupported file type: {file.content_type}. Allowed: {', '.join(allowed_types)}",
             )
 
-    # Validate file sizes
-    total_size = sum([len(await file.read()) for file in files])
+    # Read file contents once (avoid double reads)
+    raw_contents: list[bytes] = []
+    total_size = 0
+    for file in files:
+        content = await file.read()
+        raw_contents.append(content)
+        total_size += len(content)
     if total_size > 500 * 1024 * 1024:  # 500MB
-        raise HTTPException(
-            status_code=413,
-            detail="Total upload size exceeds 500MB limit",
-        )
+        raise HTTPException(status_code=413, detail="Total upload size exceeds 500MB limit")
 
     # Get use case from container
     container = get_container()
@@ -140,8 +144,7 @@ async def bulk_upload_documents(
     filenames = []
     content_types = []
 
-    for file in files:
-        content = await file.read()
+    for file, content in zip(files, raw_contents):
         file_contents.append(BytesIO(content))
         filenames.append(file.filename)
         content_types.append(file.content_type)
@@ -163,6 +166,7 @@ async def bulk_upload_documents(
     return BulkUploadResponse(
         operation_id=response.operation_id,
         total_files=response.total_files,
+        uploaded=response.total_files,
         succeeded=response.succeeded,
         failed=response.failed,
         results=[
@@ -179,6 +183,7 @@ async def bulk_upload_documents(
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResponse)
+@router.post("/bulk/delete", response_model=BulkDeleteResponse)
 def bulk_delete_documents(
     request: BulkDeleteRequest,
     tenant_id: str = Depends(get_tenant_id),

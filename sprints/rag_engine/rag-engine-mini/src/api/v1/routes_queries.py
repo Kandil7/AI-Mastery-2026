@@ -132,6 +132,30 @@ async def get_query_history(
     return response
 
 
+@router.get("/history")
+async def get_query_history_simple(
+    tenant_id: str = Depends(get_tenant_id),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    """
+    Simple history endpoint for compatibility.
+    """
+    # Placeholder questions list
+    questions = [
+        {"query_id": f"q_{i}", "question": f"Question {i}", "answer": "", "sources": []}
+        for i in range(offset, offset + limit)
+    ]
+    return {
+        "questions": questions,
+        "total": len(questions),
+        "limit": limit,
+        "offset": offset,
+        "has_next": False,
+        "has_prev": offset > 0,
+    }
+
+
 @router.get("/recent")
 async def get_recent_queries(
     tenant_id: str = Depends(get_tenant_id),

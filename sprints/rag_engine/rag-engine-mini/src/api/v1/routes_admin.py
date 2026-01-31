@@ -22,6 +22,14 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin", "monitoring"])
 # ============================================================================
 
 
+class HealthComponent(BaseModel):
+    """Health status for a component."""
+
+    status: str = Field(..., description="Component status (ok, degraded, error)")
+    message: str = Field(..., description="Component message")
+    response_time_ms: int = Field(..., description="Response time")
+
+
 class HealthCheckResponse(BaseModel):
     """Response model for health check."""
 
@@ -29,14 +37,6 @@ class HealthCheckResponse(BaseModel):
     version: str = Field(..., description="Application version")
     timestamp: str = Field(..., description="Current timestamp")
     components: Dict[str, HealthComponent] = Field(..., description="Health components")
-
-
-class HealthComponent(BaseModel):
-    """Health status for a component."""
-
-    status: str = Field(..., description="Component status (ok, degraded, error)")
-    message: str = Field(..., description="Component message")
-    response_time_ms: int = Field(..., description="Response time")
 
 
 class SystemMetricsResponse(BaseModel):

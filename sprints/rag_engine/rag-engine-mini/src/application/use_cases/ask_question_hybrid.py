@@ -216,64 +216,6 @@ class AskQuestionHybridUseCase:
                 API_REQUEST_LATENCY.labels(method="ask", endpoint="/ask").observe(time.time() - start_time)
                 trace.get_current_span().record_exception(e)
                 raise
-        )
-
-        # Step 3: Grade Retrieval & Web Fallback (Stage 5)
-        if self._critique:
-            grade = self._critique.grade_retrieval(request.question, reranked)  # type: ignore
-
-            # Fallback to Web Search if irrelevant and we have a tool
-            if grade == "irrelevant" and self._search:
-                log.info("triggering_web_search", query=request.question)
-                web_results = self._search.search(request.question)  # type: ignore
-
-                # Convert web results to Source Chunks
-                web_chunks = [
-                    Chunk(
-                        id=f"web_{i}",
-                        tenant_id=TenantId("web"),
-                        document_id=None,
-                        text=f"[{r['title']}]({r['url']})\n{r['content']}",
-                    )
-                    for i, r in enumerate(web_results)
-                ]
-                reranked = web_chunks if web_chunks else reranked
-
-            elif grade == "irrelevant" and not request.expand_query:
-                # Try expansion if no web search available
-                reranked = list(
-                    self.execute_retrieval_only(
-                        tenant_id=TenantId(request.tenant_id),
-                        question=request.question,
-                        document_id=request.document_id,
-                        k_vec=request.k_vec,
-                        k_kw=request.k_kw,
-                        fused_limit=request.fused_limit,
-                        rerank_top_n=request.rerank_top_n,
-                        expand_query=True,
-                    )
-                )
-
-        # Step 4: Generation & Hallucination Check
-        prompt = build_rag_prompt(request.question, reranked)
-        answer_text = self._llm.generate(prompt, temperature=0.1)
-
-        if self._critique:
-            grade = self._critique.grade_answer(request.question, answer_text, reranked)  # type: ignore
-
-            if grade == "hallucination":
-                strict_prompt = prompt + "\n\nSTRICT: Answer ONLY using provided facts."
-                answer_text = self._llm.generate(strict_prompt, temperature=0.0)
-
-        # Step 5: Restore Privacy (De-redaction)
-        if self._privacy:
-            answer_text = self._privacy.restore(answer_text)  # type: ignore
-            self._privacy.clear()  # type: ignore
-
-        return Answer(
-            text=answer_text,
-            sources=[c.id for c in reranked],
-        )
 
     def execute_retrieval_only(
         self,
@@ -335,7 +277,7 @@ class AskQuestionHybridUseCase:
                     with self._rag_tracer.trace_vector_search(tenant_id.value, k_vec, 0):
                         vector_results = self._vector.search_scored(
                             query_vector=question_vector,
-                            tenant_id=tenant_id.value,
+                            tenant_id=tenant_id,
                             top_k=k_vec,
                             document_id=document_id,
                         )

@@ -6,7 +6,7 @@ Endpoints for document upload and management.
 نقاط نهاية رفع وإدارة المستندات
 """
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Response
 from pydantic import BaseModel
 
 from src.api.v1.deps import get_tenant_id
@@ -27,11 +27,13 @@ router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 class UploadResponse(BaseModel):
     """Response model for document upload."""
     document_id: str
+    id: str | None = None
     status: str
     message: str = ""
 
 
-@router.post("/upload", response_model=UploadResponse)
+@router.post("", response_model=UploadResponse, status_code=201)
+@router.post("/upload", response_model=UploadResponse, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
     tenant_id: str = Depends(get_tenant_id),
@@ -70,6 +72,7 @@ async def upload_document(
         
         return UploadResponse(
             document_id=result.document_id.value,
+            id=result.document_id.value,
             status=result.status,
             message=result.message,
         )
@@ -158,7 +161,7 @@ async def list_documents(
     }
 
 
-@router.delete("/{document_id}")
+@router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: str,
     tenant_id: str = Depends(get_tenant_id),
@@ -181,4 +184,4 @@ async def delete_document(
     if not success:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    return {"status": "deleted", "document_id": document_id}
+    return Response(status_code=204)
