@@ -30,7 +30,15 @@ def _chunk_hash(text: str) -> str:
     retry_backoff=True,
     retry_kwargs={"max_retries": 5},
 )
-def index_document(self, *, tenant_id: str, document_id: str) -> dict:
+def index_document(
+    self,
+    *,
+    tenant_id: str,
+    document_id: str,
+    force_rechunk: bool = False,
+    force_reembed: bool = False,
+    use_new_strategy: bool = False,
+) -> dict:
     """
     Index a document with Stage 4 features:
     1. Extract Text & Tables (High Precision)

@@ -9,11 +9,12 @@ PostgreSQL implementation of DocumentRepoPort.
 import uuid
 from typing import Sequence
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 
 from src.adapters.persistence.postgres.db import SessionLocal
 from src.adapters.persistence.postgres.models import Document
 from src.domain.entities import DocumentId, DocumentStatus, StoredFile, TenantId
+from src.application.services.document_search import SearchFilter
 
 
 class PostgresDocumentRepo:
@@ -168,3 +169,67 @@ class PostgresDocumentRepo:
                 content_type=doc.content_type,
                 size_bytes=doc.size_bytes,
             )
+
+    def count_documents(
+        self,
+        *,
+        tenant_id: TenantId,
+        filters: SearchFilter | None = None,
+    ) -> int:
+        """Count documents for a tenant with optional filters."""
+        with SessionLocal() as db:
+            stmt = select(func.count()).select_from(Document).where(
+                Document.user_id == tenant_id.value
+            )
+
+            if filters:
+                if filters.status is not None:
+                    stmt = stmt.where(Document.status == filters.status.value)
+                if filters.content_type is not None:
+                    stmt = stmt.where(Document.content_type.ilike(f"%{filters.content_type}%"))
+                if filters.created_after is not None:
+                    stmt = stmt.where(Document.created_at >= filters.created_after)
+                if filters.created_before is not None:
+                    stmt = stmt.where(Document.created_at <= filters.created_before)
+                if filters.min_size is not None:
+                    stmt = stmt.where(Document.size_bytes >= filters.min_size)
+                if filters.max_size is not None:
+                    stmt = stmt.where(Document.size_bytes <= filters.max_size)
+                if filters.filename_contains is not None:
+                    stmt = stmt.where(
+                        Document.filename.ilike(f"%{filters.filename_contains}%")
+                    )
+                if filters.filename_regex is not None:
+                    stmt = stmt.where(Document.filename.op("~")(filters.filename_regex))
+
+            return int(db.execute(stmt).scalar_one() or 0)
+
+    def get_document(
+        self,
+        *,
+        tenant_id: TenantId,
+        document_id: DocumentId,
+    ) -> dict | None:
+        """Get document details by ID."""
+        with SessionLocal() as db:
+            stmt = select(Document).where(
+                Document.id == document_id.value,
+                Document.user_id == tenant_id.value,
+            )
+            doc = db.execute(stmt).scalar_one_or_none()
+            if not doc:
+                return None
+            return {
+                "id": doc.id,
+                "user_id": doc.user_id,
+                "filename": doc.filename,
+                "content_type": doc.content_type,
+                "file_path": doc.file_path,
+                "size_bytes": doc.size_bytes,
+                "file_sha256": doc.file_sha256,
+                "status": doc.status,
+                "error": doc.error,
+                "created_at": doc.created_at,
+                "updated_at": doc.updated_at,
+                "chunks_count": 0,
+            }
