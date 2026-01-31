@@ -37,6 +37,9 @@ from src.application.use_cases.export_use_case import ExportUseCase
 
 # Import the health check service
 from src.application.services.health_check_service import HealthCheckService
+
+# Import the A/B testing service
+from src.application.services.ab_testing_service import ABTestingService
  
 # Note: In production, these would be real implementations
 # For now, we use placeholder adapters for some ports
@@ -241,6 +244,9 @@ def get_container() -> dict:
         llm=llm
     )
     
+    # A/B Testing Service (added)
+    ab_test_service = ABTestingService()
+    
     # i18n Service (Phase 7)
     i18n_service = i18nService()
     
@@ -325,6 +331,7 @@ def get_container() -> dict:
         "export_service": export_service,
         "export_use_case": export_use_case,
         "health_check_service": health_check_service,
+        "ab_test_service": ab_test_service,
 
         # Use cases
         "upload_use_case": upload_use_case,
