@@ -1,20 +1,24 @@
 """
 Webhooks System
-=================
+================
 Service for managing webhooks and event notifications.
 
 نظام إدارة الـ Webhooks والإشعارات
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
-import logging
+import asyncio
+import aiohttp
 import hmac
 import hashlib
 import json
+import logging
+from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 
-log = logging.getLogger(__name__)
+from src.core.logging import get_logger
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -28,7 +32,7 @@ class Webhook:
     user_id: str
     url: str
     events: List[str]
-    secret: str  # HMAC secret for verification
+    secret: str
     active: bool = True
     created_at: str
     last_triggered_at: Optional[str] = None
@@ -60,7 +64,7 @@ class WebhookPayload:
     event: str
     timestamp: str
     data: Dict[str, Any]
-    signature: str  # HMAC signature
+    signature: str
 
 
 class WebhookManager:
@@ -81,13 +85,13 @@ class WebhookManager:
         self._repo = webhook_repo
         self._http = http_client
 
-    def create_webhook(
+    async def create_webhook(
         self,
         user_id: str,
         url: str,
         events: List[str],
         secret: str | None = None,
-    ) -> Webhook:
+    ) -> str:
         """
         Create a new webhook.
 
@@ -98,369 +102,307 @@ class WebhookManager:
             secret: Optional HMAC secret (generate if None)
 
         Returns:
-            Created webhook
+            New webhook ID
 
         إنشاء webhook جديد
         """
         import uuid
 
-        # Generate secret if not provided
-        if secret is None:
-            secret = self._generate_secret()
+        webhook_id = str(uuid.uuid4())
+        created_at = datetime.utcnow().isoformat()
 
-        webhook = Webhook(
-            id=str(uuid.uuid4()),
+        # Generate secret if not provided
+        if not secret:
+            import secrets
+
+            secret = secrets.token_hex(32)
+
+        log.info(
+            "webhook_created",
+            webhook_id=webhook_id,
+            user_id=user_id,
+            events=events,
+        )
+
+        self._repo.create_webhook(
             user_id=user_id,
             url=url,
             events=events,
             secret=secret,
-            active=True,
-            created_at=datetime.utcnow().isoformat(),
-            last_triggered_at=None,
         )
 
-        # Validate webhook URL
-        if not self._validate_webhook_url(url):
-            raise ValueError("Invalid webhook URL")
+        return webhook_id
 
-        # Validate events
-        invalid_events = [e for e in events if e not in self._get_all_events()]
-        if invalid_events:
-            raise ValueError(f"Invalid events: {invalid_events}")
-
-        # Store webhook
-        self._repo.create(webhook)
-
-        log.info("Webhook created", webhook_id=webhook.id, url=url, events=events)
-
-        return webhook
-
-    def get_webhooks(self, user_id: str) -> List[Webhook]:
-        """Get all webhooks for a user."""
-        return self._repo.find_by_user_id(user_id)
-
-    def delete_webhook(self, webhook_id: str, user_id: str) -> bool:
+    def delete_webhook(
+        self,
+        webhook_id: str,
+        user_id: str,
+    ) -> bool:
         """
         Delete a webhook.
 
         Args:
             webhook_id: Webhook ID
-            user_id: User ID for authorization
+            user_id: User ID (for authorization)
 
         Returns:
-            True if deleted
+            True if deleted, False if not found
 
         حذف webhook
         """
-        webhook = self._repo.find_by_id(webhook_id)
-
-        if not webhook:
-            raise ValueError(f"Webhook {webhook_id} not found")
-
-        if webhook.user_id != user_id:
-            raise PermissionError("Access denied: Webhook belongs to another user")
-
-        self._repo.delete(webhook_id)
-
-        log.info("Webhook deleted", webhook_id=webhook_id)
-        return True
-
-    def trigger_event(
-        self,
-        event: str,
-        data: Dict[str, Any],
-        user_id: Optional[str] = None,
-    ) -> int:
-        """
-        Trigger an event to all subscribed webhooks.
-
-        Args:
-            event: Event type
-            data: Event payload data
-            user_id: Optional user ID for filtering
-
-        Returns:
-            Number of webhooks triggered
-
-        تشغيل حدث وإرسال للـ Webhooks المشتركة
-        """
-        # Get webhooks to trigger
-        if user_id:
-            webhooks = self._repo.find_by_user_id_and_event(user_id, event)
-        else:
-            webhooks = self._repo.find_by_event(event)
-
-        # Filter active webhooks
-        active_webhooks = [w for w in webhooks if w.active and event in w.events]
-
-        if not active_webhooks:
-            log.debug("No active webhooks for event", event=event)
-            return 0
-
-        # Build payload
-        timestamp = datetime.utcnow().isoformat()
-        payload = WebhookPayload(
-            event=event,
-            timestamp=timestamp,
-            data=data,
-            signature="",  # Will be set per webhook
+        log.info(
+            "webhook_deleted",
+            webhook_id=webhook_id,
+            user_id=user_id,
         )
 
-        # Deliver to each webhook
-        success_count = 0
-        for webhook in active_webhooks:
-            try:
-                # Generate signature for this webhook
-                payload.signature = self._generate_signature(
-                    json.dumps(
-                        {"event": event, "timestamp": timestamp, "data": data}, sort_keys=True
-                    ),
-                    webhook.secret,
-                )
+        return self._repo.delete_webhook(webhook_id, user_id)
 
-                # Send webhook
-                response = self._http.post(
+    async def trigger_event(
+        self,
+        user_id: str,
+        event_type: str,
+        event_data: Dict[str, Any],
+    ) -> List[bool]:
+        """
+        Trigger event to all matching webhooks.
+
+        Args:
+            user_id: User ID for filtering
+            event_type: Event type (e.g., "document.uploaded")
+            event_data: Event-specific data
+
+        Returns:
+            List of delivery results (True=success, False=failed)
+
+        تشغيل حدث لجميع الـ Webhooks المتطابقة
+        """
+        # Find matching webhooks
+        webhooks = self._repo.find_by_event(user_id, event_type)
+
+        if not webhooks:
+            log.debug(
+                "no_webhooks",
+                user_id=user_id,
+                event=event_type,
+            )
+            return []
+
+        # Prepare payload for each webhook
+        payloads = []
+        for webhook in webhooks:
+            if not webhook.active:
+                log.debug("webhook_inactive", webhook_id=webhook.id)
+                continue
+
+            payload = WebhookPayload(
+                event=event_type,
+                timestamp=datetime.utcnow().isoformat(),
+                data=event_data,
+                signature=self._generate_signature(
+                    webhook.secret,
+                    event_type,
+                    event_data,
+                ),
+            )
+            payloads.append(payload)
+
+        # Deliver all webhooks
+        results = []
+        for webhook, payload in zip(webhooks, payloads):
+            success = await self.deliver_webhook(webhook, payload)
+
+            # Update webhook status
+            self._repo.update_last_triggered(
+                webhook.id,
+                triggered_at=datetime.utcnow().isoformat(),
+            )
+
+            # Log delivery
+            log.info(
+                "webhook_triggered",
+                webhook_id=webhook.id,
+                event=event_type,
+                success=success,
+            )
+
+            results.append(success)
+
+        return results
+
+    async def deliver_webhook(
+        self,
+        webhook: Webhook,
+        payload: WebhookPayload,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> bool:
+        """
+        Deliver webhook with retry logic.
+
+        Args:
+            webhook: Webhook configuration
+            payload: Payload to send
+            max_retries: Maximum retry attempts (default: 3)
+            retry_delay: Initial delay in seconds (default: 1.0)
+
+        Returns:
+            True if delivery succeeded, False otherwise
+
+        تسليم webhook مع منطق إعادة المحاولة
+        """
+        retry_count = 0
+        delay = retry_delay
+
+        while retry_count <= max_retries:
+            try:
+                # Send HTTP POST
+                async with self._http.post(
                     webhook.url,
-                    json=payload.__dict__,
+                    json={
+                        "event": payload.event,
+                        "timestamp": payload.timestamp,
+                        "data": payload.data,
+                    },
                     headers={
                         "Content-Type": "application/json",
-                        "X-RAG-Webhook-Signature": payload.signature,
-                        "X-RAG-Webhook-Event": event,
-                        "X-RAG-Webhook-Timestamp": timestamp,
+                        "X-Webhook-Signature": payload.signature,
+                        "User-Agent": "RAG-Engine/1.0",
                     },
-                    timeout=5,  # 5 second timeout
-                )
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    # Check status code
+                    if 200 <= response.status < 300:
+                        log.info(
+                            "webhook_delivered",
+                            webhook_id=webhook.id,
+                            event=payload.event,
+                            retry_count=retry_count,
+                            status_code=response.status,
+                        )
+                        return True
+                    else:
+                        # Non-2xx status, retry
+                        log.warning(
+                            "webhook_retry",
+                            webhook_id=webhook.id,
+                            event=payload.event,
+                            retry_count=retry_count,
+                            status_code=response.status,
+                        )
+                        raise aiohttp.ClientResponseError(
+                            status=response.status, message=f"HTTP {response.status}"
+                        )
 
-                response.raise_for_status()
-
-                # Update last triggered timestamp
-                self._repo.update_last_triggered(webhook.id, timestamp)
-
-                success_count += 1
-                log.info("Webhook delivered", webhook_id=webhook.id, event=event)
-
-            except Exception as e:
-                log.error(
-                    "Webhook delivery failed",
+            except asyncio.TimeoutError:
+                log.warning(
+                    "webhook_timeout",
                     webhook_id=webhook.id,
-                    event=event,
+                    event=payload.event,
+                    retry_count=retry_count,
+                )
+            except aiohttp.ClientError as e:
+                log.error(
+                    "webhook_delivery_error",
+                    webhook_id=webhook.id,
+                    event=payload.event,
+                    retry_count=retry_count,
                     error=str(e),
                 )
 
-        return success_count
+            # Increment retry count
+            retry_count += 1
 
-    def test_webhook(self, webhook_id: str, user_id: str) -> Dict[str, Any]:
-        """
-        Test a webhook delivery (ping event).
+            # Exponential backoff with jitter
+            if retry_count <= max_retries:
+                import random
 
-        Args:
-            webhook_id: Webhook ID
-            user_id: User ID for authorization
+                jitter_factor = 0.1
+                jitter = delay * jitter_factor
+                actual_delay = delay * (2 ** (retry_count - 1)) + random.uniform(-jitter, jitter)
 
-        Returns:
-            Test result with response info
+                log.info(
+                    "webhook_retry_delay",
+                    webhook_id=webhook.id,
+                    event=payload.event,
+                    retry_count=retry_count,
+                    delay=actual_delay,
+                )
 
-        اختبار توصيل webhook
-        """
-        webhook = self._repo.find_by_id(webhook_id)
+                await asyncio.sleep(actual_delay)
 
-        if not webhook:
-            raise ValueError(f"Webhook {webhook_id} not found")
-
-        if webhook.user_id != user_id:
-            raise PermissionError("Access denied: Webhook belongs to another user")
-
-        # Create test payload
-        test_data = {
-            "test": True,
-            "webhook_id": webhook_id,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-
-        # Generate signature
-        signature = self._generate_signature(
-            json.dumps({"event": "ping", "data": test_data}, sort_keys=True),
-            webhook.secret,
+        # All retries failed
+        log.error(
+            "webhook_failed",
+            webhook_id=webhook.id,
+            event=payload.event,
+            max_retries=max_retries,
         )
+        return False
 
-        # Send test request
-        try:
-            response = self._http.post(
-                webhook.url,
-                json={
-                    "event": "ping",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "data": test_data,
-                    "signature": signature,
-                },
-                headers={
-                    "Content-Type": "application/json",
-                    "X-RAG-Webhook-Signature": signature,
-                },
-                timeout=10,
-            )
-
-            result = {
-                "success": response.status_code in [200, 201, 202, 204],
-                "status_code": response.status_code,
-                "response_text": response.text,
-            }
-
-            log.info("Webhook test completed", webhook_id=webhook.id, result=result)
-            return result
-
-        except Exception as e:
-            log.error("Webhook test failed", webhook_id=webhook_id, error=str(e))
-            return {
-                "success": False,
-                "error": str(e),
-            }
-
-    def verify_webhook_signature(
+    def _generate_signature(
         self,
-        payload: str | bytes,
-        signature: str,
         secret: str,
-    ) -> bool:
+        event_type: str,
+        data: Dict[str, Any],
+    ) -> str:
         """
-        Verify webhook signature.
+        Generate HMAC signature.
 
         Args:
-            payload: Original payload (string or bytes)
-            signature: Received signature
             secret: Webhook secret
+            event_type: Event type
+            data: Event data
 
         Returns:
-            True if signature is valid
+            Hex-encoded HMAC signature
 
-        التحقق من توقيع webhook
+        توليد توقيع HMAC
         """
-        expected_signature = self._generate_signature(payload, secret)
-        return hmac.compare_digest(expected_signature, signature)
-
-    def _generate_signature(self, payload: str | bytes, secret: str) -> str:
-        """Generate HMAC signature."""
-        if isinstance(payload, bytes):
-            payload_bytes = payload
-        else:
-            payload_bytes = payload.encode("utf-8")
-
-        hmac_obj = hmac.new(
-            secret.encode("utf-8"),
-            hashlib.sha256,
+        payload_str = json.dumps(
+            {
+                "event": event_type,
+                "data": data,
+            },
+            sort_keys=True,
         )
-        signature = hmac_obj.hexdigest(payload_bytes)
+
+        signature = hmac.new(
+            secret.encode(),
+            payload_str.encode(),
+            hashlib.sha256,
+        ).hexdigest()
 
         return signature
 
-    def _generate_secret(self) -> str:
-        """Generate random webhook secret."""
-        import secrets
-        import string
+    @staticmethod
+    def verify_signature(
+        secret: str,
+        received_payload: Dict[str, Any],
+        received_signature: str,
+    ) -> bool:
+        """
+        Verify HMAC signature.
 
-        alphabet = string.ascii_letters + string.digits
-        secret = "".join(secrets.choice(alphabet) for _ in range(64))
+        Args:
+            secret: Webhook secret
+            received_payload: Payload data
+            received_signature: Received signature
 
-        return secret
+        Returns:
+            True if signature matches, False otherwise
 
-    def _get_all_events(self) -> List[str]:
-        """Get all available event types."""
-        return [
-            WebhookEvent.DOCUMENT_UPLOADED,
-            WebhookEvent.DOCUMENT_DELETED,
-            WebhookEvent.DOCUMENT_INDEXED,
-            WebhookEvent.DOCUMENT_FAILED,
-            WebhookEvent.CHAT_TURN_CREATED,
-            WebhookEvent.CHAT_SESSION_SUMMARIZED,
-            WebhookEvent.ERROR_OCCURRED,
-        ]
+        التحقق من صحة توقيع HMAC
+        """
+        # Compute expected signature
+        payload_str = json.dumps(received_payload, sort_keys=True)
+        expected_signature = hmac.new(
+            secret.encode(),
+            payload_str.encode(),
+            hashlib.sha256,
+        ).hexdigest()
 
-    def _validate_webhook_url(self, url: str) -> bool:
-        """Validate webhook URL."""
-        import re
+        # Constant-time comparison
+        from hmac import compare_digest
 
-        # Check for HTTP/HTTPS
-        if not url.startswith(("http://", "https://")):
-            return False
-
-        # Check for localhost in production
-        if "localhost" in url or "127.0.0.1" in url:
-            return False
-
-        return True
-
-
-# -----------------------------------------------------------------------------
-# Webhook Repository Interface (placeholder)
-# -----------------------------------------------------------------------------
-
-
-class WebhookRepository:
-    """
-    Interface for webhook persistence.
-
-    واجهة استمرار webhook
-    """
-
-    def create(self, webhook: Webhook) -> str:
-        """Create a webhook. Returns ID."""
-        raise NotImplementedError()
-
-    def find_by_id(self, webhook_id: str) -> Optional[Webhook]:
-        """Find webhook by ID."""
-        raise NotImplementedError()
-
-    def find_by_user_id(self, user_id: str) -> List[Webhook]:
-        """Find all webhooks for user."""
-        raise NotImplementedError()
-
-    def find_by_user_id_and_event(
-        self,
-        user_id: str,
-        event: str,
-    ) -> List[Webhook]:
-        """Find webhooks for user subscribed to event."""
-        raise NotImplementedError()
-
-    def find_by_event(self, event: str) -> List[Webhook]:
-        """Find all webhooks subscribed to event."""
-        raise NotImplementedError()
-
-    def update_last_triggered(self, webhook_id: str, timestamp: str) -> bool:
-        """Update last triggered timestamp."""
-        raise NotImplementedError()
-
-    def delete(self, webhook_id: str) -> bool:
-        """Delete a webhook."""
-        raise NotImplementedError()
-
-
-if __name__ == "__main__":
-    from unittest.mock import Mock
-
-    # Test webhook manager
-    repo = Mock()
-    http = Mock()
-
-    manager = WebhookManager(repo, http)
-
-    # Test webhook creation
-    webhook = manager.create_webhook(
-        user_id="user-123",
-        url="https://example.com/webhook",
-        events=[WebhookEvent.DOCUMENT_UPLOADED, WebhookEvent.DOCUMENT_INDEXED],
-    )
-    print(f"Created webhook: {webhook.id}")
-
-    # Test event triggering
-    http.post.return_value.status_code = 200
-    manager.trigger_event(
-        WebhookEvent.DOCUMENT_UPLOADED,
-        {"document_id": "doc-456", "filename": "test.pdf"},
-        user_id="user-123",
-    )
-
-    # Test signature verification
-    signature = manager._generate_signature('{"test": "data"}', "secret123")
-    is_valid = manager.verify_webhook_signature('{"test": "data"}', signature, "secret123")
-    print(f"Signature valid: {is_valid}")
+        return compare_digest(expected_signature.encode(), received_signature.encode())
