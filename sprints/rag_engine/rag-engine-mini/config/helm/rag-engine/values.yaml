@@ -1,0 +1,146 @@
+apiVersion: v2
+name: rag-engine
+description: RAG Engine - Retrieval-Augmented Generation system
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - rag
+  - retrieval
+  - llm
+  - vector-database
+  - ai
+  - search
+maintainers:
+  - name: RAG Engine Team
+    email: support@rag-engine.com
+sources:
+  - https://github.com/rag-engine/rag-engine
+
+dependencies: []
+
+# Configuration
+# Default configuration values
+# Default configuration values for RAG Engine deployment
+# القيم الافتراضية لنشر محرك RAG
+commonLabels:
+  app.kubernetes.io/name: rag-engine
+  app.kubernetes.io/instance: rag-engine
+  app.kubernetes.io/version: v1.0.0
+  app.kubernetes.io/component: core
+  app.kubernetes.io/managed-by: helm
+
+# Main configuration section for core application
+# قسم التكوين الرئيسي للتطبيق الأساسي
+config:
+  # Image configuration
+  # تكوين الصورة
+  image:
+    repository: rag-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Replica count
+  # عدد النسخ المكررة
+  replicaCount: 3
+  
+  # Resource limits and requests
+  # حدود وموارد الموارد
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # Autoscaling configuration
+  # تكوين التوسيع التلقائي
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  # Service configuration
+  # تكوين الخدمة
+  service:
+    type: ClusterIP
+    port: 8000
+  
+  # Ingress configuration
+  # تكوين الدخول
+  ingress:
+    enabled: true
+    className: nginx
+    host: rag-engine.example.com
+    tls: true
+  
+  # Persistence configuration
+  # تكوين الاستمرار
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 10Gi
+    accessMode: ReadWriteOnce
+    mountPath: /app/uploads
+  
+  # PostgreSQL configuration
+  # تكوين PostgreSQL
+  postgresql:
+    enabled: true
+    host: postgres-postgresql.rag-engine.svc.cluster.local
+    port: 5432
+    database: ragdb
+    username: postgres
+    password: postgres
+    maxConnections: 100
+  
+  # Redis configuration
+  # تكوين Redis
+  redis:
+    enabled: true
+    host: redis-master.rag-engine.svc.cluster.local
+    port: 6379
+  
+  # Qdrant configuration
+  # تكوين Qdrant
+  qdrant:
+    enabled: true
+    host: qdrant.rag-engine.svc.cluster.local
+    port: 6333
+  
+  # LLM configuration
+  # تكوين نموذج اللغة
+  llm:
+    backend: openai
+    model: gpt-4o-mini
+    maxTokens: 700
+    temperature: 0.2
+    timeout: 30
+
+# Configuration for development environment
+# تكوين بيئة التطوير
+config-dev:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    postgresql:
+      host: postgres-dev.rag-engine.svc.cluster.local
+      maxConnections: 20
+
+# Configuration for production environment
+# تكوين بيئة الإنتاج
+config-prod:
+  replicaCount: 5
+  persistence:
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+  postgresql:
+      maxConnections: 200

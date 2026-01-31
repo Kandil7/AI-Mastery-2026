@@ -1,0 +1,229 @@
+# RAG Engine Helm Chart Notes
+# ملاحظات مخطط Helm لمحرك RAG
+
+## Quick Start / البدء السريع
+
+```bash
+# Install the chart
+helm install rag-engine ./config/helm/rag-engine --namespace rag-engine
+
+# Upgrade the chart
+helm upgrade rag-engine ./config/helm/rag-engine --namespace rag-engine
+```
+
+## Configuration / التكوين
+
+The following values can be customized during installation:
+
+### Image Configuration / تكوين الصورة
+- `image.repository`: Docker image repository (default: rag-engine)
+- `image.tag`: Image tag (default: latest)
+
+### Replica Configuration / تكوين النسخ
+- `replicaCount`: Number of pod replicas (default: 3)
+- `autoscaling.enabled`: Enable horizontal pod autoscaler (default: true)
+- `autoscaling.minReplicas`: Minimum replicas (default: 2)
+- `autoscaling.maxReplicas`: Maximum replicas (default: 10)
+
+### Resource Configuration / تكوين الموارد
+- `resources.requests.cpu`: CPU request (default: 500m)
+- `resources.requests.memory`: Memory request (default: 1Gi)
+- `resources.limits.cpu`: CPU limit (default: 1000m)
+- `resources.limits.memory`: Memory limit (default: 2Gi)
+
+### Service Configuration / تكوين الخدمة
+- `service.type`: Service type - ClusterIP, NodePort, or LoadBalancer (default: ClusterIP)
+- `service.port`: Service port (default: 8000)
+
+### Ingress Configuration / تكوين الدخول
+- `ingress.enabled`: Enable ingress (default: true)
+- `ingress.host`: Ingress host (default: rag-engine.example.com)
+- `ingress.className`: Ingress controller (default: nginx)
+- `ingress.tls`: Enable TLS (default: true)
+
+### Persistence Configuration / تكوين الاستمرار
+- `persistence.enabled`: Enable PVC (default: true)
+- `persistence.storageClass`: Storage class (default: standard)
+- `persistence.size`: Storage size (default: 10Gi)
+- `persistence.mountPath`: Mount path (default: /app/uploads)
+
+### Database Configuration / تكوين قاعدة البيانات
+- `postgresql.enabled`: Enable PostgreSQL (default: true)
+- `postgresql.host`: PostgreSQL host
+- `postgresql.port`: PostgreSQL port (default: 5432)
+- `postgresql.database`: Database name (default: ragdb)
+- `postgresql.username`: Database username (default: postgres)
+- `postgresql.password`: Database password
+- `postgresql.maxConnections`: Max connections (default: 100)
+
+### Redis Configuration / تكوين Redis
+- `redis.enabled`: Enable Redis (default: true)
+- `redis.host`: Redis host (default: redis-master.rag-engine.svc.cluster.local)
+- `redis.port`: Redis port (default: 6379)
+
+### Qdrant Configuration / تكوين Qdrant
+- `qdrant.enabled`: Enable Qdrant (default: true)
+- `qdrant.host`: Qdrant host (default: qdrant.rag-engine.svc.cluster.local)
+- `qdrant.port`: Qdrant port (default: 6333)
+
+### LLM Configuration / تكوين نموذج اللغة
+- `llm.backend`: LLM backend - openai, gemini, huggingface, ollama (default: openai)
+- `llm.model`: LLM model (default: gpt-4o-mini)
+- `llm.maxTokens`: Max tokens (default: 700)
+- `llm.temperature`: Sampling temperature (default: 0.2)
+- `llm.timeout`: Request timeout in seconds (default: 30)
+
+## Secrets / الأسرار
+
+The following secrets must be created before installation:
+
+```bash
+kubectl create secret generic rag-engine-secrets \
+  --from-literal=database-url="postgresql://user:pass@postgres:5432/rag" \
+  --from-literal=redis-url="redis://redis-master.rag-engine.svc.cluster.local:6379/0" \
+  --from-literal=qdrant-host="qdrant" \
+  --from-literal=qdrant-port="6333" \
+  --from-literal=openai-api-key="sk-..." \
+  --from-literal=jwt-secret-key="jwt-secret-here" \
+  --namespace=rag-engine
+```
+
+## Port Forwarding / توجيه المنافذ
+
+```bash
+# Forward local port 8000 to pod
+kubectl port-forward svc/rag-engine-service 8000:8000 --namespace=rag-engine
+
+# Access FastAPI UI
+kubectl port-forward svc/rag-engine-service 8000:8000 --namespace=rag-engine
+```
+
+Access the application at: http://localhost:8000
+
+## Health Checks / فحوص الصحة
+
+The following health endpoints are available:
+
+- `/health` - Basic health check
+- `/health/ready` - Readiness check with dependency validation
+- `/health/deep` - Deep health check with detailed diagnostics
+
+```bash
+# Check pod status
+kubectl get pods -n rag-engine
+
+# Check logs
+kubectl logs -n rag-engine -l rag-engine
+```
+
+## Scaling / التوسيع
+
+### Horizontal Pod Autoscaling (HPA)
+
+The deployment includes an HPA resource that automatically scales based on CPU utilization:
+
+- **Scale down** when CPU < 70%
+- **Scale up** when CPU > 70%
+- **Min replicas**: 2
+- **Max replicas**: 10
+
+To check HPA status:
+```bash
+kubectl get hpa rag-engine-hpa -n rag-engine
+```
+
+### Vertical Scaling
+
+To manually scale the deployment:
+```bash
+# Scale to 5 replicas
+kubectl scale deployment rag-engine --replicas=5 --namespace=rag-engine
+
+# Scale to 3 replicas
+kubectl scale deployment rag-engine --replicas=3 --namespace=rag-engine
+```
+
+## Uninstallation / الإلغاء
+
+To uninstall the Helm release:
+```bash
+helm uninstall rag-engine --namespace rag-engine
+```
+
+## Troubleshooting / استكشاف الأخطاء
+
+### Pod not starting / لم تبدأ الحاوية
+
+Check pod logs:
+```bash
+kubectl logs -n rag-engine -l rag-engine
+```
+
+Check pod events:
+```bash
+kubectl describe pod -n rag-engine <pod-name> --namespace=rag-engine
+```
+
+### Failed health checks / فشل فحوص الصحة
+
+If health checks fail:
+1. Check ConfigMap and Secret names are correct
+2. Verify environment variables match secrets
+3. Check service endpoints are accessible
+4. Review application logs for startup errors
+
+## Production Considerations / اعتبارات الإنتاج
+
+### Resource Sizing / أحجام الموارد
+
+- Start with recommended values
+- Monitor resource usage with:
+  ```bash
+  kubectl top pods -n rag-engine
+  ```
+- Adjust based on actual usage patterns
+- Consider using node affinity for database pods
+
+### High Availability / التوفر العالي
+
+- Use minimum 2 replicas for fault tolerance
+- Enable Pod Disruption Budget with `minAvailable: 1`
+- Configure liveness and readiness probes
+- Set appropriate `terminationGracePeriodSeconds` (30s for graceful shutdown)
+
+### Backup Strategy / إستراتيجية النسخ الاحتياطي
+
+- Database: Regular PostgreSQL backups using WAL archiving
+- Storage: Volume snapshots or external backup solutions
+- ConfigMap: Version control for configuration changes
+
+### Monitoring / المراقبة
+
+The application exposes Prometheus metrics at `/metrics` endpoint:
+```bash
+# Create ServiceMonitor and PodMonitor for metrics collection
+# Configure Prometheus to scrape metrics
+```
+
+### Security / الأمان
+
+- Use Kubernetes Secrets for all sensitive data
+- Enable RBAC with proper role definitions
+- Use NetworkPolicy to restrict pod-to-pod communication
+- Enable PodSecurityContext (if cluster supports it)
+- Use TLS for Ingress
+- Regular security updates for image vulnerabilities
+
+### Performance Optimization / تحسين الأداء
+
+- Use init containers for database migrations
+- Configure appropriate resource requests/limits
+- Enable readiness probes to avoid slow rollouts
+- Use efficient probe intervals (avoid thundering herd)
+
+## Support / الدعم
+
+For issues and support:
+- GitHub: https://github.com/rag-engine/rag-engine/issues
+- Email: support@rag-engine.com
+- Documentation: https://docs.rag-engine.com

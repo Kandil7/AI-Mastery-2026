@@ -1,0 +1,33 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rag-engine-hpa
+  namespace: rag-engine
+  labels:
+    app: rag-engine
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rag-engine
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+    target:
+      type: AverageValue
+      averageValue: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
