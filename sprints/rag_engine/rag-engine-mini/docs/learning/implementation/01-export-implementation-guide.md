@@ -168,7 +168,7 @@ export_use_case = ExportUseCase(export_service=export_service)
 return {
     # ... other services
     "export_service": export_service,
-    "export_use_case": export_use_case,
+    "export_case": export_use_case,
 }
 ```
 
@@ -213,6 +213,36 @@ The export functionality includes comprehensive tests in `tests/unit/test_export
 3. **Caching**: Frequently accessed data is cached
 4. **Resource Limits**: Prevents excessive resource consumption
 
+## Multi-Layer Caching Integration
+
+To enhance performance of the export functionality, a multi-layer caching system has been implemented with three tiers:
+
+### L1: Memory Cache
+- **Purpose**: Fastest access for frequently exported data
+- **Technology**: Python dictionary with size limits
+- **Characteristics**: 
+  - Sub-millisecond access times
+  - Limited by available memory
+  - LRU-style eviction policy for export previews
+
+### L2: Redis Cache
+- **Purpose**: Shared cache for export metadata across application instances
+- **Technology**: Redis server
+- **Characteristics**:
+  - Millisecond access times
+  - Shared across multiple processes/servers
+  - Persistence options available for export job states
+
+### L3: Persistent Cache
+- **Purpose**: Long-term storage for export job results and metadata
+- **Technology**: Database or file system
+- **Characteristics**:
+  - Slower access times but reliable
+  - Survives application restarts
+  - Suitable for infrequently accessed export results
+
+The caching system automatically promotes frequently accessed export previews and job metadata up the hierarchy, improving response times for repeated requests.
+
 ## Educational Value
 
 This implementation demonstrates:
@@ -223,10 +253,12 @@ This implementation demonstrates:
 4. **API Design**: RESTful endpoint design
 5. **Async Programming**: Non-blocking operations
 6. **Error Handling**: Comprehensive error management
-7. **Testing**: Thorough test coverage
+7. **Performance Optimization**: Multi-layer caching strategies
+8. **Resource Management**: Memory and size constraints
+9. **Testing**: Thorough test coverage
 
 ## Conclusion
 
 The export functionality completes a critical feature that was marked as pending in the project completion checklist. It follows the same architectural patterns as the rest of the RAG Engine Mini, ensuring consistency and maintainability. The implementation provides a solid foundation for users to export their data in multiple formats while maintaining security and performance standards.
 
-This addition brings the RAG Engine Mini closer to full completion, providing users with a comprehensive solution for their RAG needs including data export capabilities.
+The integration of multi-layer caching ensures that frequently accessed export data and job states are served efficiently, reducing redundant computation and improving user experience. This addition brings the RAG Engine Mini closer to full completion, providing users with a comprehensive solution for their RAG needs including data export capabilities.
