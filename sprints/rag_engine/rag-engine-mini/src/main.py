@@ -23,6 +23,7 @@ from src.api.v1.routes_documents_search import router as documents_search_router
 from src.api.v1.routes_documents_bulk import router as documents_bulk_router
 from src.api.v1.routes_auth import router as auth_router
 from src.api.v1.routes_admin import router as admin_router
+from src.api.v1.routes_export import router as export_router
 from src.api.v1.graphql import schema as graphql_schema
 from strawberry.fastapi import GraphQLRouter
 from src.application.services.event_manager import get_event_manager
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(ask_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(export_router)
 
     # Include GraphQL with context injection
     async def get_graphql_context(request):
