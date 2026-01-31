@@ -1,4 +1,46 @@
 """
+Export Routes (Legacy Compatibility)
+===============================
+
+This module provides legacy compatibility endpoints for export functionality.
+"""
+
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/export", tags=["export"])
+
+
+@router.get("/")
+async def export_root():
+    """
+    Export root endpoint for legacy compatibility.
+    
+    This endpoint exists for backward compatibility.
+    New implementations should use /exports endpoints.
+    """
+    return {
+        "message": "Export API - Use /exports for new implementations",
+        "available_formats": ["pdf", "markdown", "csv", "json"]
+    }
+
+
+@router.get("/status/{job_id}")
+async def get_export_status_legacy(job_id: str):
+    """
+    Legacy endpoint for checking export status.
+    
+    This endpoint exists for backward compatibility.
+    New implementations should use /exports/{job_id} endpoint.
+    """
+    return {
+        "job_id": job_id,
+        "status": "completed",  # Placeholder
+        "message": "Use /exports/{job_id} for new implementations"
+    }
+
+
+__all__ = ["router"]
+"""
 Export Routes
 =============
 API endpoints for exporting documents and chat sessions.

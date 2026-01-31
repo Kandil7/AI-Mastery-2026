@@ -12,20 +12,6 @@ from qdrant_client import QdrantClient
 
 from src.core.config import settings
 
-
-@lru_cache(maxsize=1)
-def get_container() -> dict:
-    """
-    Build and cache the DI container.
-    
-    This is the single place where all adapters are instantiated
-    and wired to their corresponding ports.
-    
-    Design Decision: Using a simple dict as container for clarity.
-    For larger projects, consider dependency-injector or similar.
-    
-    هذا هو المكان الوحيد لإنشاء وربط المحولات
-    """
 from src.adapters.llm.openai_llm import OpenAILLM
 from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
 from src.adapters.vector.qdrant_store import QdrantVectorStore
@@ -44,9 +30,30 @@ from src.application.use_cases.search_documents import SearchDocumentsUseCase
 from src.application.use_cases.bulk_operations import BulkOperationsUseCase
 from src.application.use_cases.reindex_document import ReindexDocumentUseCase
 from src.application.services.i18n import i18nService
+
+# Import the export service and use case
+from src.application.services.export_service import ExportService
+from src.application.use_cases.export_use_case import ExportUseCase
+
+# Import the health check service
+from src.application.services.health_check_service import HealthCheckService
+ 
+# Note: In production, these would be real implementations
+# For now, we use placeholder adapters for some ports
+
+@lru_cache(maxsize=1)
+def get_container() -> dict:
+    """
+    Build and cache the DI container.
     
-    # Note: In production, these would be real implementations
-    # For now, we use placeholder adapters for some ports
+    This is the single place where all adapters are instantiated
+    and wired to their corresponding ports.
+    
+    Design Decision: Using a simple dict as container for clarity.
+    For larger projects, consider dependency-injector or similar.
+    
+    هذا هو المكان الوحيد لإنشاء وربط المحولات
+    """
     
     # =========================================================================
     # Infrastructure adapters
@@ -220,6 +227,23 @@ from src.application.services.i18n import i18nService
     privacy_guard = PrivacyGuardService()
     search_tool = TavilySearchAdapter(api_key=settings.tavily_api_key or "")
     
+    # Export Service (added)
+    export_service = ExportService(
+        document_repo=document_repo
+    )
+    export_use_case = ExportUseCase(export_service=export_service)
+    
+    # Health Check Service (added)
+    health_check_service = HealthCheckService(
+        document_repo=document_repo,
+        cache=cache,
+        vector_store=vector_store,
+        llm=llm
+    )
+    
+    # i18n Service (Phase 7)
+    i18n_service = i18nService()
+    
     # =========================================================================
     # Use cases
     # =========================================================================
@@ -297,18 +321,17 @@ from src.application.services.i18n import i18nService
         "vision_service": vision_service,
         "router": semantic_router,
         "privacy": privacy_guard,
-        
-    # i18n Service (Phase 7)
-    from src.application.services.i18n import i18nService
+        "i18n_service": i18n_service,
+        "export_service": export_service,
+        "export_use_case": export_use_case,
+        "health_check_service": health_check_service,
 
-    i18n_service = i18nService()
-
-    # Use cases
-    "upload_use_case": upload_use_case,
-    "ask_hybrid_use_case": ask_hybrid_use_case,
-    "search_documents_use_case": search_documents_use_case,
-    "bulk_operations_use_case": bulk_operations_use_case,
-    "reindex_document_use_case": reindex_document_use_case,
+        # Use cases
+        "upload_use_case": upload_use_case,
+        "ask_hybrid_use_case": ask_hybrid_use_case,
+        "search_documents_use_case": search_documents_use_case,
+        "bulk_operations_use_case": bulk_operations_use_case,
+        "reindex_document_use_case": reindex_document_use_case,
     }
 
 
