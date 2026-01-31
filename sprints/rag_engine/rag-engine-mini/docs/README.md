@@ -34,54 +34,61 @@ For those who want to understand the "Why" behind the architecture:
 - [**Agentic RAG Workflows**](./notebooks/11_agentic_rag_workflows.ipynb): **[PINNACLE]** Autonomous ReAct planning.
 - [**Synthetic Data Flywheel**](./notebooks/12_synthetic_data_flywheel.ipynb): **[LEGEND]** Self-improving evaluation datasets.
 - [**Advanced Evaluation (RAGAS)**](./scripts/evaluate_ragas.py): Evaluating RAG pipelines with RAGAS.
-- [**Scaling RAG Pipes**](deep-dives/scaling-rag-pipelines.md): Async workers, Caching, and Redis.
+- [**Scaling RAG Pipes**](deep-dives/scaling-rag-pipes.md): Async workers, Caching, and Redis.
 - [**LLM-as-a-Judge**](deep-dives/llm-as-a-judge.md): Verification and Grounding.
 - [**Common RAG Pitfalls**](deep-dives/common-rag-pitfalls.md): Troubleshooting common failures.
 - [**Architecture Patterns**](deep-dives/architecture-patterns.md): Ports, Adapters, and Modularity.
 
 ## 🎓 Educational & Curriculum 🆕
-- [**The Educational Map**](EDUCATIONAL.md): **(Start Here)** A complete guide to using this repo as a learning course.
-- [**Concept ↔ Code Map**](learning-map.md): Where theory meets practice.
-- [**Failure Modes**](failure-modes/01_low_recall.md): Debugging real-world RAG issues.
-- [**Architecture Decisions**](adr/001-postgres-fts-vs-elasticsearch.md): Why we built it this way.
-- [**Developer Guide**](developer-guide.md): How to extend the system.
-- [**Visual Guide**](./VISUAL_GUIDE.md): Flowcharts of Architecture and Data.
 
-- [**Notebooks Index**](../notebooks/): Step-by-step interactive tutorials.
+### Core Educational Resources
+- [**AI Engineering Curriculum**](AI_ENGINEERING_CURRICULUM.md): Complete curriculum from beginner to expert in production-ready RAG systems.
+- [**Educational Implementation Guide**](EDUCATIONAL_IMPLEMENTATION_GUIDE.md): Comprehensive walkthrough connecting theory to implementation.
+- [**Educational Layer Guide**](EDUCATIONAL.md): Navigation map for educational content.
 
-## 📖 Global Resources
+### Learning Pathways
+- [**Complete Learning Pathway**](educational/complete_learning_pathway_guide.md): Structured learning journey from RAG beginner to AI architect.
+- [**Mastery Journey**](MASTERY_JOURNEY.md): Skill tree and graduation requirements for RAG engineering mastery.
+- [**Roadmap**](ROADMAP.md): Journey from "Hello World" to "AI Lead Engineer".
 
-- [**Glossary of Terms**](../GLOSSARY.md): English/Arabic technical reference.
+### Layer-Specific Guides
+- [**Domain Layer Guide**](educational/domain_layer_guide.md): Pure business logic and entities.
+- [**Application Layer Guide**](educational/application_layer_guide.md): Use cases and services.
+- [**Adapters Layer Guide**](educational/adapters_layer_guide.md): Concrete implementations of external dependencies.
+- [**API Layer Guide**](educational/api_layer_guide.md): FastAPI routes and controllers.
+- [**Workers Layer Guide**](educational/workers_layer_guide.md): Background processing and task queues.
+- [**Complete RAG Pipeline Guide**](educational/complete_rag_pipeline_guide.md): End-to-end system walkthrough.
 
-## 🚀 Quick Links
+### Extension and Development Guides
+- [**Extension Development Guide**](educational/extension_development_guide.md): How to extend the RAG Engine while maintaining educational quality.
+- [**Atomic Commit Practices**](educational/atomic_commit_practices_guide.md): Following senior engineer standards for commits.
 
-- [Getting Started](../README.md#-quick-start)
-- [Project Structure](../STRUCTURE.md)
-- [Educational Notebooks](../notebooks/)
+### Hands-On Learning
+- [**Comprehensive Hands-On Notebook**](../notebooks/educational/rag_engine_mini_comprehensive_guide.ipynb): Interactive learning notebook covering all system aspects.
+- [**Practical Exercises Guide**](educational/practical_exercises_guide.md): Hands-on exercises to reinforce learning.
 
-## 🔧 Key Concepts
+### Code Walkthroughs
+- [**Ask Hybrid Use Case**](code-walkthroughs/ask-hybrid-usecase.md): Step-by-step tour of the main use case.
+- [**Document Ingestion Process**](code-walkthroughs/document-ingestion.md): Complete walkthrough of document processing pipeline.
+- [**Embedding Generation & Caching**](code-walkthroughs/embedding-generation-caching.md): How embeddings are created and cached efficiently.
 
-### Clean Architecture
-- **Domain**: Pure business logic (entities, errors)
-- **Application**: Use cases and ports (interfaces)
-- **Adapters**: External implementations (databases, APIs)
-- **API**: HTTP layer (routes, validation)
+### Architecture Decision Records (ADRs)
+- [**PostgreSQL FTS vs Elasticsearch**](adr/001-postgres-fts-vs-elasticsearch.md): Search backend selection rationale.
+- [**RRF vs Weighted Fusion**](adr/002-rrf-vs-weighted-fusion.md): Ranking algorithm decision.
+- [**Cross-Encoder vs LLM Reranking**](adr/003-cross-encoder-vs-llm-rerank.md): Reranking approach comparison.
+- [**Minimal Vector Payload Design**](adr/004-minimal-vector-payload.md): Storage architecture decision.
+- [**Chunk Deduplication Strategy**](adr/005-chunk-dedup-design.md): Approach to handling duplicate content.
 
-### Hybrid Search
-- Vector search (semantic similarity via Qdrant)
-- Keyword search (lexical matching via Postgres FTS)
-- RRF fusion (combining results without score calibration)
-- Cross-Encoder reranking (precision improvement)
+### Failure Modes & Troubleshooting
+- [**Low Recall Issues**](failure_modes/low-recall.md): Diagnosing and resolving retrieval problems.
+- [**Poor Re-Ranking**](failure_modes/bad-re-ranking.md): Identifying and fixing ranking issues.
+- [**Hallucinations**](failure_modes/hallucinations.md): Preventing and mitigating hallucinations.
+- [**Slow Latency**](failure_modes/slow-latency.md): Performance troubleshooting guide.
+- [**Poor Chunking**](failure_modes/poor-chunking.md): Optimizing document segmentation.
 
-### Multi-Tenancy
-- API key-based authentication
-- Tenant isolation in all queries
-- Per-tenant chunk deduplication
-
-## 📝 Contributing to Docs
-
-When adding documentation:
-1. Use clear, concise language
-2. Include code examples
-3. Add bilingual support (English + Arabic) where helpful
-4. Update this index file
+### Exercises & Assessments
+- [**Level 1: Semantic Embeddings**](exercises/level1_embeddings.md): Foundational embedding concepts.
+- [**Level 2: Chunking Strategies**](exercises/level2_chunking.md): Document segmentation techniques.
+- [**Level 3: Hybrid Search**](exercises/level3_hybrid_search.md): Combining different retrieval methods.
+- [**Level 4: Re-Ranking**](exercises/level4_reranking.md): Improving result quality.
+- [**Level 5: Evaluation**](exercises/level5_evaluation.md): Measuring system performance.
