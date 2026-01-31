@@ -234,7 +234,7 @@ class JWTProvider:
             )
         except jwt.ExpiredSignatureError:
             raise JWTError("Token has expired")
-        except jwt.InvalidTokenError as e:
+        except JWTError as e:
             raise JWTError(f"Invalid token: {str(e)}")
 
     def verify_access_token(self, token: str) -> TokenPayload:

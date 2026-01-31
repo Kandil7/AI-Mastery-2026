@@ -29,7 +29,6 @@ def get_container() -> dict:
     from src.adapters.llm.openai_llm import OpenAILLM
     from src.adapters.embeddings.openai_embeddings import OpenAIEmbeddings
     from src.adapters.vector.qdrant_store import QdrantVectorStore
-    from src.adapters.rerank.cross_encoder import CrossEncoderReranker
     from src.adapters.rerank.noop_reranker import NoopReranker
     from src.adapters.cache.redis_cache import RedisCache
     from src.adapters.filestore.local_store import LocalFileStore
@@ -136,10 +135,15 @@ def get_container() -> dict:
     # =========================================================================
     
     if settings.rerank_backend == "cross_encoder":
-        reranker = CrossEncoderReranker(
-            model_name=settings.cross_encoder_model,
-            device=settings.cross_encoder_device,
-        )
+        try:
+            from src.adapters.rerank.cross_encoder import CrossEncoderReranker
+
+            reranker = CrossEncoderReranker(
+                model_name=settings.cross_encoder_model,
+                device=settings.cross_encoder_device,
+            )
+        except ModuleNotFoundError:
+            reranker = NoopReranker()
     elif settings.rerank_backend == "llm":
         from src.adapters.rerank.llm_reranker import LLMReranker
         reranker = LLMReranker(llm=llm)

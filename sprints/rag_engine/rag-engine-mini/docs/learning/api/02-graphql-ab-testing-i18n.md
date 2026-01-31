@@ -30,14 +30,64 @@ class ExportResult:
 
 class DocumentExportService:
     """Service for exporting documents."""
-    
+
+    def __init__(self, document_repo, export_dir: str = "exports"):
+        self._repo = document_repo
+        self._export_dir = export_dir
+
     def export_documents(self, request: ExportRequest) -> ExportResult:
         """Export documents in specified format."""
-        # TODO: Implement export logic
-        pass
+        fmt = request.format.lower().strip()
+        if fmt not in {"pdf", "markdown", "csv", "json"}:
+            raise ValueError(f"Unsupported export format: {request.format}")
+
+        # Fetch documents (repo is expected to return dicts)
+        documents = self._repo.get_many(request.document_ids)
+        if not documents:
+            raise ValueError("No documents found to export")
+
+        # Build export payload
+        if fmt == "markdown":
+            content = export_to_markdown(documents)
+            content_type = "text/markdown"
+            ext = "md"
+        elif fmt == "csv":
+            content = export_to_csv(documents)
+            content_type = "text/csv"
+            ext = "csv"
+        elif fmt == "json":
+            content = export_to_json(documents)
+            content_type = "application/json"
+            ext = "json"
+        else:
+            # PDF requires file output
+            content = None
+            content_type = "application/pdf"
+            ext = "pdf"
+
+        # Write output
+        import os
+        os.makedirs(self._export_dir, exist_ok=True)
+        file_path = os.path.join(self._export_dir, f"export_{len(documents)}.{ext}")
+
+        if fmt == "pdf":
+            export_to_pdf(documents, file_path)
+            size_bytes = os.path.getsize(file_path)
+        else:
+            with open(file_path, "w", encoding="utf-8") as handle:
+                handle.write(content)
+            size_bytes = len(content.encode("utf-8"))
+
+        log.info("Export completed", format=fmt, count=len(documents), file_path=file_path)
+        return ExportResult(
+            file_path=file_path,
+            content_type=content_type,
+            size_bytes=size_bytes,
+        )
 
 
 # Markdown Export
+
 def export_to_markdown(documents: List[dict]) -> str:
     """Export documents as Markdown."""
     md = ""
@@ -130,6 +180,7 @@ class Experiment:
     variant_b: str  # Name of variant B
     traffic_percentage: int  # Percentage for variant A (B gets 100% - this)
     metrics: Dict[str, float]
+    primary_metric: str = "conversion_rate"
     start_date: str
     end_date: Optional[str] = None
 
@@ -170,6 +221,7 @@ class ExperimentManager:
             variant_b=variant_b,
             traffic_percentage=traffic_percentage,
             metrics={},
+            primary_metric="conversion_rate",
             start_date=datetime.utcnow().isoformat(),
         )
         
@@ -232,7 +284,7 @@ class ExperimentManager:
         metrics_b = self._repo.get_metrics(experiment_id, experiment.variant_b)
         
         # Simple analysis: compare average of primary metric
-        primary_metric = "conversion_rate"  # TODO: Make configurable
+        primary_metric = experiment.primary_metric
         
         avg_a = sum(m.get(primary_metric, 0) for m in metrics_a) / len(metrics_a)
         avg_b = sum(m.get(primary_metric, 0) for m in metrics_b) / len(metrics_b)
@@ -245,9 +297,27 @@ class ExperimentManager:
             winning_variant = experiment.variant_b
             improvement = (avg_b - avg_a) / avg_a * 100 if avg_a > 0 else 0
         
-        # Calculate statistical significance (placeholder)
-        # TODO: Implement proper statistical test (t-test, chi-squared)
-        significance = len(metrics_a) > 30 and len(metrics_b) > 30
+        # Simple Welch's t-test (normal approx for p-value)
+        import math
+        import statistics as stats
+
+        def _p_value_welch(a: list, b: list) -> float:
+            if len(a) < 2 or len(b) < 2:
+                return 1.0
+            mean_a, mean_b = stats.mean(a), stats.mean(b)
+            var_a, var_b = stats.variance(a), stats.variance(b)
+            denom = math.sqrt(var_a / len(a) + var_b / len(b))
+            if denom == 0:
+                return 1.0
+            t_stat = (mean_a - mean_b) / denom
+            # Normal approximation for large samples
+            z = abs(t_stat)
+            return 2.0 * (1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2))))
+
+        a_vals = [m.get(primary_metric, 0) for m in metrics_a]
+        b_vals = [m.get(primary_metric, 0) for m in metrics_b]
+        p_value = _p_value_welch(a_vals, b_vals)
+        significance = p_value < 0.05
         
         result = ExperimentResult(
             experiment_id=experiment_id,
@@ -303,21 +373,33 @@ class Translator:
     
     def _load_translations(self):
         """Load translations from files or database."""
-        # TODO: Load from translations/ directory or database
+        from pathlib import Path
         self._translations = {}
-        
-        # Sample translations
-        self._translations["welcome"] = Translation(
-            key="welcome",
-            ar="مرحباً",
-            en="Welcome",
-        )
-        self._translations["search_placeholder"] = Translation(
-            key="search_placeholder",
-            ar="ابحث في مستنداتك...",
-            en="Search your documents...",
-        )
-        
+
+        translations_dir = Path("translations")
+        if translations_dir.exists():
+            for file_path in translations_dir.glob("*.json"):
+                data = json.loads(file_path.read_text(encoding="utf-8"))
+                for key, value in data.items():
+                    self._translations[key] = Translation(
+                        key=key,
+                        ar=value.get("ar", ""),
+                        en=value.get("en", ""),
+                    )
+
+        if not self._translations:
+            # Sample translations (fallback)
+            self._translations["welcome"] = Translation(
+                key="welcome",
+                ar="?????",
+                en="Welcome",
+            )
+            self._translations["search_placeholder"] = Translation(
+                key="search_placeholder",
+                ar="???? ?? ????????...",
+                en="Search your documents...",
+            )
+
         log.info("Translations loaded", count=len(self._translations))
     
     def set_language(self, language: str):

@@ -20,8 +20,9 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 import os
-from typing import Callable, Any
+from typing import Callable, Any, ContextManager
 from functools import wraps
+from contextlib import contextmanager
 
 
 def setup_tracing(
@@ -234,59 +235,69 @@ class RAGTracer:
     def __init__(self, tracer: trace.Tracer):
         self._tracer = tracer
 
-    def start_rag_pipeline(self, tenant_id: str, question: str) -> trace.Span:
+    @contextmanager
+    def start_rag_pipeline(self, tenant_id: str, question: str) -> ContextManager[trace.Span]:
         """Start the main RAG pipeline span."""
-        span = self._tracer.start_as_current_span("rag_pipeline")
-        span.set_attribute("tenant_id", tenant_id)
-        span.set_attribute("question", question)
-        span.set_attribute("question_length", len(question))
-        return span
+        with self._tracer.start_as_current_span("rag_pipeline") as span:
+            span.set_attribute("tenant_id", tenant_id)
+            span.set_attribute("question", question)
+            span.set_attribute("question_length", len(question))
+            yield span
 
-    def trace_embedding(self, text: str, cached: bool = False) -> trace.Span:
+    @contextmanager
+    def trace_embedding(self, text: str, cached: bool = False) -> ContextManager[trace.Span]:
         """Trace embedding generation."""
-        span = self._tracer.start_as_current_span("embedding_generation")
-        span.set_attribute("text_length", len(text))
-        span.set_attribute("cached", str(cached))
-        return span
+        with self._tracer.start_as_current_span("embedding_generation") as span:
+            span.set_attribute("text_length", len(text))
+            span.set_attribute("cached", str(cached))
+            yield span
 
-    def trace_vector_search(self, tenant_id: str, k: int, results_count: int) -> trace.Span:
+    @contextmanager
+    def trace_vector_search(
+        self, tenant_id: str, k: int, results_count: int
+    ) -> ContextManager[trace.Span]:
         """Trace vector search operation."""
-        span = self._tracer.start_as_current_span("vector_search")
-        span.set_attribute("tenant_id", tenant_id)
-        span.set_attribute("k", k)
-        span.set_attribute("results_count", results_count)
-        return span
+        with self._tracer.start_as_current_span("vector_search") as span:
+            span.set_attribute("tenant_id", tenant_id)
+            span.set_attribute("k", k)
+            span.set_attribute("results_count", results_count)
+            yield span
 
-    def trace_keyword_search(self, tenant_id: str, query: str, results_count: int) -> trace.Span:
+    @contextmanager
+    def trace_keyword_search(
+        self, tenant_id: str, query: str, results_count: int
+    ) -> ContextManager[trace.Span]:
         """Trace keyword search operation."""
-        span = self._tracer.start_as_current_span("keyword_search")
-        span.set_attribute("tenant_id", tenant_id)
-        span.set_attribute("query", query)
-        span.set_attribute("results_count", results_count)
-        return span
+        with self._tracer.start_as_current_span("keyword_search") as span:
+            span.set_attribute("tenant_id", tenant_id)
+            span.set_attribute("query", query)
+            span.set_attribute("results_count", results_count)
+            yield span
 
-    def trace_rerank(self, chunks_count: int, top_n: int) -> trace.Span:
+    @contextmanager
+    def trace_rerank(self, chunks_count: int, top_n: int) -> ContextManager[trace.Span]:
         """Trace reranking operation."""
-        span = self._tracer.start_as_current_span("rerank")
-        span.set_attribute("chunks_count", chunks_count)
-        span.set_attribute("top_n", top_n)
-        return span
+        with self._tracer.start_as_current_span("rerank") as span:
+            span.set_attribute("chunks_count", chunks_count)
+            span.set_attribute("top_n", top_n)
+            yield span
 
+    @contextmanager
     def trace_llm_generation(
         self,
         model: str,
         prompt_tokens: int,
         completion_tokens: int,
         temperature: float,
-    ) -> trace.Span:
+    ) -> ContextManager[trace.Span]:
         """Trace LLM generation."""
-        span = self._tracer.start_as_current_span("llm_generation")
-        span.set_attribute("model", model)
-        span.set_attribute("prompt_tokens", prompt_tokens)
-        span.set_attribute("completion_tokens", completion_tokens)
-        span.set_attribute("total_tokens", prompt_tokens + completion_tokens)
-        span.set_attribute("temperature", temperature)
-        return span
+        with self._tracer.start_as_current_span("llm_generation") as span:
+            span.set_attribute("model", model)
+            span.set_attribute("prompt_tokens", prompt_tokens)
+            span.set_attribute("completion_tokens", completion_tokens)
+            span.set_attribute("total_tokens", prompt_tokens + completion_tokens)
+            span.set_attribute("temperature", temperature)
+            yield span
 
 
 def get_rag_tracer() -> RAGTracer:
