@@ -1,21 +1,27 @@
 apiVersion: v2
 name: rag-engine
-description: RAG Engine - Retrieval-Augmented Generation system
-version: 1.0.0
+description: A production-ready RAG engine with hybrid search and reranking
 type: application
-keywords:
-  - rag
-  - retrieval
-  - llm
-  - ai
-  - search
-  - vector-database
+version: 0.1.0
+appVersion: "0.2.0"
+
 maintainers:
   - name: RAG Engine Team
-    email: support@rag-engine.com
-    url: https://github.com/rag-engine/rag-engine
+    email: dev@example.com
+
+home: https://github.com/your-org/rag-engine-mini
 sources:
-  - https://github.com/rag-engine/rag-engine
+  - https://github.com/your-org/rag-engine-mini
+
+keywords:
+  - rag
+  - ai
+  - search
+  - vector
+  - hybrid-search
+  - llm
+
 annotations:
-  "artifacthub.io/links": "[]"
-  "artifacthub.io/links-type": "source"
+  artifacthub.io/license: MIT
+  artifacthub.io/operator: false
+  artifacthub.io/prerelease: false

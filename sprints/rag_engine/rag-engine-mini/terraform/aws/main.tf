@@ -1,45 +1,166 @@
-# AWS Terraform Configuration
-# ==========================
-# Infrastructure as Code for AWS deployment.
-# البنية التحتية ككود لنشر AWS
+# Terraform configuration for RAG Engine on AWS# Kubernetes provider for EKS
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_name
+}
 
-# AWS Provider
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_name
+}
+
+provider "kubernetes" {
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+  load_config_file       = false
+  version                = "~> 2.24"
+}
+
+# Helm provider for EKS
+provider "helm" {
+  kubernetes {
+    host                   = data.aws_eks_cluster.cluster.endpoint
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+}
+
+# Create namespace for RAG Engine
+resource "kubernetes_namespace" "rag_engine" {
+  metadata {
+    name = var.namespace
+    labels = {
+      name = var.namespace
+    }
+  }
+}
+
+# Deploy RAG Engine using Helm
+resource "helm_release" "rag_engine" {
+  name       = "rag-engine"
+  repository = ""  # Using local chart
+  chart      = "../../../config/helm/rag-engine"
+  namespace  = kubernetes_namespace.rag_engine.metadata[0].name
+
+  set {
+    name  = "ragEngine.replicaCount"
+    value = var.rag_engine_replicas
+  }
+
+  set_sensitive {
+    name  = "ragEngine.env.OPENAI_API_KEY"
+    value = var.openai_api_key
+  }
+
+  depends_on = [kubernetes_namespace.rag_engine]
+}
+# Sets up EKS cluster, VPC, and related infrastructure
+
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+}
+
+# Provider configuration
 provider "aws" {
   region = var.aws_region
 
   default_tags {
-    Environment = var.environment
-    Project     = "rag-engine"
-    ManagedBy  = "terraform"
+    tags = {
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
   }
 }
 
-# Module: VPC and Networking
-module "networking" {
-  source = "./modules/networking"
+# Create VPC for the cluster
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
 
-  vpc_cidr           = var.vpc_cidr
-  availability_zones  = var.availability_zones
-  environment         = var.environment
-  project_name        = var.project_name
+  name = "${var.project_name}-vpc"
+  cidr = var.vpc_cidr_block
 
-  tags = var.default_tags
+  azs             = var.availability_zones
+  private_subnets = var.private_subnet_cidrs
+  public_subnets  = var.public_subnet_cidrs
+
+  enable_nat_gateway = true
+  single_nat_gateway = true
+  enable_vpn_gateway = false
+
+  public_subnet_tags = {
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"                    = "1"
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"           = "1"
+  }
 }
 
-# Module: EKS Cluster
-module "eks_cluster" {
-  source = "./modules/eks"
+# Create EKS cluster
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
 
-  cluster_name    = "${var.project_name}-${var.environment}"
-  vpc_id         = module.networking.vpc_id
-  subnet_ids      = module.networking.private_subnet_ids
-  environment     = var.environment
-  node_type      = var.eks_node_type
-  min_nodes      = var.eks_min_nodes
-  max_nodes      = var.eks_max_nodes
-  desired_nodes  = var.eks_desired_nodes
+  cluster_name    = var.cluster_name
+  cluster_version = var.k8s_version
 
-  tags = var.default_tags
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = concat(module.vpc.private_subnets, module.vpc.public_subnets)
+
+  # EKS managed node group
+  eks_managed_node_group_defaults = {
+    ami_type = "AL2_x86_64"
+  }
+
+  eks_managed_node_groups = {
+    initial = {
+      name = "${var.cluster_name}-ng-default"
+
+      instance_types = var.node_instance_types
+
+      min_size     = var.node_min_size
+      max_size     = var.node_max_size
+      desired_size = var.node_desired_size
+
+      # Attach additional policies to the node IAM role
+      attach_additional_iam_policies = [
+        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+        "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      ]
+    }
+  }
+
+  # Enable cluster creator admin role
+  enable_cluster_creator_admin_permissions = true
+
+  # Manage aws-auth configmap
+  manage_aws_auth_configmap = true
+
+  # Workers role additional policies
+  worker_role_additional_policies = {
+    AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicy"
+  }
 }
 
 # Module: RDS PostgreSQL

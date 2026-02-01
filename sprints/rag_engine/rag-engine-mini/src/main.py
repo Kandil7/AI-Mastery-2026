@@ -89,17 +89,29 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
+    # -----------------
+    # Core Health Routes
     app.include_router(health_router)
+    
+    # Document Management Routes
     app.include_router(documents_router)
     app.include_router(documents_search_router)
     app.include_router(documents_bulk_router)
+    
+    # Query & Interaction Routes
     app.include_router(queries_router)
     app.include_router(chat_router)
     app.include_router(ask_router)
+    
+    # Authentication & Administration Routes
     app.include_router(auth_router)
     app.include_router(admin_router)
+    
+    # Export Routes
     app.include_router(export_router)
     app.include_router(exports_router)  # Our new router
+    
+    # Experimentation Routes
     app.include_router(ab_testing_router)
 
     # Include GraphQL with context injection

@@ -1,153 +1,102 @@
-# AWS Terraform Variables
-# ========================
-# Configuration variables for AWS infrastructure.
+# Variables for RAG Engine AWS Infrastructure
 
-# متغيرات تكوين Terraform لـ AWS
-
-variable "aws_region" {
-  description = "AWS region for all resources"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "environment" {
-  description = "Environment name (dev, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
+# General configuration
 variable "project_name" {
-  description = "Project name prefix for all resources"
+  description = "Name of the project"
   type        = string
   default     = "rag-engine"
 }
 
-variable "availability_zones" {
-  description = "List of availability zones"
-  type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+variable "environment" {
+  description = "Environment name (dev/staging/prod)"
+  type        = string
+  default     = "dev"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+variable "aws_region" {
+  description = "AWS region to deploy to"
+  type        = string
+  default     = "us-west-2"
+}
+
+# VPC configuration
+variable "vpc_cidr_block" {
+  description = "CIDR block for the VPC"
   type        = string
   default     = "10.0.0.0/16"
 }
 
-variable "eks_node_type" {
-  description = "EC2 instance type for EKS nodes"
-  type        = string
-  default     = "t3.medium"
-}
-
-variable "eks_min_nodes" {
-  description = "Minimum number of EKS nodes"
-  type        = number
-  default     = 2
-}
-
-variable "eks_max_nodes" {
-  description = "Maximum number of EKS nodes"
-  type        = number
-  default     = 10
-}
-
-variable "eks_desired_nodes" {
-  description = "Desired number of EKS nodes"
-  type        = number
-  default     = 3
-}
-
-variable "eks_public_access_cidrs" {
-  description = "CIDR blocks allowed to access EKS API"
+variable "availability_zones" {
+  description = "Availability zones to use for the subnets"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = ["us-west-2a", "us-west-2b", "us-west-2c"]
+}
+
+variable "private_subnet_cidrs" {
+  description = "CIDR blocks for private subnets"
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+}
+
+variable "public_subnet_cidrs" {
+  description = "CIDR blocks for public subnets"
+  type        = list(string)
+  default     = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+}
+
+# EKS configuration
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "rag-engine-cluster"
 }
 
 variable "k8s_version" {
-  description = "Kubernetes version for EKS"
+  description = "Kubernetes version for the EKS cluster"
   type        = string
   default     = "1.28"
 }
 
-variable "postgres_version" {
-  description = "PostgreSQL engine version"
-  type        = string
-  default     = "15.4"
+variable "node_instance_types" {
+  description = "Instance types for the EKS nodes"
+  type        = list(string)
+  default     = ["t3.medium"]
 }
 
-variable "rds_instance_class" {
-  description = "RDS instance class"
-  type        = string
-  default     = "db.t3.medium"
-}
-
-variable "rds_storage_gb" {
-  description = "Allocated storage for RDS in GB"
+variable "node_min_size" {
+  description = "Minimum number of nodes in the node group"
   type        = number
-  default     = 100
+  default     = 1
 }
 
-variable "database_name" {
-  description = "Database name"
-  type        = string
-  default     = "ragengine"
+variable "node_max_size" {
+  description = "Maximum number of nodes in the node group"
+  type        = number
+  default     = 5
 }
 
-variable "database_username" {
-  description = "Database master username"
-  type        = string
-  default     = "ragengine_admin"
-}
-
-variable "redis_node_type" {
-  description = "ElastiCache node type"
-  type        = string
-  default     = "cache.t3.medium"
-}
-
-variable "redis_num_nodes" {
-  description = "Number of Redis cache nodes"
+variable "node_desired_size" {
+  description = "Desired number of nodes in the node group"
   type        = number
   default     = 2
 }
 
-variable "redis_version" {
-  description = "Redis engine version"
+# RAG Engine configuration
+variable "namespace" {
+  description = "Kubernetes namespace for RAG Engine"
   type        = string
-  default     = "7.0"
+  default     = "rag-engine"
 }
 
-variable "redis_auth_token" {
-  description = "Redis auth token"
+variable "rag_engine_replicas" {
+  description = "Number of replicas for RAG Engine API"
+  type        = number
+  default     = 3
+}
+
+# Secrets
+variable "openai_api_key" {
+  description = "OpenAI API key for RAG Engine"
   type        = string
   sensitive   = true
-  default     = null
-}
-
-variable "s3_sse_enabled" {
-  description = "Enable server-side encryption for S3"
-  type        = bool
-  default     = true
-}
-
-variable "s3_versioning" {
-  description = "Enable S3 bucket versioning"
-  type        = bool
-  default     = true
-}
-
-variable "default_tags" {
-  description = "Default tags for all resources"
-  type        = map(string)
-  default = {
-    Environment = "dev"
-    ManagedBy  = "terraform"
-  }
-}
-
-variable "tags" {
-  description = "Additional tags for resources"
-  type        = map(string)
-  default     = {}
 }

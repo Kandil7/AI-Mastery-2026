@@ -1,119 +1,45 @@
-# AWS Deployment Guide
-# ======================
-# Complete guide for deploying RAG Engine to AWS using Terraform.
+# RAG Engine on AWS with Terraform
 
-# دليل نشر RAG Engine إلى AWS باستخدام Terraform
+This Terraform configuration sets up the infrastructure for the RAG Engine on AWS, including an EKS cluster and all required resources.
 
-## Prerequisites / المتطلبات
+## Prerequisites
 
-1. **AWS Account** with appropriate IAM permissions
-2. **Terraform** >= 1.3.0 installed locally
-3. **AWS CLI** configured with credentials
-4. **kubectl** for cluster management
-5. **Helm** for application deployment
+- AWS CLI configured with appropriate permissions
+- Terraform >= 1.0
+- kubectl
+- AWS IAM permissions for EKS, VPC, EC2, and related services
 
-## Installation / التثبيت
 
-```bash
-# Install Terraform (macOS)
-brew install terraform
+## Quick Start
 
-# Install Terraform (Linux)
-wget -O- https://apt.releases.hashicorp.com/terraform/pool/main/main.html
-sudo unzip main && sudo mv terraform /usr/local/bin/
-
-# Install AWS CLI
-pip install awscli
-
-# Install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl && sudo mv kubectl /usr/local/bin/
-
-# Install Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-```
-
-## Configuration / التكوين
-
-### 1. Create Terraform Workspace
-
-```bash
-cd terraform/aws
-
-# Configure AWS credentials
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_REGION="us-east-1"
-
-# Or use AWS CLI profile
-export AWS_PROFILE="rag-engine-profile"
-```
-
-### 2. Customize Variables
-
-Create `terraform.tfvars`:
-
-```hcl
-# Environment
-environment = "prod"
-project_name = "rag-engine"
-
-# Networking
-vpc_cidr           = "10.0.0.0/16"
-availability_zones  = ["us-east-1a", "us-east-1b"]
-
-# EKS Cluster
-eks_node_type      = "t3.large"
-eks_min_nodes      = 3
-eks_max_nodes      = 10
-eks_desired_nodes  = 3
-k8s_version        = "1.28"
-
-# Database
-rds_instance_class = "db.r5.xlarge"
-rds_storage_gb     = 500
-postgres_version    = "15.4"
-
-# Redis
-redis_node_type = "cache.m6g.large"
-redis_num_nodes = 3
-redis_version   = "7.0"
-```
-
-## Deployment / النشر
-
-### 1. Initialize Terraform
-
+1. Initialize Terraform:
 ```bash
 terraform init
 ```
 
-### 2. Plan Changes
+2. Create a `terraform.tfvars` file with your variables:
+```hcl
+aws_region         = "us-west-2"
+cluster_name       = "rag-engine-prod"
+openai_api_key     = "your-openai-api-key"
+environment        = "prod"
+```
 
+3. Review the execution plan:
 ```bash
-# Review planned changes
-terraform plan \
-  -var-file="terraform.tfvars" \
-  -out="tfplan"
+terraform plan
 ```
 
-### 3. Apply Configuration
-
+4. Apply the configuration:
 ```bash
-# Deploy infrastructure
-terraform apply \
-  -var-file="terraform.tfvars" \
-  -auto-approve
+terraform apply
 ```
 
-Expected outputs:
+5. Configure kubectl for the new cluster:
+```bash
+aws eks --region $(terraform output -raw region) update-kubeconfig --name $(terraform output -raw cluster_name)
 ```
-eks_cluster_endpoint = "https://ABC123.gr7.us-east-1.eks.amazonaws.com"
-eks_cluster_name = "rag-engine-prod"
-rds_endpoint = "rag-engine-prod.xxxxxx.us-east-1.rds.amazonaws.com"
-redis_endpoint = "rag-engine-prod-redis.xxxxxx.0001.use1.cache.amazonaws.com"
-s3_bucket_name = "rag-engine-prod-uploads"
-```
+
 
 ### 4. Configure kubectl
 
@@ -175,23 +101,12 @@ kubectl -n rag-engine get ingress
 
 *Prices are estimates as of 2026-01-31. Actual costs may vary.*
 
-## Security Considerations / اعتبارات الأمان
+## Security
 
-1. **Network Isolation**
-   - Private subnets for RDS and ElastiCache
-   - NAT gateways for outbound traffic
-   - Security groups with least privilege
-
-2. **Encryption**
-   - S3 server-side encryption enabled
-   - RDS encryption at rest enabled
-   - ElastiCache transit encryption enabled
-   - EKS secrets manager for sensitive data
-
-3. **Access Control**
-   - IAM roles with least privilege
-   - S3 bucket policies restrict to EKS cluster
-   - Database credentials in AWS Secrets Manager
+- Private subnets for worker nodes
+- Public subnets for load balancers
+- IAM roles with least-privilege access
+- Kubernetes RBAC controls
 
 ## Monitoring / المراقبة
 
@@ -284,16 +199,14 @@ terraform destroy \
 rm -rf .terraform
 ```
 
-## Best Practices / أفضل الممارسات
+## Scaling
 
-1. **Use Terraform Workspaces** - Separate dev/staging/prod environments
-2. **State Management** - Use Terraform Cloud or S3 for state storage
-3. **Version Control** - Commit Terraform files to Git
-4. **Cost Optimization** - Use Spot instances for EKS nodes when possible
-5. **Backup Strategy** - Enable RDS backups and S3 versioning
-6. **Monitoring** - Set up CloudWatch dashboards and alarms
-7. **Security** - Regularly rotate credentials and review IAM policies
-8. **Documentation** - Document all changes and procedures
+Node groups are configured with:
+- Minimum: 1 node
+- Desired: 2 nodes
+- Maximum: 5 nodes
+
+Adjust these values in your `terraform.tfvars` file as needed.
 
 ---
 
