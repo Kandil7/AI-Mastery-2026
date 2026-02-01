@@ -1,0 +1,229 @@
+# =============================================================================
+# RAG Engine Mini - Production Deployment
+# =============================================================================
+# This docker-compose file deploys the complete RAG Engine stack including:
+# - RAG Engine API (FastAPI application)
+# - PostgreSQL (metadata storage)
+# - Redis (caching and task queue)
+# - Qdrant (vector database)
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # RAG Engine Application
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: "0.1.0"
+        BUILD_DATE: "2026-02-01"
+    container_name: rag_engine_api
+    ports:
+      - "8000:8000"
+    environment:
+      # Application Settings
+      - APP_NAME=RAG Engine Mini
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - ENV=production
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/rag
+      - DATABASE_POOL_SIZE=10
+      - DATABASE_MAX_OVERFLOW=20
+      
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_POOL_SIZE=50
+      
+      # Qdrant Configuration
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=documents
+      - VECTOR_SIZE=1536
+      
+      # LLM Configuration (set via environment or defaults to mock)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEFAULT_LLM_PROVIDER=mock
+      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+      
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      
+      # File Storage
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=52428800
+      
+      # Feature Flags
+      - ENABLE_HYBRID_SEARCH=true
+      - ENABLE_RERANKING=true
+      - ENABLE_AB_TESTING=false
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+  # ===========================================================================
+  # PostgreSQL - Metadata and Relational Data
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: rag_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rag
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+  # ===========================================================================
+  # Redis - Caching and Task Queue
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: rag_redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+  # ===========================================================================
+  # Qdrant - Vector Database
+  # ===========================================================================
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: rag_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__LOG_LEVEL: INFO
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+  # ===========================================================================
+  # Celery Worker - Background Task Processing
+  # ===========================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag_worker
+    command: celery -A src.workers.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - APP_NAME=RAG Engine Mini Worker
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - ENV=production
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/rag
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEFAULT_LLM_PROVIDER=mock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+  # ===========================================================================
+  # Flower - Celery Monitoring (Optional)
+  # ===========================================================================
+  flower:
+    image: mher/flower:2.0
+    container_name: rag_flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - rag_network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  pg_data:
+    driver: local
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  uploads_data:
+    driver: local
+  logs_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  rag_network:
+    driver: bridge
+    name: rag_network

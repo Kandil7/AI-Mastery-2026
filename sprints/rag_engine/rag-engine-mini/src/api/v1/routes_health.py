@@ -13,7 +13,8 @@ import time
 
 from ...domain.entities import TenantId
 from ...core.config import settings
-from .deps import get_container, get_tenant_id
+from .deps import get_tenant_id
+from ...core.bootstrap import get_container
 from ...application.services.health_check_service import HealthCheckService
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -366,19 +367,19 @@ async def dependencies_health():
 async def comprehensive_health_check():
     """
     Comprehensive health check using the dedicated HealthCheckService.
-    
-    This endpoint performs a complete system health assessment using the 
+
+    This endpoint performs a complete system health assessment using the
     dedicated service implementation.
     """
     container = get_container()
-    
+
     # Create an instance of the health check service with all required dependencies
     health_service = container.get("health_check_service")
-    
+
     if health_service:
         # Perform comprehensive system health check
         report = await health_service.check_system_health()
-        
+
         return {
             "overall_status": report.overall_status,
             "timestamp": report.timestamp.isoformat(),
@@ -388,11 +389,12 @@ async def comprehensive_health_check():
                     "status": comp.status,
                     "response_time_ms": comp.response_time_ms,
                     "details": comp.details,
-                    "extra_info": comp.extra_info
-                } for comp in report.components
+                    "extra_info": comp.extra_info,
+                }
+                for comp in report.components
             ],
             "dependencies": report.dependencies,
-            "metrics": report.metrics
+            "metrics": report.metrics,
         }
     else:
         # Fallback if service is not available in container
@@ -402,7 +404,7 @@ async def comprehensive_health_check():
             "error": "HealthCheckService not available in container",
             "components": [],
             "dependencies": {},
-            "metrics": {}
+            "metrics": {},
         }
 
 

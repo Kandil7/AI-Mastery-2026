@@ -37,8 +37,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/uuid": "^9.0.8"
-  "devDependencies": {
+    "@types/uuid": "^9.0.8",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
     "@tailwindcss/forms": "^0.5.7",
