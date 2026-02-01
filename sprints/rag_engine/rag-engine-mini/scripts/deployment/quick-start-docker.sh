@@ -2,6 +2,21 @@
 # quick-start-docker.sh
 # One-command deployment of RAG Engine using Docker Compose
 # Usage: ./quick-start-docker.sh [environment]
+#
+# PRODUCTION DEPLOYMENT GUIDE
+# ===========================
+# This script deploys RAG Engine Mini to production using Docker Compose
+# 
+# WHAT IT DOES:
+# 1. Checks prerequisites (Docker, Docker Compose)
+# 2. Creates necessary directories
+# 3. Generates secure environment variables
+# 4. Creates docker-compose.yml configuration
+# 5. Starts all services (API, PostgreSQL, Redis, Qdrant, Nginx)
+# 6. Verifies deployment health
+#
+# TIMELINE: 5-10 minutes for initial deployment
+# RESULT: Fully working RAG Engine at http://localhost:8000
 
 set -e
 
