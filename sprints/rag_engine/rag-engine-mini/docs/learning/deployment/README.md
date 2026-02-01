@@ -76,6 +76,25 @@ This comprehensive educational package covers the complete deployment lifecycle 
     - Drift detection and testing
     - Production best practices
 
+### Advanced Operations
+11. **10-disaster-recovery.md** (1,600+ lines)
+    - Database backup strategies (AWS RDS, GCP Cloud SQL, Azure PostgreSQL)
+    - Vector store (Qdrant) snapshots and recovery
+    - Object storage cross-region replication
+    - Configuration and secrets backup
+    - 3 detailed disaster recovery runbooks
+    - Automated backup testing and chaos engineering
+    - RPO/RTO monitoring and compliance
+
+12. **11-performance-testing.md** (1,800+ lines)
+    - Load testing fundamentals and metrics
+    - Testing tools: Locust, k6, Artillery
+    - Cloud-specific testing (AWS, GCP, Azure)
+    - Results analysis and capacity planning
+    - Right-sizing recommendations
+    - Performance optimization strategies
+    - CI/CD integration for continuous testing
+
 ## 🎯 Learning Paths
 
 ### Path 1: Production Specialist (30 hours)
@@ -120,9 +139,9 @@ This comprehensive educational package covers the complete deployment lifecycle 
 ## 📊 Statistics
 
 ### Documentation
-- **Total Files:** 10 comprehensive guides
-- **Total Lines:** 25,700+ lines
-- **Average Guide Length:** 2,570 lines
+- **Total Files:** 12 comprehensive guides
+- **Total Lines:** 29,100+ lines
+- **Average Guide Length:** 2,425 lines
 
 ### Content Breakdown
 | Module | Lines | Topics |
@@ -137,6 +156,8 @@ This comprehensive educational package covers the complete deployment lifecycle 
 | **GCP Deployment** | **3,900** | **Cloud Run/GKE + Services** |
 | **Azure Deployment** | **5,100** | **Container Apps/AKS + Services** |
 | **Terraform IaC** | **2,800** | **Multi-cloud automation** |
+| **Disaster Recovery** | **1,600** | **Backup strategies & runbooks** |
+| **Performance Testing** | **1,800** | **Load testing & optimization** |
 
 ### Interactive Notebooks
 - **Docker Tutorial:** 22 cells (hands-on exercises)
@@ -394,29 +415,33 @@ You now have everything needed to:
 - ✅ Maintain high availability
 - ✅ Optimize cloud costs
 - ✅ Manage infrastructure as code
+- ✅ Test performance under load
+- ✅ Plan for disaster recovery
 
 **Start with Module 1 and work your way through to production mastery!** 🚀
 
 ---
 
 **Total Educational Value:**
-- **10 comprehensive guides** (6 core + 3 cloud + 1 IaC)
-- **25,700+ lines of documentation**
+- **12 comprehensive guides** (6 core + 3 cloud + 1 IaC + 2 operations)
+- **29,100+ lines of documentation**
 - **3 learning paths** (30h, 20h, 12h)
 - **28 structured modules**
 - **3 interactive notebooks**
 - **Production-ready knowledge**
 
-**Cloud Coverage:**
+**Coverage:**
 - ☁️ **AWS:** ECS, EKS, RDS, ElastiCache, S3, CloudWatch
 - ☁️ **GCP:** Cloud Run, GKE, Cloud SQL, Memorystore, Cloud Armor
 - ☁️ **Azure:** Container Apps, AKS, PostgreSQL, Redis, App Gateway
 - 🔧 **Terraform:** Multi-cloud IaC, state management, CI/CD
+- 🛡️ **Disaster Recovery:** Backups, runbooks, RPO/RTO monitoring
+- ⚡ **Performance:** Load testing, capacity planning, optimization
 
 **Estimated Study Time:**
-- Beginner: 40-45 hours (includes all clouds + IaC)
-- Intermediate: 30-35 hours
-- Expert: 18-23 hours
+- Beginner: 45-50 hours (complete coverage)
+- Intermediate: 35-40 hours
+- Expert: 20-25 hours
 
 **Next Steps:**
 1. Start with 00-production-roadmap.md
@@ -425,5 +450,7 @@ You now have everything needed to:
 4. Pick your cloud provider (AWS/GCP/Azure)
 5. Work through cloud deployment guide
 6. Learn Terraform for infrastructure automation
-7. Build capstone projects
-8. Deploy to production! 🎊
+7. Set up disaster recovery and backups
+8. Implement performance testing
+9. Build capstone projects
+10. Deploy to production! 🎊
