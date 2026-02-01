@@ -66,6 +66,16 @@ This comprehensive educational package covers the complete deployment lifecycle 
    - Application Gateway with WAF
    - Cost optimization ($180-750/month)
 
+### Infrastructure as Code
+10. **09-terraform-iac.md** (2,800+ lines)
+    - Terraform fundamentals and providers
+    - AWS/GCP/Azure configurations
+    - State management and collaboration
+    - CI/CD for infrastructure
+    - Secrets management and security
+    - Drift detection and testing
+    - Production best practices
+
 ## 🎯 Learning Paths
 
 ### Path 1: Production Specialist (30 hours)
@@ -110,9 +120,9 @@ This comprehensive educational package covers the complete deployment lifecycle 
 ## 📊 Statistics
 
 ### Documentation
-- **Total Files:** 9 comprehensive guides
-- **Total Lines:** 22,900+ lines
-- **Average Guide Length:** 2,540 lines
+- **Total Files:** 10 comprehensive guides
+- **Total Lines:** 25,700+ lines
+- **Average Guide Length:** 2,570 lines
 
 ### Content Breakdown
 | Module | Lines | Topics |
@@ -126,6 +136,7 @@ This comprehensive educational package covers the complete deployment lifecycle 
 | **AWS Deployment** | **2,600** | **ECS/EKS + Cloud Services** |
 | **GCP Deployment** | **3,900** | **Cloud Run/GKE + Services** |
 | **Azure Deployment** | **5,100** | **Container Apps/AKS + Services** |
+| **Terraform IaC** | **2,800** | **Multi-cloud automation** |
 
 ### Interactive Notebooks
 - **Docker Tutorial:** 22 cells (hands-on exercises)
@@ -377,19 +388,20 @@ After completing these materials, learners should be able to:
 You now have everything needed to:
 - ✅ Deploy RAG Engine to any environment
 - ✅ Choose between AWS, GCP, and Azure
-- ✅ Implement production best practices
+- ✅ Implement Infrastructure as Code with Terraform
 - ✅ Automate deployment pipelines
 - ✅ Handle production incidents
 - ✅ Maintain high availability
 - ✅ Optimize cloud costs
+- ✅ Manage infrastructure as code
 
 **Start with Module 1 and work your way through to production mastery!** 🚀
 
 ---
 
 **Total Educational Value:**
-- **9 comprehensive guides** (6 core + 3 cloud)
-- **22,900+ lines of documentation**
+- **10 comprehensive guides** (6 core + 3 cloud + 1 IaC)
+- **25,700+ lines of documentation**
 - **3 learning paths** (30h, 20h, 12h)
 - **28 structured modules**
 - **3 interactive notebooks**
@@ -399,11 +411,12 @@ You now have everything needed to:
 - ☁️ **AWS:** ECS, EKS, RDS, ElastiCache, S3, CloudWatch
 - ☁️ **GCP:** Cloud Run, GKE, Cloud SQL, Memorystore, Cloud Armor
 - ☁️ **Azure:** Container Apps, AKS, PostgreSQL, Redis, App Gateway
+- 🔧 **Terraform:** Multi-cloud IaC, state management, CI/CD
 
 **Estimated Study Time:**
-- Beginner: 35-40 hours (includes all 3 clouds)
-- Intermediate: 25-30 hours
-- Expert: 15-20 hours
+- Beginner: 40-45 hours (includes all clouds + IaC)
+- Intermediate: 30-35 hours
+- Expert: 18-23 hours
 
 **Next Steps:**
 1. Start with 00-production-roadmap.md
@@ -411,5 +424,6 @@ You now have everything needed to:
 3. Work through Docker and Kubernetes modules
 4. Pick your cloud provider (AWS/GCP/Azure)
 5. Work through cloud deployment guide
-6. Build capstone projects
-7. Deploy to production! 🎊
+6. Learn Terraform for infrastructure automation
+7. Build capstone projects
+8. Deploy to production! 🎊
