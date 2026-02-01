@@ -18,6 +18,8 @@ class Language(str, Enum):
 
     ENGLISH = "en"
     ARABIC = "ar"
+    HEBREW = "he"
+    FARSI = "fa"
     SPANISH = "es"
     FRENCH = "fr"
     GERMAN = "de"
