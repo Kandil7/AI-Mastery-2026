@@ -44,6 +44,28 @@ This comprehensive educational package covers the complete deployment lifecycle 
    - Diagnostic scripts
    - Incident response
 
+### Cloud Deployment Guides
+7. **06-aws-deployment.md** (2,600+ lines)
+   - ECS with Fargate (serverless)
+   - EKS (managed Kubernetes)
+   - RDS, ElastiCache, S3 integration
+   - CloudWatch monitoring
+   - Cost optimization ($200-800/month)
+
+8. **07-gcp-deployment.md** (3,900+ lines)
+   - Cloud Run (fully serverless)
+   - GKE Autopilot/Standard
+   - Cloud SQL, Memorystore integration
+   - Cloud Monitoring & Armor
+   - Cost optimization ($150-600/month)
+
+9. **08-azure-deployment.md** (5,100+ lines)
+   - Container Apps (KEDA-based)
+   - AKS with AGIC
+   - Azure PostgreSQL, Redis
+   - Application Gateway with WAF
+   - Cost optimization ($180-750/month)
+
 ## 🎯 Learning Paths
 
 ### Path 1: Production Specialist (30 hours)
@@ -88,9 +110,9 @@ This comprehensive educational package covers the complete deployment lifecycle 
 ## 📊 Statistics
 
 ### Documentation
-- **Total Files:** 6 comprehensive guides
-- **Total Lines:** 11,300+ lines
-- **Average Guide Length:** 1,880 lines
+- **Total Files:** 9 comprehensive guides
+- **Total Lines:** 22,900+ lines
+- **Average Guide Length:** 2,540 lines
 
 ### Content Breakdown
 | Module | Lines | Topics |
@@ -101,10 +123,14 @@ This comprehensive educational package covers the complete deployment lifecycle 
 | Kubernetes | 2,000 | Complete K8s guide |
 | CI/CD Pipeline | 1,800 | Automation strategies |
 | Troubleshooting | 1,500 | 8 issue categories |
+| **AWS Deployment** | **2,600** | **ECS/EKS + Cloud Services** |
+| **GCP Deployment** | **3,900** | **Cloud Run/GKE + Services** |
+| **Azure Deployment** | **5,100** | **Container Apps/AKS + Services** |
 
 ### Interactive Notebooks
 - **Docker Tutorial:** 22 cells (hands-on exercises)
-- **Future:** Kubernetes, CI/CD, Monitoring notebooks
+- **Kubernetes Tutorial:** 40+ cells (deployments, services, HPA)
+- **Cloud Deployment Chooser:** Interactive decision tree with cost calculator
 
 ## 🎓 Key Learning Outcomes
 
@@ -350,30 +376,40 @@ After completing these materials, learners should be able to:
 
 You now have everything needed to:
 - ✅ Deploy RAG Engine to any environment
+- ✅ Choose between AWS, GCP, and Azure
 - ✅ Implement production best practices
 - ✅ Automate deployment pipelines
 - ✅ Handle production incidents
 - ✅ Maintain high availability
+- ✅ Optimize cloud costs
 
 **Start with Module 1 and work your way through to production mastery!** 🚀
 
 ---
 
 **Total Educational Value:**
-- 6 comprehensive guides
-- 11,300+ lines of documentation
-- 3 learning paths
-- 28 structured modules
-- Production-ready knowledge
+- **9 comprehensive guides** (6 core + 3 cloud)
+- **22,900+ lines of documentation**
+- **3 learning paths** (30h, 20h, 12h)
+- **28 structured modules**
+- **3 interactive notebooks**
+- **Production-ready knowledge**
+
+**Cloud Coverage:**
+- ☁️ **AWS:** ECS, EKS, RDS, ElastiCache, S3, CloudWatch
+- ☁️ **GCP:** Cloud Run, GKE, Cloud SQL, Memorystore, Cloud Armor
+- ☁️ **Azure:** Container Apps, AKS, PostgreSQL, Redis, App Gateway
 
 **Estimated Study Time:**
-- Beginner: 25-30 hours
-- Intermediate: 18-23 hours
-- Expert: 12-15 hours
+- Beginner: 35-40 hours (includes all 3 clouds)
+- Intermediate: 25-30 hours
+- Expert: 15-20 hours
 
 **Next Steps:**
 1. Start with 00-production-roadmap.md
 2. Choose your learning path
-3. Work through modules
-4. Build capstone projects
-5. Deploy to production! 🎊
+3. Work through Docker and Kubernetes modules
+4. Pick your cloud provider (AWS/GCP/Azure)
+5. Work through cloud deployment guide
+6. Build capstone projects
+7. Deploy to production! 🎊
