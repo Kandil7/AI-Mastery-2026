@@ -155,6 +155,7 @@ class MarkdownChunker(BaseChunker):
         counter = CharCounter()
 
         while current_pos < start_pos + len(content):
+            prev_pos = current_pos
             # Calculate how much we can take for this chunk
             remaining_content = content[current_pos - start_pos:]
             chunk_size = min(self.config.chunk_size, len(remaining_content))
@@ -170,10 +171,10 @@ class MarkdownChunker(BaseChunker):
             })
             
             # Move to next position, accounting for overlap
-            current_pos = chunk_end - self.config.chunk_overlap
-            if current_pos <= chunk_end and self.config.chunk_overlap > 0:
-                # Ensure we don't get stuck in an infinite loop
-                current_pos = max(current_pos, chunk_end + 1)
+            next_pos = chunk_end - self.config.chunk_overlap
+            if next_pos <= prev_pos:
+                next_pos = prev_pos + 1
+            current_pos = next_pos
 
         return chunks
     
@@ -186,37 +187,47 @@ class MarkdownChunker(BaseChunker):
         
         for i in range(1, len(chunks)):
             current_chunk = chunks[i]
-            previous_chunk = result[-1]  # Use the last chunk in result (which may have overlap)
+            previous_chunk = result[-1]
             
-            # Extract the overlap from the previous chunk
             prev_content = previous_chunk.content
-            prev_tokens = len(prev_content)  # Using character count as tokens for simplicity
-            overlap_size = min(self.config.chunk_overlap, prev_tokens)
+            overlap_size = min(self.config.chunk_overlap, len(prev_content))
             
-            if overlap_size > 0:
-                overlap_text = prev_content[-overlap_size:]
-                new_content = overlap_text + current_chunk.content
-            else:
-                new_content = current_chunk.content
-            
-            # Create a new document with the overlapped content
-            new_doc = Document(
-                id=current_chunk.id,
-                content=new_content,
-                source=current_chunk.source,
-                doc_type=current_chunk.doc_type,
-                metadata={
-                    **current_chunk.metadata,
-                    "has_overlap": True,
-                    "overlap_from": previous_chunk.id,
-                    "overlap_strategy": "markdown"
-                },
-                created_at=current_chunk.created_at,
-                updated_at=current_chunk.updated_at,
-                access_control=current_chunk.access_control,
-                page_number=current_chunk.page_number,
-                section_title=current_chunk.section_title
+            new_content = (
+                prev_content[-overlap_size:] + current_chunk.content
+                if overlap_size > 0
+                else current_chunk.content
             )
+            
+            new_metadata = {
+                **(getattr(current_chunk, "metadata", {}) or {}),
+                "has_overlap": True,
+                "overlap_from": getattr(previous_chunk, "id", None),
+                "overlap_strategy": "markdown",
+                "overlap_size": overlap_size,
+                "chunk_char_len": len(new_content),
+            }
+
+            ctor_kwargs = {
+                "id": getattr(current_chunk, "id", None),
+                "content": new_content,
+                "metadata": new_metadata,
+            }
+            if hasattr(current_chunk, "embedding"):
+                ctor_kwargs["embedding"] = getattr(current_chunk, "embedding")
+
+            new_doc = Document(**ctor_kwargs)
+
+            for attr in (
+                "source",
+                "doc_type",
+                "created_at",
+                "updated_at",
+                "access_control",
+                "page_number",
+                "section_title",
+            ):
+                if hasattr(current_chunk, attr):
+                    setattr(new_doc, attr, getattr(current_chunk, attr))
             
             result.append(new_doc)
         

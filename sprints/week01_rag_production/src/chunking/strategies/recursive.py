@@ -123,11 +123,9 @@ def _apply_overlap_units(
         # Get the overlapping portion from the previous chunk
         overlap_text = counter.slice_by_units(prev_chunk_text, prev_chunk_size - overlap_size_units, prev_chunk_size)
         
-        # Create new chunk with overlap prepended
+        # Create new chunk with overlap prepended; keep original span for accurate offsets
         new_text = overlap_text + chunk.text
-        new_span = TextSpan(chunks[i-1].span.start, chunk.span.end)
-        
-        result.append(_Piece(new_text, new_span))
+        result.append(_Piece(new_text, chunk.span))
 
     return result
 
@@ -270,9 +268,9 @@ class RecursiveCharacterChunker(BaseChunker):
             chunks.append(_Piece(chunk_text, TextSpan(chunk_start, chunk_end)))
             
             # Move start position forward, accounting for overlap
-            start = end - self.config.chunk_overlap
-            if start < end and self.config.chunk_overlap > 0:
-                # Ensure we don't get stuck in an infinite loop
-                start = max(start, start + 1)
+            next_start = end - self.config.chunk_overlap
+            if next_start <= start:
+                next_start = start + 1
+            start = next_start
 
         return chunks

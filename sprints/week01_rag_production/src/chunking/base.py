@@ -38,24 +38,36 @@ class BaseChunker(ABC):
         chunk_id = self._stable_chunk_id(original_doc.id, chunk_index, span, content)
 
         chunk_metadata = {
-            **(original_doc.metadata or {}),
+            **(getattr(original_doc, "metadata", {}) or {}),
             "chunk_index": chunk_index,
             "chunk_start": span.start,
             "chunk_end": span.end,
-            "original_id": original_doc.id,
+            "original_id": getattr(original_doc, "id", None),
             "chunk_char_len": len(content),
             "chunk_strategy": self.__class__.__name__,
         }
 
-        return Document(
-            id=chunk_id,
-            content=content,
-            source=original_doc.source,
-            doc_type=f"{original_doc.doc_type}_chunk",
-            metadata=chunk_metadata,
-            created_at=original_doc.created_at,
-            updated_at=original_doc.updated_at,
-            access_control=original_doc.access_control,
-            page_number=original_doc.page_number,
-            section_title=original_doc.section_title,
-        )
+        ctor_kwargs = {
+            "id": chunk_id,
+            "content": content,
+            "metadata": chunk_metadata,
+        }
+
+        if hasattr(original_doc, "embedding"):
+            ctor_kwargs["embedding"] = getattr(original_doc, "embedding")
+
+        chunk_doc = Document(**ctor_kwargs)
+
+        for attr in (
+            "source",
+            "doc_type",
+            "created_at",
+            "updated_at",
+            "access_control",
+            "page_number",
+            "section_title",
+        ):
+            if hasattr(original_doc, attr):
+                setattr(chunk_doc, attr, getattr(original_doc, attr))
+
+        return chunk_doc

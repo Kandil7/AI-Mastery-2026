@@ -1,63 +1,59 @@
 """
-File Upload and Processing Module for Production RAG System
+Production File Upload + Processing Module for RAG
 
-This module implements comprehensive file upload and processing functionality for the RAG system.
-It handles various document formats, performs content extraction, validation, and preprocessing
-before indexing in the RAG pipeline.
-
-The module follows production best practices:
-- Secure file handling with validation and sanitization
-- Support for multiple document formats (PDF, DOCX, TXT, MD)
-- Content extraction with error handling and fallbacks
-- File size and type validation
-- Virus scanning integration (conceptual)
-- OCR support for scanned documents (conceptual)
-
-Key Features:
-- Multiple file format support
-- Content extraction and text cleaning
-- File validation and security checks
-- Asynchronous processing for large files
-- Progress tracking for long-running operations
-- Error recovery and retry mechanisms
-
-Security Considerations:
-- File type validation to prevent malicious uploads
-- Size limits to prevent resource exhaustion
-- Content sanitization to prevent injection attacks
-- Secure temporary file handling
-- Virus scanning integration points
+Upgrades included:
+- Content-based file type sniffing (magic bytes) + extension + MIME validation
+- Secure storage with UUID filenames + tenant-aware directories
+- Streaming save (no need to load full file into memory)
+- Virus scanning integration (optional clamd)
+- PDF extraction with fallback + OCR for scanned PDFs (optional pdf2image + pytesseract)
+- Process isolation + timeouts for extraction to avoid parser hangs
+- Resource limits: max size, max pages, max extracted chars
+- Async jobs + progress tracking store (pluggable)
+- Language detection integrated (optional langdetect)
+- Automatic cleanup
 """
 
 import asyncio
 import hashlib
-import os
-import tempfile
-from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
-from pydantic import BaseModel, Field, field_validator
-from abc import ABC, abstractmethod
 import logging
+import mimetypes
+import os
+import re
+import time
+import uuid
+from abc import ABC, abstractmethod
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel, Field, field_validator
 
 # Import document class from retrieval module
 from src.retrieval import Document
 
-# Try to import required libraries with graceful fallbacks
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# ----------------------------
+# Optional dependencies
+# ----------------------------
 try:
     import PyPDF2
     from pdfminer.high_level import extract_text as pdf_extract_text
     PDF_SUPPORT = True
 except ImportError:
     PDF_SUPPORT = False
-    logging.warning("PyPDF2 or pdfminer not available. PDF support disabled.")
+    logger.warning("PyPDF2 or pdfminer not available. PDF support disabled.")
 
 try:
     import docx
     DOCX_SUPPORT = True
 except ImportError:
     DOCX_SUPPORT = False
-    logging.warning("python-docx not available. DOCX support disabled.")
+    logger.warning("python-docx not available. DOCX support disabled.")
 
 try:
     from PIL import Image
@@ -65,77 +61,91 @@ try:
     OCR_SUPPORT = True
 except ImportError:
     OCR_SUPPORT = False
-    logging.warning("PIL or pytesseract not available. OCR support disabled.")
+    logger.warning("PIL or pytesseract not available. OCR support disabled.")
 
 try:
     from langdetect import detect
     LANG_DETECT_SUPPORT = True
 except ImportError:
     LANG_DETECT_SUPPORT = False
-    logging.warning("langdetect not available. Language detection disabled.")
+    logger.warning("langdetect not available. Language detection disabled.")
+
+try:
+    import magic  # python-magic (libmagic)
+    MAGIC_SUPPORT = True
+except ImportError:
+    MAGIC_SUPPORT = False
+    logger.warning("python-magic not available. Content sniffing will be heuristic.")
+
+try:
+    import clamd  # clamd client for ClamAV daemon
+    CLAMAV_SUPPORT = True
+except ImportError:
+    CLAMAV_SUPPORT = False
+    logger.warning("clamd not available. Virus scanning will be skipped.")
+
+try:
+    from pdf2image import convert_from_path  # rasterize PDF pages for OCR
+    PDF2IMAGE_SUPPORT = True
+except ImportError:
+    PDF2IMAGE_SUPPORT = False
+    logger.warning("pdf2image not available. OCR fallback for scanned PDFs disabled.")
 
 
+# ----------------------------
+# Enums / Models
+# ----------------------------
 class FileType(Enum):
-    """Enumeration for supported file types."""
     PDF = "pdf"
     DOCX = "docx"
     TXT = "txt"
     MD = "md"
-    IMAGE = "image"  # For OCR processing
+    IMAGE = "image"
+
+
+class JobStatus(Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
 
 
 class FileUploadRequest(BaseModel):
-    """
-    Request model for file upload operations.
+    filename: str = Field(..., min_length=1, max_length=255)
+    content_type: str = Field(..., description="MIME type (client-provided, not trusted)")
+    file_size: int = Field(..., gt=0)
+    tenant_id: Optional[str] = Field(None, description="Multi-tenant routing key")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    Attributes:
-        filename (str): Original filename
-        content_type (str): MIME type of the file
-        file_size (int): Size of the file in bytes
-        chunk_size (int): Size of file chunks for processing
-        chunk_number (int): Current chunk number (for large files)
-        total_chunks (int): Total number of chunks (for large files)
-        metadata (Dict[str, Any]): Additional metadata for the file
-    """
-    filename: str = Field(..., min_length=1, max_length=255, description="Original filename")
-    content_type: str = Field(..., description="MIME type of the file")
-    file_size: int = Field(..., gt=0, description="Size of the file in bytes")
-    chunk_size: Optional[int] = Field(None, gt=0, description="Size of file chunks")
-    chunk_number: Optional[int] = Field(None, ge=0, description="Current chunk number")
-    total_chunks: Optional[int] = Field(None, ge=0, description="Total number of chunks")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-
-    @field_validator('filename')
-    def validate_filename(cls, v):
-        """Validate filename format."""
+    @field_validator("filename")
+    def validate_filename(cls, v: str) -> str:
         if not v or not isinstance(v, str):
             raise ValueError("Filename must be a non-empty string")
-        if '..' in v or '/' in v or '\\' in v:
-            raise ValueError("Filename contains invalid characters")
+        # prevent traversal + weird separators
+        if ".." in v or "/" in v or "\\" in v:
+            raise ValueError("Filename contains invalid path characters")
+        # basic sanitation
+        if len(v.strip()) == 0:
+            raise ValueError("Filename cannot be blank")
         return v
 
-    @field_validator('file_size')
-    def validate_file_size(cls, v):
-        """Validate file size (max 50MB)."""
-        max_size = 50 * 1024 * 1024  # 50MB
+    @field_validator("file_size")
+    def validate_file_size(cls, v: int) -> int:
+        max_size = 50 * 1024 * 1024
         if v > max_size:
-            raise ValueError(f"File size exceeds maximum allowed size of {max_size} bytes")
+            raise ValueError(f"File size exceeds max allowed ({max_size} bytes)")
+        return v
+
+    @field_validator("tenant_id")
+    def validate_tenant_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if not re.fullmatch(r"[a-zA-Z0-9_\-]{1,64}", v):
+            raise ValueError("tenant_id must be alphanumeric/_/- up to 64 chars")
         return v
 
 
 class FileProcessingResult(BaseModel):
-    """
-    Result model for file processing operations.
-
-    Attributes:
-        success (bool): Whether the operation was successful
-        message (str): Human-readable message about the result
-        documents (List[Document]): Extracted documents
-        extracted_text_length (int): Total length of extracted text
-        processing_time_ms (float): Time taken for processing in milliseconds
-        warnings (List[str]): Any warnings during processing
-        metadata (Dict[str, Any]): Additional metadata about the processing
-    """
     success: bool
     message: str
     documents: List[Document]
@@ -145,414 +155,663 @@ class FileProcessingResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-class DocumentProcessor(ABC):
-    """
-    Abstract base class for document processors.
+class JobInfo(BaseModel):
+    job_id: str
+    status: JobStatus
+    progress: float = Field(0.0, ge=0.0, le=100.0)
+    message: str = ""
+    created_at: float
+    updated_at: float
+    result: Optional[FileProcessingResult] = None
+    error: Optional[str] = None
 
-    Defines the interface for processing different document types.
-    Each concrete processor should implement the extract_text method.
-    """
 
+# ----------------------------
+# Progress Store (pluggable)
+# ----------------------------
+class ProgressStore(ABC):
     @abstractmethod
-    def extract_text(self, file_path: str) -> str:
+    def create(self) -> JobInfo: ...
+    @abstractmethod
+    def update(self, job_id: str, **kwargs) -> JobInfo: ...
+    @abstractmethod
+    def get(self, job_id: str) -> Optional[JobInfo]: ...
+
+
+class InMemoryProgressStore(ProgressStore):
+    def __init__(self):
+        self._jobs: Dict[str, JobInfo] = {}
+        self._lock = asyncio.Lock()
+
+    def create(self) -> JobInfo:
+        now = time.time()
+        job = JobInfo(
+            job_id=str(uuid.uuid4()),
+            status=JobStatus.QUEUED,
+            progress=0.0,
+            message="queued",
+            created_at=now,
+            updated_at=now,
+        )
+        self._jobs[job.job_id] = job
+        return job
+
+    def update(self, job_id: str, **kwargs) -> JobInfo:
+        job = self._jobs[job_id]
+        data = job.model_dump()
+        data.update(kwargs)
+        data["updated_at"] = time.time()
+        job = JobInfo(**data)
+        self._jobs[job_id] = job
+        return job
+
+    def get(self, job_id: str) -> Optional[JobInfo]:
+        return self._jobs.get(job_id)
+
+
+# ----------------------------
+# Document Processors
+# ----------------------------
+class DocumentProcessor(ABC):
+    @abstractmethod
+    def extract_text(self, file_path: str, *, limits: "ExtractionLimits") -> Tuple[str, Dict[str, Any]]:
         """
-        Extract text content from the document.
-
-        Args:
-            file_path: Path to the document file
-
         Returns:
-            Extracted text content as a string
+            (text, meta) where meta includes extraction method details.
         """
-        pass
 
-    def validate_file(self, file_path: str) -> bool:
-        """
-        Validate the file before processing.
 
-        Args:
-            file_path: Path to the document file
+@dataclass(frozen=True)
+class ExtractionLimits:
+    max_pages: int = 300
+    max_chars: int = 2_000_000          # cap extracted text length
+    timeout_sec: int = 60              # hard timeout for extraction
+    ocr_max_pages: int = 20            # cap OCR pages (expensive)
+    min_text_threshold: int = 200      # below this treat as "scanned/empty"
 
-        Returns:
-            True if file is valid, False otherwise
-        """
-        path = Path(file_path)
-        return path.exists() and path.is_file() and path.stat().st_size > 0
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars]
 
 
 class PDFProcessor(DocumentProcessor):
-    """
-    Processor for PDF documents.
-
-    Handles PDF files using multiple extraction methods with fallbacks.
-    """
-
-    def extract_text(self, file_path: str) -> str:
-        """
-        Extract text from PDF file using multiple methods with fallbacks.
-
-        Args:
-            file_path: Path to the PDF file
-
-        Returns:
-            Extracted text content as a string
-        """
+    def extract_text(self, file_path: str, *, limits: ExtractionLimits) -> Tuple[str, Dict[str, Any]]:
         if not PDF_SUPPORT:
             raise RuntimeError("PDF processing libraries not available")
 
+        meta: Dict[str, Any] = {"method": None, "ocr_used": False, "pages": None}
+
+        # First, attempt pdfminer
         text = ""
-        errors = []
+        errors: List[str] = []
 
-        # Method 1: Try pdfminer (more accurate for complex layouts)
         try:
-            text = pdf_extract_text(file_path)
-            if text.strip():
-                return text
+            text = pdf_extract_text(file_path) or ""
+            meta["method"] = "pdfminer"
+            # Try to estimate pages using PyPDF2 (cheap)
+            try:
+                with open(file_path, "rb") as f:
+                    r = PyPDF2.PdfReader(f)
+                    meta["pages"] = len(r.pages)
+                    if meta["pages"] and meta["pages"] > limits.max_pages:
+                        raise RuntimeError(f"PDF has too many pages ({meta['pages']} > {limits.max_pages})")
+            except Exception as e:
+                errors.append(f"page_count failed: {e}")
+
+            if len(text.strip()) >= limits.min_text_threshold:
+                return _truncate_text(text, limits.max_chars), meta
         except Exception as e:
-            errors.append(f"pdfminer failed: {str(e)}")
+            errors.append(f"pdfminer failed: {e}")
 
-        # Method 2: Try PyPDF2
+        # Second, PyPDF2
         try:
-            with open(file_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                pages_text = []
-                for page_num in range(len(reader.pages)):
-                    page = reader.pages[page_num]
-                    page_text = page.extract_text()
-                    pages_text.append(page_text)
-                text = "\n".join(pages_text)
-                
+            pages_text: List[str] = []
+            with open(file_path, "rb") as f:
+                r = PyPDF2.PdfReader(f)
+                page_count = len(r.pages)
+                meta["pages"] = page_count
+                if page_count > limits.max_pages:
+                    raise RuntimeError(f"PDF has too many pages ({page_count} > {limits.max_pages})")
+
+                for i in range(page_count):
+                    page = r.pages[i]
+                    pt = page.extract_text() or ""
+                    pages_text.append(pt)
+
+            text = "\n".join(pages_text)
+            meta["method"] = "pypdf2"
+            if len(text.strip()) >= limits.min_text_threshold:
+                return _truncate_text(text, limits.max_chars), meta
+        except Exception as e:
+            errors.append(f"PyPDF2 failed: {e}")
+
+        # OCR fallback for scanned PDFs (optional)
+        if OCR_SUPPORT and PDF2IMAGE_SUPPORT:
+            try:
+                meta["method"] = "ocr_pdf"
+                meta["ocr_used"] = True
+
+                # Rasterize only first N pages to control cost
+                images = convert_from_path(file_path, first_page=1, last_page=min(limits.ocr_max_pages, limits.max_pages))
+                ocr_parts: List[str] = []
+                for img in images:
+                    ocr_parts.append(pytesseract.image_to_string(img))
+                text = "\n".join(ocr_parts)
+
                 if text.strip():
-                    return text
-        except Exception as e:
-            errors.append(f"PyPDF2 failed: {str(e)}")
+                    return _truncate_text(text, limits.max_chars), meta
+            except Exception as e:
+                errors.append(f"OCR fallback failed: {e}")
 
-        # If both methods failed, raise an exception with error details
-        raise RuntimeError(f"Failed to extract text from PDF. Errors: {'; '.join(errors)}")
+        raise RuntimeError(f"Failed to extract text from PDF. Errors: {'; '.join(map(str, errors))}")
 
 
 class DOCXProcessor(DocumentProcessor):
-    """
-    Processor for DOCX documents.
-
-    Handles Microsoft Word documents using python-docx.
-    """
-
-    def extract_text(self, file_path: str) -> str:
-        """
-        Extract text from DOCX file.
-
-        Args:
-            file_path: Path to the DOCX file
-
-        Returns:
-            Extracted text content as a string
-        """
+    def extract_text(self, file_path: str, *, limits: ExtractionLimits) -> Tuple[str, Dict[str, Any]]:
         if not DOCX_SUPPORT:
             raise RuntimeError("DOCX processing libraries not available")
 
-        try:
-            doc = docx.Document(file_path)
-            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-            return "\n".join(paragraphs)
-        except Exception as e:
-            raise RuntimeError(f"Failed to extract text from DOCX: {str(e)}")
+        meta = {"method": "python-docx"}
+        doc = docx.Document(file_path)
+
+        parts: List[str] = []
+        # paragraphs
+        parts.extend([p.text for p in doc.paragraphs if p.text and p.text.strip()])
+
+        # tables (common missing piece)
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text)
+                if row_text.strip():
+                    parts.append(row_text)
+
+        text = "\n".join(parts)
+        return _truncate_text(text, limits.max_chars), meta
 
 
 class TextProcessor(DocumentProcessor):
-    """
-    Processor for plain text files.
+    def extract_text(self, file_path: str, *, limits: ExtractionLimits) -> Tuple[str, Dict[str, Any]]:
+        meta = {"method": "text"}
+        encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252"]
+        last_err: Optional[Exception] = None
 
-    Handles TXT and MD files with encoding detection.
-    """
-
-    def extract_text(self, file_path: str) -> str:
-        """
-        Extract text from plain text file with encoding detection.
-
-        Args:
-            file_path: Path to the text file
-
-        Returns:
-            Extracted text content as a string
-        """
-        encodings = ['utf-8', 'latin-1', 'cp1252']
-
-        for encoding in encodings:
+        for enc in encodings:
             try:
-                with open(file_path, 'r', encoding=encoding) as file:
-                    return file.read()
-            except UnicodeDecodeError:
+                with open(file_path, "r", encoding=enc) as f:
+                    text = f.read()
+                return _truncate_text(text, limits.max_chars), {**meta, "encoding": enc}
+            except UnicodeDecodeError as e:
+                last_err = e
                 continue
-            except Exception as e:
-                raise RuntimeError(f"Failed to read text file: {str(e)}")
 
-        raise RuntimeError("Failed to decode text file with any of the attempted encodings")
+        raise RuntimeError(f"Failed to decode text file. Last error: {last_err}")
 
 
 class ImageProcessor(DocumentProcessor):
-    """
-    Processor for image files with OCR support.
-
-    Handles image files using OCR technology.
-    """
-
-    def extract_text(self, file_path: str) -> str:
-        """
-        Extract text from image file using OCR.
-
-        Args:
-            file_path: Path to the image file
-
-        Returns:
-            Extracted text content as a string
-        """
+    def extract_text(self, file_path: str, *, limits: ExtractionLimits) -> Tuple[str, Dict[str, Any]]:
         if not OCR_SUPPORT:
             raise RuntimeError("OCR processing libraries not available")
+        meta = {"method": "ocr_image", "ocr_used": True}
 
+        image = Image.open(file_path)
+        text = pytesseract.image_to_string(image)
+        return _truncate_text(text, limits.max_chars), meta
+
+
+# ----------------------------
+# File Type Sniffing
+# ----------------------------
+class FileSniffer:
+    """
+    Detect file type via:
+    1) libmagic if available
+    2) signature heuristics
+    3) extension fallback
+    """
+
+    def sniff_mime(self, file_path: str) -> Optional[str]:
+        if MAGIC_SUPPORT:
+            try:
+                m = magic.Magic(mime=True)
+                return m.from_file(file_path)
+            except Exception:
+                return None
+
+        # Heuristic signature sniffing
         try:
-            image = Image.open(file_path)
-            text = pytesseract.image_to_string(image)
-            return text
+            with open(file_path, "rb") as f:
+                head = f.read(16)
+            # PDF: %PDF-
+            if head.startswith(b"%PDF-"):
+                return "application/pdf"
+            # ZIP (DOCX is zip container)
+            if head.startswith(b"PK\x03\x04"):
+                return "application/zip"
+            # PNG
+            if head.startswith(b"\x89PNG\r\n\x1a\n"):
+                return "image/png"
+            # JPG
+            if head.startswith(b"\xFF\xD8\xFF"):
+                return "image/jpeg"
+        except Exception:
+            return None
+
+        return None
+
+    def to_file_type(self, filename: str, sniffed_mime: Optional[str]) -> FileType:
+        ext = Path(filename).suffix.lower().lstrip(".")
+        # primary by sniffed mime
+        if sniffed_mime:
+            if sniffed_mime == "application/pdf":
+                return FileType.PDF
+            if sniffed_mime in ("image/png", "image/jpeg", "image/bmp", "image/tiff", "image/webp"):
+                return FileType.IMAGE
+            if sniffed_mime in ("text/plain", "text/markdown", "text/x-markdown"):
+                return FileType.TXT if ext == "txt" else FileType.MD
+            # zip could be docx
+            if sniffed_mime in ("application/zip",):
+                if ext in ("docx", "doc"):
+                    return FileType.DOCX
+
+        # fallback by extension
+        if ext == "pdf":
+            return FileType.PDF
+        if ext in ("docx", "doc"):
+            return FileType.DOCX
+        if ext == "txt":
+            return FileType.TXT
+        if ext == "md":
+            return FileType.MD
+        if ext in ("jpg", "jpeg", "png", "bmp", "tiff", "webp"):
+            return FileType.IMAGE
+
+        raise ValueError(f"Unsupported file type: {ext} (sniffed_mime={sniffed_mime})")
+
+
+# ----------------------------
+# Virus Scanning
+# ----------------------------
+class VirusScanner(ABC):
+    @abstractmethod
+    def scan(self, file_path: str) -> Tuple[bool, Optional[str]]:
+        """Returns (is_clean, reason)."""
+
+
+class NoopVirusScanner(VirusScanner):
+    def scan(self, file_path: str) -> Tuple[bool, Optional[str]]:
+        return True, None
+
+
+class ClamAVScanner(VirusScanner):
+    def __init__(self, socket_path: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
+        if not CLAMAV_SUPPORT:
+            raise RuntimeError("clamd not installed")
+        self.socket_path = socket_path
+        self.host = host
+        self.port = port
+
+    def _client(self):
+        if self.socket_path:
+            return clamd.ClamdUnixSocket(self.socket_path)
+        if self.host and self.port:
+            return clamd.ClamdNetworkSocket(self.host, self.port)
+        # default unix socket
+        return clamd.ClamdUnixSocket()
+
+    def scan(self, file_path: str) -> Tuple[bool, Optional[str]]:
+        c = self._client()
+        try:
+            res = c.scan(file_path)
+            # res example: {"/path": ("OK", None)} or ("FOUND", "MalwareName")
+            status, info = res.get(file_path, (None, None))
+            if status == "OK":
+                return True, None
+            return False, f"Virus scan failed: {status} {info}"
         except Exception as e:
-            raise RuntimeError(f"Failed to extract text from image using OCR: {str(e)}")
+            # in production you may choose fail-closed; here fail-open with warning is safer for dev
+            return True, f"Virus scan unavailable: {e}"
 
 
+# ----------------------------
+# Secure Storage
+# ----------------------------
+class SecureStorage:
+    def __init__(self, base_dir: str):
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    def tenant_dir(self, tenant_id: Optional[str]) -> Path:
+        tid = tenant_id or "public"
+        p = self.base_dir / tid
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def generate_path(self, tenant_id: Optional[str], original_filename: str) -> Path:
+        ext = Path(original_filename).suffix.lower()
+        safe_ext = ext if re.fullmatch(r"\.[a-z0-9]{1,8}", ext) else ""
+        filename = f"{uuid.uuid4().hex}{safe_ext}"
+        return self.tenant_dir(tenant_id) / filename
+
+
+# ----------------------------
+# Extraction Runner (Process isolation + timeout)
+# ----------------------------
+def _extract_in_subprocess(processor_name: str, file_path: str, limits: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    """
+    Runs in a separate process to isolate parser hangs.
+    """
+    lim = ExtractionLimits(**limits)
+
+    processors: Dict[str, DocumentProcessor] = {
+        "pdf": PDFProcessor(),
+        "docx": DOCXProcessor(),
+        "text": TextProcessor(),
+        "image": ImageProcessor(),
+        "md": TextProcessor(),
+        "txt": TextProcessor(),
+    }
+    proc = processors[processor_name]
+    return proc.extract_text(file_path, limits=lim)
+
+
+# ----------------------------
+# FileManager (Production)
+# ----------------------------
 class FileManager:
-    """
-    Manager class for handling file uploads and processing.
-
-    Coordinates the entire file processing pipeline from upload to document extraction.
-    """
-
-    def __init__(self, upload_dir: str = "uploads", max_file_size: int = 50 * 1024 * 1024):
-        """
-        Initialize the file manager.
-
-        Args:
-            upload_dir: Directory to store uploaded files temporarily
-            max_file_size: Maximum allowed file size in bytes
-        """
-        self.upload_dir = Path(upload_dir)
+    def __init__(
+        self,
+        upload_dir: str = "uploads",
+        max_file_size: int = 50 * 1024 * 1024,
+        extraction_limits: ExtractionLimits = ExtractionLimits(),
+        progress_store: Optional[ProgressStore] = None,
+        virus_scanner: Optional[VirusScanner] = None,
+        process_pool_workers: int = 2,
+    ):
         self.max_file_size = max_file_size
-        self.processors = {
-            FileType.PDF: PDFProcessor() if PDF_SUPPORT else None,
-            FileType.DOCX: DOCXProcessor() if DOCX_SUPPORT else None,
-            FileType.TXT: TextProcessor(),
-            FileType.MD: TextProcessor(),
-            FileType.IMAGE: ImageProcessor() if OCR_SUPPORT else None,
+        self.limits = extraction_limits
+        self.sniffer = FileSniffer()
+        self.storage = SecureStorage(upload_dir)
+        self.progress = progress_store or InMemoryProgressStore()
+        self.virus_scanner = virus_scanner or NoopVirusScanner()
+        self.pool = ProcessPoolExecutor(max_workers=process_pool_workers)
+
+        # registry
+        self._processor_key_by_type: Dict[FileType, str] = {
+            FileType.PDF: "pdf",
+            FileType.DOCX: "docx",
+            FileType.TXT: "txt",
+            FileType.MD: "md",
+            FileType.IMAGE: "image",
         }
 
-        # Create upload directory if it doesn't exist
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
+    # ---------- Validation ----------
+    def validate_file_upload(self, req: FileUploadRequest) -> List[str]:
+        errors: List[str] = []
 
-    def get_file_type(self, filename: str) -> FileType:
-        """
-        Determine the file type based on the extension.
+        if req.file_size > self.max_file_size:
+            errors.append(f"File too large: {req.file_size} > {self.max_file_size}")
 
-        Args:
-            filename: Name of the file
+        # quick extension sanity (not authoritative)
+        ext = Path(req.filename).suffix.lower().lstrip(".")
+        if not ext:
+            errors.append("Missing file extension")
 
-        Returns:
-            FileType enum value
-        """
-        ext = Path(filename).suffix.lower()[1:]  # Remove the dot
-        
-        if ext == 'pdf':
-            return FileType.PDF
-        elif ext in ['docx', 'doc']:
-            return FileType.DOCX
-        elif ext == 'txt':
-            return FileType.TXT
-        elif ext == 'md':
-            return FileType.MD
-        elif ext in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']:
-            return FileType.IMAGE
-        else:
-            raise ValueError(f"Unsupported file type: {ext}")
-
-    def validate_file_upload(self, file_request: FileUploadRequest) -> List[str]:
-        """
-        Validate file upload request.
-
-        Args:
-            file_request: File upload request object
-
-        Returns:
-            List of validation errors (empty if valid)
-        """
-        errors = []
-
-        # Check file size
-        if file_request.file_size > self.max_file_size:
-            errors.append(f"File size {file_request.file_size} exceeds maximum allowed size {self.max_file_size}")
-
-        # Check file extension
-        try:
-            file_type = self.get_file_type(file_request.filename)
-            if not self.processors.get(file_type):
-                errors.append(f"File type {file_type.value} is not supported or required libraries are missing")
-        except ValueError as e:
-            errors.append(str(e))
-
-        # Check content type
-        allowed_types = [
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain',
-            'text/markdown',
-            'text/x-markdown',
-            'image/jpeg',
-            'image/png',
-            'image/bmp',
-            'image/tiff',
-            'image/webp'
-        ]
-        
-        if file_request.content_type not in allowed_types:
-            errors.append(f"Content type {file_request.content_type} not allowed")
+        # allowlist of client mime (still not trusted)
+        allowed_client_types = {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "text/markdown",
+            "text/x-markdown",
+            "image/jpeg",
+            "image/png",
+            "image/bmp",
+            "image/tiff",
+            "image/webp",
+        }
+        if req.content_type not in allowed_client_types:
+            errors.append(f"Client content type not allowed: {req.content_type}")
 
         return errors
 
-    async def save_uploaded_file(self, file_data: bytes, filename: str) -> str:
+    # ---------- Saving ----------
+    async def save_stream(self, stream: AsyncIterator[bytes], req: FileUploadRequest) -> str:
         """
-        Save uploaded file to temporary location.
-
-        Args:
-            file_data: Raw file data
-            filename: Original filename
-
-        Returns:
-            Path to saved file
+        Save upload stream to disk safely with size enforcement.
         """
-        # Create a secure filename to prevent path traversal
-        secure_filename = Path(filename).name
-        file_path = self.upload_dir / secure_filename
+        target_path = self.storage.generate_path(req.tenant_id, req.filename)
 
-        # Write file asynchronously
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self._write_file_sync, file_data, file_path)
+        total = 0
+        try:
+            with open(target_path, "wb") as f:
+                async for chunk in stream:
+                    total += len(chunk)
+                    if total > self.max_file_size:
+                        raise ValueError("Upload exceeds max_file_size during streaming")
+                    f.write(chunk)
+            return str(target_path.absolute())
+        except Exception:
+            # cleanup on failure
+            try:
+                if target_path.exists():
+                    target_path.unlink()
+            except Exception:
+                pass
+            raise
 
-        return str(file_path.absolute())
+    async def save_bytes(self, data: bytes, req: FileUploadRequest) -> str:
+        if len(data) > self.max_file_size:
+            raise ValueError("Upload exceeds max_file_size")
+        target_path = self.storage.generate_path(req.tenant_id, req.filename)
+        with open(target_path, "wb") as f:
+            f.write(data)
+        return str(target_path.absolute())
 
-    def _write_file_sync(self, file_data: bytes, file_path: Path):
-        """Synchronously write file data to disk."""
-        with open(file_path, 'wb') as f:
-            f.write(file_data)
-
+    # ---------- Hash ----------
     def calculate_file_hash(self, file_path: str) -> str:
-        """
-        Calculate SHA-256 hash of the file for integrity verification.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            SHA-256 hash as hexadecimal string
-        """
-        sha256_hash = hashlib.sha256()
+        sha = hashlib.sha256()
         with open(file_path, "rb") as f:
-            # Read the file in chunks to handle large files efficiently
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
+            for b in iter(lambda: f.read(4096), b""):
+                sha.update(b)
+        return sha.hexdigest()
 
-    async def process_file(self, file_path: str, original_filename: str, 
-                          metadata: Optional[Dict[str, Any]] = None) -> FileProcessingResult:
+    # ---------- Jobs ----------
+    def create_processing_job(self) -> JobInfo:
+        return self.progress.create()
+
+    def get_job(self, job_id: str) -> Optional[JobInfo]:
+        return self.progress.get(job_id)
+
+    async def process_file_async_job(
+        self,
+        job_id: str,
+        file_path: str,
+        original_filename: str,
+        req: FileUploadRequest,
+    ) -> None:
         """
-        Process a file and extract documents.
-
-        Args:
-            file_path: Path to the file to process
-            original_filename: Original filename
-            metadata: Additional metadata to attach to documents
-
-        Returns:
-            FileProcessingResult containing extracted documents and metadata
+        Runs the full pipeline as an async job with progress updates.
         """
-        import time
-        start_time = time.time()
+        self.progress.update(job_id, status=JobStatus.RUNNING, progress=1.0, message="starting")
+
+        warnings: List[str] = []
+        start = time.time()
 
         try:
-            # Determine file type
-            file_type = self.get_file_type(original_filename)
+            # 1) sniff mime from content
+            self.progress.update(job_id, progress=5.0, message="sniffing file type")
+            sniffed_mime = self.sniffer.sniff_mime(file_path)
+            file_type = self.sniffer.to_file_type(original_filename, sniffed_mime)
 
-            # Get appropriate processor
-            processor = self.processors.get(file_type)
-            if not processor:
-                raise RuntimeError(f"No processor available for file type: {file_type}")
+            # 2) virus scan (optional)
+            self.progress.update(job_id, progress=10.0, message="virus scanning")
+            is_clean, scan_note = self.virus_scanner.scan(file_path)
+            if scan_note:
+                warnings.append(scan_note)
+            if not is_clean:
+                raise RuntimeError(f"Upload rejected: {scan_note or 'malware found'}")
 
-            # Validate file
-            if not processor.validate_file(file_path):
-                raise ValueError(f"Invalid file: {file_path}")
+            # 3) extraction in subprocess with timeout
+            self.progress.update(job_id, progress=20.0, message="extracting text")
+            processor_key = self._processor_key_by_type[file_type]
 
-            # Extract text
-            extracted_text = processor.extract_text(file_path)
+            loop = asyncio.get_running_loop()
+            limits_dict = self.limits.__dict__.copy()
 
-            # Calculate hash for integrity
+            fut = loop.run_in_executor(
+                self.pool,
+                _extract_in_subprocess,
+                processor_key,
+                file_path,
+                limits_dict,
+            )
+            try:
+                extracted_text, extraction_meta = await asyncio.wait_for(fut, timeout=self.limits.timeout_sec + 5)
+            except asyncio.TimeoutError:
+                raise RuntimeError(f"Extraction timed out after ~{self.limits.timeout_sec}s")
+
+            self.progress.update(job_id, progress=70.0, message="post-processing")
+
+            extracted_text = extracted_text or ""
+            extracted_text = extracted_text.strip()
+
+            # 4) language detection
+            lang = None
+            if LANG_DETECT_SUPPORT and extracted_text:
+                try:
+                    lang = detect(extracted_text[:5000])
+                except Exception as e:
+                    warnings.append(f"Language detection failed: {e}")
+
+            # 5) hash + Document
             file_hash = self.calculate_file_hash(file_path)
-
-            # Create document
             doc_id = f"file_{file_hash[:16]}"
-            document = Document(
+
+            processed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            doc = Document(
                 id=doc_id,
                 content=extracted_text,
                 source="file_upload",
                 doc_type=file_type.value,
                 metadata={
+                    "tenant_id": req.tenant_id,
                     "original_filename": original_filename,
+                    "stored_filename": Path(file_path).name,
                     "file_hash": file_hash,
+                    "sniffed_mime": sniffed_mime,
+                    "client_mime": req.content_type,
                     "file_type": file_type.value,
                     "content_length": len(extracted_text),
-                    "processed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    **(metadata or {})
-                }
+                    "language": lang,
+                    "processed_at": processed_at,
+                    "extraction": extraction_meta,
+                    **(req.metadata or {}),
+                },
             )
 
-            # Calculate processing time
-            processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-
-            return FileProcessingResult(
+            ms = (time.time() - start) * 1000
+            result = FileProcessingResult(
                 success=True,
-                message=f"Successfully processed {original_filename}",
-                documents=[document],
+                message=f"Processed {original_filename}",
+                documents=[doc],
                 extracted_text_length=len(extracted_text),
-                processing_time_ms=processing_time,
+                processing_time_ms=ms,
+                warnings=warnings,
                 metadata={
                     "file_type": file_type.value,
-                    "original_filename": original_filename
-                }
+                    "original_filename": original_filename,
+                    "doc_id": doc_id,
+                },
+            )
+
+            self.progress.update(job_id, status=JobStatus.SUCCEEDED, progress=100.0, message="done", result=result)
+
+            logger.info(
+                "file_processed",
+                extra={
+                    "job_id": job_id,
+                    "tenant_id": req.tenant_id,
+                    "file_type": file_type.value,
+                    "doc_id": doc_id,
+                    "chars": len(extracted_text),
+                    "ms": ms,
+                    "method": (result.metadata or {}).get("extraction_method"),
+                },
             )
 
         except Exception as e:
-            processing_time = (time.time() - start_time) * 1000
-            return FileProcessingResult(
-                success=False,
-                message=f"Error processing file {original_filename}: {str(e)}",
-                documents=[],
-                extracted_text_length=0,
-                processing_time_ms=processing_time,
-                warnings=[f"Processing failed: {str(e)}"]
-            )
+            ms = (time.time() - start) * 1000
+            err = str(e)
+            self.progress.update(job_id, status=JobStatus.FAILED, progress=100.0, message="failed", error=err)
+            logger.exception("file_processing_failed", extra={"job_id": job_id, "tenant_id": req.tenant_id, "ms": ms})
 
-    def cleanup_temp_file(self, file_path: str):
+        finally:
+            # Always cleanup local stored file after processing (you can make this configurable)
+            try:
+                p = Path(file_path)
+                if p.exists():
+                    p.unlink()
+            except Exception as e:
+                logger.warning("cleanup_failed", extra={"job_id": job_id, "error": str(e)})
+
+    # ---------- Convenience: one-shot (no job) ----------
+    async def process_file(
+        self,
+        file_path: str,
+        original_filename: str,
+        req: FileUploadRequest,
+    ) -> FileProcessingResult:
         """
-        Remove temporary file after processing.
-
-        Args:
-            file_path: Path to the temporary file
+        One-shot processing without job tracking (still safe + isolated).
         """
-        try:
-            path = Path(file_path)
-            if path.exists():
-                path.unlink()
-        except Exception as e:
-            logging.warning(f"Failed to cleanup temp file {file_path}: {str(e)}")
+        job = self.create_processing_job()
+        await self.process_file_async_job(job.job_id, file_path, original_filename, req)
+        info = self.get_job(job.job_id)
+        if info and info.result:
+            return info.result
+        return FileProcessingResult(
+            success=False,
+            message=f"Processing failed: {info.error if info else 'unknown'}",
+            documents=[],
+            extracted_text_length=0,
+            processing_time_ms=0.0,
+            warnings=[info.error] if info and info.error else ["unknown error"],
+        )
 
 
-# Create a singleton instance of the file manager
-file_manager = FileManager()
+# ----------------------------
+# Singleton
+# ----------------------------
+progress_store = InMemoryProgressStore()
 
-__all__ = ["FileManager", "FileUploadRequest", "FileProcessingResult", 
-           "FileType", "file_manager"]
+# Optional: enable ClamAV scanner if you have clamd running.
+# virus_scanner = ClamAVScanner(socket_path="/var/run/clamav/clamd.ctl")
+virus_scanner = NoopVirusScanner()
+
+file_manager = FileManager(
+    upload_dir="uploads",
+    max_file_size=50 * 1024 * 1024,
+    extraction_limits=ExtractionLimits(
+        max_pages=300,
+        max_chars=2_000_000,
+        timeout_sec=60,
+        ocr_max_pages=20,
+        min_text_threshold=200,
+    ),
+    progress_store=progress_store,
+    virus_scanner=virus_scanner,
+    process_pool_workers=2,
+)
+
+__all__ = [
+    "FileManager",
+    "FileUploadRequest",
+    "FileProcessingResult",
+    "FileType",
+    "JobInfo",
+    "JobStatus",
+    "file_manager",
+]
