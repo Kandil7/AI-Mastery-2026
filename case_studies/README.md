@@ -27,25 +27,28 @@ This directory contains comprehensive case studies demonstrating end-to-end mach
 8. [Autonomous Vehicle Perception System with Multimodal AI](08_autonomous_vehicle_perception.md) - Multimodal AI, autonomous systems
 9. [Genomic Sequence Analysis with Transformers for Precision Medicine](09_genomic_sequence_analysis.md) - Bioinformatics, healthcare AI
 10. [Climate-Optimized Energy Grid Management with Reinforcement Learning](10_climate_optimized_energy_grid.md) - Reinforcement learning, sustainability
+11. [AI-Powered Digital Twins for Smart Manufacturing](12_digital_twins_smart_manufacturing.md) - Digital twins, industrial AI
+12. [AI for Science: Molecular Discovery Platform](13_molecular_discovery_platform.md) - AI for Science, molecular discovery
+13. [Federated Learning for Healthcare Analytics](14_federated_learning_healthcare.md) - Federated learning, healthcare AI
 
 ### Full Stack AI Case Studies
-11. [Uber Eats GNN Recommendations](full_stack_ai/01_uber_eats_gnn_recommendations.md) - Graph neural networks
-12. [Notion AI RAG Architecture](full_stack_ai/02_notion_ai_rag_architecture.md) - Retrieval augmented generation
-13. [Intercom Finance Support Agent](full_stack_ai/03_intercom_fin_support_agent.md) - Conversational AI
-14. [Salesforce Trust Layer](full_stack_ai/04_salesforce_trust_layer.md) - Trust and safety systems
-15. [Pinterest Ranking Pipeline](full_stack_ai/05_pinterest_ranking_pipeline.md) - Ranking algorithms
-16. [DoorDash Feature Store](full_stack_ai/06_doordash_feature_store.md) - Feature engineering and storage
-17. [Siemens Edge AI](full_stack_ai/07_siemens_edge_ai.md) - Edge computing
-18. [Manufacturing Quality Control](full_stack_ai/08_manufacturing_quality_control.md) - Industrial AI
-19. [Medical IoMT Devices](full_stack_ai/09_medical_iomt_devices.md) - Healthcare IoT
-20. [Industrial IoT Predictive Maintenance](full_stack_ai/10_industrial_iot_pdm.md) - Predictive maintenance
-21. [Hybrid Edge-Cloud Systems](full_stack_ai/11_hybrid_edge_cloud.md) - Distributed AI systems
+14. [Uber Eats GNN Recommendations](full_stack_ai/01_uber_eats_gnn_recommendations.md) - Graph neural networks
+15. [Notion AI RAG Architecture](full_stack_ai/02_notion_ai_rag_architecture.md) - Retrieval augmented generation
+16. [Intercom Finance Support Agent](full_stack_ai/03_intercom_fin_support_agent.md) - Conversational AI
+17. [Salesforce Trust Layer](full_stack_ai/04_salesforce_trust_layer.md) - Trust and safety systems
+18. [Pinterest Ranking Pipeline](full_stack_ai/05_pinterest_ranking_pipeline.md) - Ranking algorithms
+19. [DoorDash Feature Store](full_stack_ai/06_doordash_feature_store.md) - Feature engineering and storage
+20. [Siemens Edge AI](full_stack_ai/07_siemens_edge_ai.md) - Edge computing
+21. [Manufacturing Quality Control](full_stack_ai/08_manufacturing_quality_control.md) - Industrial AI
+22. [Medical IoMT Devices](full_stack_ai/09_medical_iomt_devices.md) - Healthcare IoT
+23. [Industrial IoT Predictive Maintenance](full_stack_ai/10_industrial_iot_pdm.md) - Predictive maintenance
+24. [Hybrid Edge-Cloud Systems](full_stack_ai/11_hybrid_edge_cloud.md) - Distributed AI systems
 
 ### Domain-Specific Case Studies
-22. [Legal Document RAG System](legal_document_rag_system/) - Legal technology, document processing
-23. [Medical Diagnosis Agent](medical_diagnosis_agent/) - Healthcare AI, clinical decision support
-24. [Supply Chain Optimization](supply_chain_optimization/) - Operations research, optimization
-25. [Time Series Forecasting](time_series_forecasting/) - Forecasting, temporal data
+25. [Legal Document RAG System](legal_document_rag_system/) - Legal technology, document processing
+26. [Medical Diagnosis Agent](medical_diagnosis_agent/) - Healthcare AI, clinical decision support
+27. [Supply Chain Optimization](supply_chain_optimization/) - Operations research, optimization
+28. [Time Series Forecasting](time_series_forecasting/) - Forecasting, temporal data
 
 ## Case Study Format
 
