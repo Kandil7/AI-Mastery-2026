@@ -1,33 +1,48 @@
+# HPA for API component
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: rag-engine-hpa
+  name: rag-engine-api-hpa
   namespace: rag-engine
-  labels:
-    app: rag-engine
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: rag-engine
+    name: rag-engine-api
   minReplicas: 2
   maxReplicas: 10
   metrics:
   - type: Resource
     resource:
       name: cpu
-    target:
-      type: AverageValue
-      averageValue: 70
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      stabilizationWindowSeconds: 300
-      policies:
-      - type: Percent
-        value: 50
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-      - type: Percent
-        value: 100
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# HPA for Worker component
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rag-engine-worker-hpa
+  namespace: rag-engine
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rag-engine-worker
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75

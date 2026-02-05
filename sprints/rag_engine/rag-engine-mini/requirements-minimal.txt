@@ -1,0 +1,21 @@
+# Core Requirements for RAG Engine - Minimal Set
+# ================================================
+# This is a minimal requirements file for quick deployment
+# Install full requirements.txt for production use
+
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+gunicorn>=21.2.0
+python-multipart>=0.0.9
+
+# Configuration & Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database (using SQLite for quick start)
+sqlalchemy>=2.0.25
+
+# Utilities
+aiofiles>=23.2.1
+httpx>=0.26.0

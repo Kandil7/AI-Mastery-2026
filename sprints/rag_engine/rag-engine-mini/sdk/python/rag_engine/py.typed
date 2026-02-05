@@ -1,0 +1,5 @@
+"""RAG Engine Python SDK - Examples
+
+This package is a PEP 561 marker to indicate that this package
+supports type hints as specified in PEP 484.
+"""

@@ -1,0 +1,411 @@
+╔════════════════════════════════════════════════════════════════╗
+║  RAG ENGINE MINI - PRODUCTION DEPLOYMENT EXECUTION LOG         ║
+║  Simulated Run with Full Output                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+[2026-02-01 17:05:23] Starting production deployment...
+[2026-02-01 17:05:23] User: developer@rag-engine.com
+[2026-02-01 17:05:23] Environment: production
+[2026-02-01 17:05:23] Working Directory: /home/developer/projects/rag-engine-mini
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1: Environment Check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:05:24] ✓ Project root confirmed
+[17:05:24]   Found: README.md
+[17:05:24]   Found: docker-compose.prod.yml
+[17:05:24]   Found: Dockerfile
+
+[17:05:24] ✓ Docker version 24.0.7
+[17:05:24]   API version: 1.43
+[17:05:24]   Go version: go1.20.10
+[17:05:24]   Git commit: 24.0.7-0ubuntu4
+[17:05:24]   Built: Wed Oct 25 20:51:00 2023
+[17:05:24]   OS/Arch: linux/amd64
+
+[17:05:24] ✓ Docker Compose version v2.23.0
+[17:05:24] ✓ Docker daemon running
+[17:05:24]   Containers: 0
+[17:05:24]   Images: 12
+[17:05:24]   Server Version: 24.0.7
+[17:05:24]   Storage Driver: overlay2
+[17:05:24]   Cgroup Driver: systemd
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2: Creating Production Structure
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:05:25] Creating directory: data/postgres
+[17:05:25] Creating directory: data/redis
+[17:05:25] Creating directory: data/qdrant
+[17:05:25] Creating directory: data/documents
+[17:05:25] Creating directory: logs
+[17:05:25] Creating directory: ssl
+
+[17:05:25] ✓ All directories created
+[17:05:25]   Total: 6 directories
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3: Generating Production Secrets
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:05:26] Generating JWT_SECRET...
+[17:05:26]   Generated: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+[17:05:26]   Length: 44 characters
+
+[17:05:26] Generating DB_PASSWORD...
+[17:05:26]   Generated: c3VwZXJzZWNyZXRwYXNzd29yZDEyMzQ1Njc4...
+[17:05:26]   Length: 44 characters
+
+[17:05:26] Generating REDIS_PASSWORD...
+[17:05:26]   Generated: cmVkaXNzdXBlcnNlY3JldDEyMzQ1Njc4OTA...
+[17:05:26]   Length: 48 characters
+
+[17:05:26] Generating API_KEY...
+[17:05:26]   Generated: c2VjdXJlYXBpa2V5Zm9ycHJvZHVjdGlvbg...
+[17:05:26]   Length: 44 characters
+
+[17:05:26] ✓ Environment file created: .env
+[17:05:26]   Size: 1,024 bytes
+[17:05:26]   Permissions: 600 (secure)
+
+⚠️  IMPORTANT: Review .env file and add your API keys
+   Edit: nano .env
+   Add: OPENAI_API_KEY=sk-your-key-here
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4: Production Docker Compose Configuration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:05:27] Validating docker-compose.prod.yml...
+[17:05:27] ✓ Configuration valid
+
+[17:05:27] Services defined:
+[17:05:27]   1. api (RAG Engine API)
+[17:05:27]      - Port: 8000
+[17:05:27]      - Replicas: 1
+[17:05:27]      - Healthcheck: enabled
+[17:05:27]      - Memory limit: 2GB
+[17:05:27]      - CPU limit: 2 cores
+
+[17:05:27]   2. postgres (PostgreSQL 14)
+[17:05:27]      - Port: 5432
+[17:05:27]      - Storage: ./data/postgres
+[17:05:27]      - Healthcheck: enabled
+
+[17:05:27]   3. redis (Redis 7)
+[17:05:27]      - Port: 6379
+[17:05:27]      - Storage: ./data/redis
+[17:05:27]      - Healthcheck: enabled
+
+[17:05:27]   4. qdrant (Vector Database)
+[17:05:27]      - Port: 6333
+[17:05:27]      - Storage: ./data/qdrant
+
+[17:05:27]   5. nginx (Reverse Proxy)
+[17:05:27]      - Port: 80
+[17:05:27]      - SSL: ./ssl
+
+[17:05:27] ✓ 5 services configured
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5: Pulling Docker Images
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:05:28] Starting image download...
+[17:05:28] This may take 2-5 minutes depending on connection
+
+[17:05:28] [1/5] Pulling postgres:14-alpine...
+[17:05:28] 14-alpine: Pulling from library/postgres
+[17:05:29] 4db1b1c8c20a: Pulling fs layer
+[17:05:30] 6fa38eac9c5c: Pulling fs layer
+[17:05:31] a50eb384e1a4: Pulling fs layer
+[17:05:32] 8f4ebf2e1f9c: Pulling fs layer
+[17:05:33] 4f4fb700ef54: Pull complete
+[17:05:34] Digest: sha256:1a2d3c4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+[17:05:34] Status: Downloaded newer image for postgres:14-alpine
+[17:05:34] ✓ postgres:14-alpine (87.5 MB)
+
+[17:05:35] [2/5] Pulling redis:7-alpine...
+[17:05:35] 7-alpine: Pulling from library/redis
+[17:05:36] 4db1b1c8c20a: Already exists
+[17:05:37] 9c8b8c7d6e5f: Pull complete
+[17:05:38] Digest: sha256:2b3d4c5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1
+[17:05:38] Status: Downloaded newer image for redis:7-alpine
+[17:05:38] ✓ redis:7-alpine (12.3 MB)
+
+[17:05:39] [3/5] Pulling qdrant/qdrant:latest...
+[17:05:39] latest: Pulling from qdrant/qdrant
+[17:05:40] 4db1b1c8c20a: Already exists
+[17:05:41] a1b2c3d4e5f6: Pulling fs layer
+[17:05:42] g7h8i9j0k1l2: Pulling fs layer
+[17:05:43] m3n4o5p6q7r8: Pulling fs layer
+[17:05:45] Pull complete
+[17:05:46] Digest: sha256:3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2
+[17:05:46] Status: Downloaded newer image for qdrant/qdrant:latest
+[17:05:46] ✓ qdrant/qdrant:latest (156.7 MB)
+
+[17:05:47] [4/5] Pulling nginx:alpine...
+[17:05:47] alpine: Pulling from library/nginx
+[17:05:48] 4db1b1c8c20a: Already exists
+[17:05:49] 2b3c4d5e6f7g: Pull complete
+[17:05:50] Digest: sha256:4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3
+[17:05:50] Status: Downloaded newer image for nginx:alpine
+[17:05:50] ✓ nginx:alpine (23.1 MB)
+
+[17:05:51] [5/5] Building rag-engine-mini:latest...
+[17:05:51] Building 0.0s (1/1) FROM docker.io/library/python:3.11-slim
+[17:05:52] => [internal] load build definition from Dockerfile
+[17:05:53] => => transferring dockerfile: 2.8kB
+[17:05:54] => [internal] load .dockerignore
+[17:05:55] => => transferring context: 134B
+[17:05:56] => [1/8] FROM docker.io/library/python:3.11-slim@sha256:5f6g7h...
+[17:05:58] => [2/8] WORKDIR /app
+[17:05:59] => [3/8] COPY requirements.txt .
+[17:06:00] => [4/8] RUN pip install --no-cache-dir -r requirements.txt
+[17:06:15] Collecting fastapi==0.104.1
+[17:06:16]   Downloading fastapi-0.104.1-py3-none-any.whl (92 kB)
+[17:06:17] Collecting uvicorn[standard]==0.24.0
+[17:06:18]   Downloading uvicorn-0.24.0-py3-none-any.whl (62 kB)
+[17:06:20] Collecting sqlalchemy==2.0.23
+[17:06:21]   Downloading SQLAlchemy-2.0.23-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.1 MB)
+[17:06:25] Collecting psycopg2-binary==2.9.9
+[17:06:26]   Downloading psycopg2_binary-2.9.9-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.0 MB)
+[17:06:30] Collecting redis==5.0.1
+[17:06:31]   Downloading redis-5.0.1-py3-none-any.whl (250 kB)
+[17:06:32] Collecting qdrant-client==1.6.9
+[17:06:33]   Downloading qdrant_client-1.6.9-py3-none-any.whl (217 kB)
+[17:06:35] Collecting openai==1.3.0
+[17:06:36]   Downloading openai-1.3.0-py3-none-any.whl (232 kB)
+[17:06:38] Installing collected packages: fastapi, uvicorn, sqlalchemy, psycopg2-binary, redis, qdrant-client, openai
+[17:06:45] Successfully installed all packages
+
+[17:06:50] => [5/8] COPY src/ ./src/
+[17:06:51] => [6/8] COPY config/ ./config/
+[17:06:52] => [7/8] COPY alembic/ ./alembic/
+[17:06:53] => [8/8] COPY alembic.ini .
+[17:06:54] => exporting to image
+[17:06:55] => => exporting layers
+[17:06:56] => => writing image sha256:1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3
+[17:06:56] => => naming to docker.io/library/rag-engine-mini:latest
+[17:06:56] ✓ rag-engine-mini:latest (843.2 MB)
+
+[17:06:57] ✓ All images ready
+[17:06:57]   Total downloaded: ~1.1 GB
+[17:06:57]   Total time: 1m 29s
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6: Starting Production Services
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:06:58] Creating network "rag-engine-network"...
+[17:06:58] ✓ Network created
+[17:06:58]   Driver: bridge
+[17:06:58]   Subnet: 172.20.0.0/16
+
+[17:06:59] Creating volume "rag-engine_postgres-data"...
+[17:06:59] ✓ Volume created
+
+[17:06:59] Creating volume "rag-engine_redis-data"...
+[17:06:59] ✓ Volume created
+
+[17:07:00] Creating volume "rag-engine_qdrant-data"...
+[17:07:00] ✓ Volume created
+
+[17:07:01] Starting containers...
+[17:07:01] [1/5] Starting rag-engine-postgres...
+[17:07:03]   Status: Started (healthy)
+[17:07:03]   Port: 5432
+[17:07:03]   Logs: PostgreSQL init process complete; ready for start up.
+
+[17:07:04] [2/5] Starting rag-engine-redis...
+[17:07:05]   Status: Started (healthy)
+[17:07:05]   Port: 6379
+[17:07:05]   Logs: Ready to accept connections
+
+[17:07:06] [3/5] Starting rag-engine-qdrant...
+[17:07:07]   Status: Started
+[17:07:07]   Port: 6333
+[17:07:07]   Logs: Qdrant server started on port 6333
+
+[17:07:08] [4/5] Starting rag-engine-api...
+[17:07:15]   Status: Started (healthy)
+[17:07:15]   Port: 8000
+[17:07:15]   Logs: Uvicorn running on http://0.0.0.0:8000
+
+[17:07:16] [5/5] Starting rag-engine-nginx...
+[17:07:17]   Status: Started
+[17:07:17]   Port: 80
+[17:07:17]   Logs: Nginx started
+
+[17:07:18] ✓ All 5 services started
+[17:07:18]   Total start time: 17 seconds
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7: Health Verification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:07:19] Checking PostgreSQL... 
+[17:07:20]   ✓ Healthy (pg_isready)
+[17:07:20]   Response time: 12ms
+
+[17:07:21] Checking Redis...
+[17:07:22]   ✓ Healthy (PONG)
+[17:07:22]   Response time: 3ms
+
+[17:07:23] Checking Qdrant...
+[17:07:24]   ✓ Healthy (/healthz)
+[17:07:24]   Response time: 28ms
+
+[17:07:25] Checking API...
+[17:07:28]   Attempt 1/30...
+[17:07:29]   Attempt 2/30...
+[17:07:31]   ✓ Healthy (HTTP 200)
+[17:07:31]   Response time: 45ms
+[17:07:31]   Response: {"status": "healthy", "version": "1.0.0", "timestamp": "2026-02-01T17:07:31Z"}
+
+[17:07:32] Checking Nginx...
+[17:07:33]   ✓ Healthy (HTTP 200)
+[17:07:33]   Response time: 8ms
+
+[17:07:34] ✓ All services healthy
+[17:07:34]   Health check time: 15 seconds
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 8: Database Migration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:07:35] Running Alembic migrations...
+[17:07:36] INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+[17:07:36] INFO  [alembic.runtime.migration] Will assume transactional DDL.
+[17:07:37] INFO  [alembic.runtime.migration] Running upgrade  -> 001, create users table
+[17:07:38] INFO  [alembic.runtime.migration] Running upgrade 001 -> 002, create documents table
+[17:07:39] INFO  [alembic.runtime.migration] Running upgrade 002 -> 003, create embeddings table
+[17:07:40] INFO  [alembic.runtime.migration] Running upgrade 003 -> 004, create conversations table
+[17:07:41] INFO  [alembic.runtime.migration] Running upgrade 004 -> 005, create indexes
+
+[17:07:42] ✓ Database migrations completed
+[17:07:42]   5 migrations applied
+[17:07:42]   Database: rag_engine_prod
+[17:07:42]   Schema: public
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 9: Final Verification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:07:43] Testing API endpoints...
+
+[17:07:44] GET http://localhost:8000/health
+[17:07:45]   Status: 200 OK
+[17:07:45]   Response: {"status": "healthy", "version": "1.0.0", "environment": "production"}
+
+[17:07:46] GET http://localhost:8000/docs
+[17:07:47]   Status: 200 OK
+[17:07:47]   Content: Swagger UI loaded
+
+[17:07:48] GET http://localhost:8000/api/v1/status
+[17:07:49]   Status: 200 OK
+[17:07:49]   Database: Connected
+[17:07:49]   Redis: Connected
+[17:07:49]   Qdrant: Connected
+
+[17:07:50] ✓ All endpoints responding
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 10: Deployment Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[17:07:51] ╔══════════════════════════════════════════════════════════════╗
+[17:07:51] ║     🎉 PRODUCTION DEPLOYMENT COMPLETE! 🎉                    ║
+[17:07:51] ╚══════════════════════════════════════════════════════════════╝
+
+[17:07:52] Deployment Time: 2 minutes 28 seconds
+[17:07:52] Services Deployed: 5/5
+[17:07:52] Health Status: All healthy ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 ACCESS POINTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🌐 API Base URL:     http://localhost:8000
+  📖 API Documentation: http://localhost:8000/docs
+  🔍 Health Check:      http://localhost:8000/health
+  📊 Swagger UI:        http://localhost:8000/docs
+  🌐 Web Interface:     http://localhost (via Nginx)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛠️  USEFUL COMMANDS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  View logs:           docker-compose -f docker-compose.prod.yml logs -f
+  Stop services:       docker-compose -f docker-compose.prod.yml down
+  Restart:             docker-compose -f docker-compose.prod.yml restart
+  Check status:        docker-compose -f docker-compose.prod.yml ps
+  View API logs:       docker-compose -f docker-compose.prod.yml logs -f api
+  Database shell:      docker-compose -f docker-compose.prod.yml exec postgres psql -U rag_admin
+  Redis CLI:           docker-compose -f docker-compose.prod.yml exec redis redis-cli
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📁 IMPORTANT FILES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔐 Environment:      .env (contains secrets - keep secure!)
+  🐳 Compose Config:   docker-compose.prod.yml
+  📊 Logs:             logs/
+  💾 Data:             data/
+  🔒 SSL:              ssl/ (add certificates here)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  NEXT STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Configure API keys in .env file:
+     nano .env
+     Add: OPENAI_API_KEY=sk-your-openai-key-here
+
+  2. Test the API:
+     curl http://localhost:8000/health
+
+  3. Upload a test document:
+     curl -X POST http://localhost:8000/api/v1/documents/upload \
+       -F "file=@test-document.pdf"
+
+  4. Test RAG query:
+     curl -X POST http://localhost:8000/api/v1/chat \
+       -H "Content-Type: application/json" \
+       -d '{"message": "What is this document about?"}'
+
+  5. Open API documentation:
+     http://localhost:8000/docs
+
+  6. Set up SSL certificates (optional):
+     Place cert.pem and key.pem in ssl/
+
+  7. Configure backups:
+     ./scripts/backup/backup-routine.sh
+
+  8. Set up monitoring:
+     See docs/learning/deployment/ for monitoring guides
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 SERVICE STATUS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  rag-engine-postgres   ✓ Up (healthy)   Port 5432   Memory: 256MB
+  rag-engine-redis      ✓ Up (healthy)   Port 6379   Memory: 128MB
+  rag-engine-qdrant     ✓ Up             Port 6333   Memory: 512MB
+  rag-engine-api        ✓ Up (healthy)   Port 8000   Memory: 1GB
+  rag-engine-nginx      ✓ Up             Port 80     Memory: 32MB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧪 QUICK TEST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Test health endpoint:
+    curl http://localhost:8000/health
+
+  Expected response:
+    {"status": "healthy", "version": "1.0.0", "timestamp": "..."}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[17:07:53] ✨ Deployment completed successfully! ✨
+[17:07:53] Your RAG Engine Mini is ready for production use!
+[17:07:53] 
+[17:07:53] Need help? Check: docs/learning/deployment/README.md
+[17:07:53] Troubleshooting: docs/learning/deployment/05-troubleshooting-playbook.md
+[17:07:53] 
+[17:07:53] ✨ Happy deploying! 🚀
+
+[2026-02-01 17:07:54] Deployment log saved to: logs/deployment-20260201-170523.log

@@ -106,4 +106,4 @@ CMD ["gunicorn", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
      "--log-level", "info", \
-     "src.production.api:app"]
+     "src.main:app"]

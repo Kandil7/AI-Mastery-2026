@@ -1,0 +1,64 @@
+# Production Requirements for RAG Engine
+# Generated from pyproject.toml
+# =================================
+
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+gunicorn>=21.2.0
+python-multipart>=0.0.9
+
+# Configuration & Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+sqlalchemy>=2.0.25
+psycopg[binary]>=3.1.17
+alembic>=1.13.1
+
+# Vector Store
+qdrant-client>=1.7.0
+
+# LLM & Embeddings
+openai>=1.10.0
+tiktoken>=0.5.2
+
+# Reranking
+sentence-transformers>=2.3.0
+
+# Document Processing
+pypdf>=4.0.0
+python-docx>=1.1.0
+pandas>=2.1.0
+tabulate>=0.9.0
+reportlab>=4.0.0
+pymupdf>=1.23.0
+
+# Async & Background Tasks
+celery>=5.3.6
+redis>=5.0.1
+
+# Logging & Observability
+structlog>=24.1.0
+prometheus-client>=0.20.0
+opentelemetry-api>=1.21.0
+opentelemetry-sdk>=1.21.0
+opentelemetry-exporter-jaeger-thrift>=1.21.0
+opentelemetry-exporter-otlp>=1.21.0
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-instrumentation-sqlalchemy>=0.45b0
+opentelemetry-instrumentation-requests>=0.45b0
+
+# Utilities
+aiofiles>=23.2.1
+httpx>=0.26.0
+
+# GraphQL
+strawberry-graphql>=0.217.0
+
+# LLM Extensions
+google-generativeai>=0.4.0
+huggingface-hub>=0.20.0
+ragas>=0.1.0
+tf-keras
