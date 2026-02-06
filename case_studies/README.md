@@ -53,6 +53,16 @@ This directory contains comprehensive case studies demonstrating end-to-end mach
 ### Advanced RAG Case Studies
 29. [Advanced RAG Architectures](15_advanced_rag_architectures.md) - Comprehensive RAG systems, enterprise implementations
 30. [Multi-Modal RAG Systems](16_multimodal_rag_systems.md) - AlzheimerRAG clinical implementation, multi-modal processing
+31. [Quantum-Enhanced RAG Systems](17_quantum_rag_systems.md) - Quantum code generation, UML-to-Qiskit conversion
+32. [Neuromorphic Computing RAG](18_neuromorphic_rag_systems.md) - Brain-inspired hardware, event-driven processing
+33. [Blockchain-Integrated RAG](19_blockchain_rag_systems.md) - Decentralized systems, provenance tracking
+34. [Edge AI RAG for IoT](20_edge_ai_rag_systems.md) - Resource-constrained environments, real-time processing
+35. [Temporal RAG for Time-Series](21_temporal_rag_systems.md) - Forecasting, time-aware retrieval
+36. [Bio-Inspired RAG Architectures](22_bio_inspired_rag_systems.md) - Nature-inspired design, creative problem solving
+37. [Zero-Shot Learning RAG](23_zero_shot_rag_systems.md) - Generalizable reasoning, cross-domain transfer
+38. [Multi-Expert RAG (MoE)](24_multi_expert_rag_systems.md) - Specialized retrievers, dynamic routing
+39. [Cognitive RAG Mimicking Human Memory](25_cognitive_rag_systems.md) - Associative memory, multi-hop reasoning
+40. [Sustainability-Focused Green RAG](26_green_rag_systems.md) - Energy efficiency, carbon footprint optimization
 
 ## Case Study Format
 
