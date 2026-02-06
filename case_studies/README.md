@@ -50,6 +50,10 @@ This directory contains comprehensive case studies demonstrating end-to-end mach
 27. [Supply Chain Optimization](supply_chain_optimization/) - Operations research, optimization
 28. [Time Series Forecasting](time_series_forecasting/) - Forecasting, temporal data
 
+### Advanced RAG Case Studies
+29. [Advanced RAG Architectures](15_advanced_rag_architectures.md) - Comprehensive RAG systems, enterprise implementations
+30. [Multi-Modal RAG Systems](16_multimodal_rag_systems.md) - AlzheimerRAG clinical implementation, multi-modal processing
+
 ## Case Study Format
 
 Each case study follows this standardized structure:

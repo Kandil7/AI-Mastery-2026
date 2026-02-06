@@ -264,7 +264,28 @@ docker run -p 8000:8000 issue-classifier
 - **Cost**: ~$2,000/month
 - **Key Insight**: Thompson Sampling (Bayesian MAB) for adaptive traffic allocation
 
-**Total System Design Coverage**: $33,800/month across all 5 designs | ~5,000 lines of technical documentation
+### 6. [Advanced RAG Systems](docs/system_design_solutions/15_advanced_rag_systems.md) ✅
+- **Scope**: Multi-source retrieval, agentic workflows, enterprise security
+- **Architecture**: Modular RAG, hybrid search, graph-based reasoning, semantic caching
+- **Tech Stack**: LangGraph, Qdrant, Elasticsearch, Neo4j, Redis
+- **Cost**: Variable based on LLM usage and data volume
+- **Key Insight**: Agentic RAG with planning and tool usage for complex queries
+
+### 7. [Real-Time RAG Systems](docs/system_design_solutions/16_realtime_rag_systems.md) ✅
+- **Scope**: Streaming data ingestion, sub-second latency, high throughput
+- **Architecture**: Stream processing, real-time indexing, multi-level caching
+- **Tech Stack**: Apache Flink, Kafka, FAISS, Redis, PyTorch
+- **Cost**: Variable based on data volume and processing requirements
+- **Key Insight**: Efficient batch processing balances freshness and resource usage
+
+### 8. [Federated RAG Systems](docs/system_design_solutions/17_federated_rag_systems.md) ✅
+- **Scope**: Privacy-preserving collaboration, multi-organization knowledge sharing
+- **Architecture**: Local RAG nodes, secure aggregation, differential privacy
+- **Tech Stack**: Secure MPC, Differential Privacy, Local Vector Stores
+- **Cost**: Distributed across participating organizations
+- **Key Insight**: Collaborative intelligence without compromising data privacy
+
+**Total System Design Coverage**: $33,800/month across all 8 designs | ~12,000 lines of technical documentation
 
 
 
