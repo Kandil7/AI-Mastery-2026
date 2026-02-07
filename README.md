@@ -11,9 +11,9 @@
 ![Status](https://img.shields.io/badge/Status-100%25%20COMPLETE%20%F0%9F%8E%89-success)
 
 **From First Principles to Production Scale.**
-*A 17-week roadmap to master the mathematics, algorithms, and engineering of modern AI.*
+*A comprehensive roadmap to master the mathematics, algorithms, and engineering of modern AI.*
 
-[Quick Start](#-quick-start) • [Roadmap](#-17-week-roadmap) • [Modules](#-module-deep-dive) • [Benchmarks](#-performance-benchmarks) • [Documentation](#-documentation)
+[Quick Start](#-quick-start) • [Learning Roadmap](docs/01_learning_roadmap/README.md) • [Module Deep Dive](#-module-deep-dive) • [Documentation](docs/README.md) • [Contributing](docs/00_introduction/CONTRIBUTING.md)
 
 </div>
 
@@ -30,31 +30,39 @@
 
 ---
 
-## 🗺️ 17-Week Roadmap
+## 🚀 Quick Start
 
-| Phase | Weeks | Focus Area | Status | Deliverables |
-|:---|:---|:---|:---|:---|
-| **I. Foundations** | 1-2 | **Mathematics & Core ML** | ✅ **COMPLETE** | 38 notebooks |
-| **II. Advanced ML** | 5-12 | **Vision, Transformers, MLOps** | ✅ **77% COMPLETE** | ResNet18, BERT, GPT-2, LoRA |
-| **III. Production** | Capstone | **End-to-End ML System** | ✅ **COMPLETE** | Auth, Monitoring, A/B Testing |
-| **IV. System Design** | Advanced | **Scale & Architecture** | ✅ **COMPLETE** | 5 comprehensive designs |
-| **V. Case Studies** | Real-World | **Production ML** | ✅ **COMPLETE** | $22M+ business impact |
-| **VI. Interview Prep** | Professional | **Career Readiness** | ✅ **88% COMPLETE** | 4 STAR stories |
+Get the AI-Mastery-2026 project up and running quickly on your local machine.
 
-**✅ PROJECT 77% COMPLETE** | 98/128 tasks | 15,000+ lines | Elite production portfolio
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/Kandil7/AI-Mastery-2026.git
+    cd AI-Mastery-2026
+    ```
+2.  **Install dependencies and setup environment:**
+    ```bash
+    make install
+    ```
+3.  **Run tests to verify installation:**
+    ```bash
+    make test
+    ```
+For more detailed instructions on environment setup, running applications (including Docker), and troubleshooting, please refer to the [User Guide](docs/00_introduction/01_user_guide.md).
 
-> [!IMPORTANT]
-> **🚀 Latest Achievements (Jan 4, 2026 - Final Update)**:
-> - ✅ **Complete Computer Vision**: ResNet18 with CIFAR-10 notebook (600+ lines)
-> - ✅ **Complete Transformers**: BERT & GPT-2 from scratch (900+ lines)
-> - ✅ **MLOps Production**: Feature store, model registry, drift detection
-> - ✅ **LLM Fine-Tuning**: LoRA implementation (0.5% trainable params)
-> - ✅ **Production Infrastructure**: JWT auth, A/B testing, Grafana monitoring
-> - ✅ **Multi-Tenant Vector DB**: Quotas, backups, point-in-time recovery
-> - ✅ **Case Studies**: $22M+ combined business impact (3 production systems)
-> - 📹 **Remaining**: Demo video + optional## 🔧 From-Scratch Implementations
+---
 
-All algorithms implemented **from first principles** to understand internal mechanics:
+## 📚 Learning Roadmap
+
+Explore the structured learning path designed to take you from foundational concepts to advanced AI engineering.
+
+*   **[Full Learning Roadmap](docs/01_learning_roadmap/README.md)**: A detailed, phase-by-phase curriculum covering all aspects of AI engineering.
+*   **[Project Roadmaps Overview](docs/01_learning_roadmap/project_roadmaps_overview.md)**: Insights into development priorities, completion status, and strategic decisions.
+
+---
+
+## 💡 Module Deep Dive
+
+This project features from-scratch implementations across various AI disciplines:
 
 ### Core Mathematics (`src/core/`)
 *Pure Python implementations with mathematical rigor.*
@@ -177,33 +185,33 @@ docker run -p 8000:8000 issue-classifier
   [Classification]    ← bug | feature | question | docs
 ```
 
-📖 **[Full Documentation](docs/CAPSTONE_README.md)** | 🎥 **[Demo Video Outline](docs/DEMO_VIDEO_OUTLINE.md)**
+📖 **[Full Documentation](docs/06_case_studies/CAPSTONE_README.md)** | 🎥 **[Demo Video Outline](docs/04_tutorials/development/DEMO_VIDEO_OUTLINE.md)**
 
 ---
 
-## 📚 Learning Notebooks (Weeks 4-8)
+## 📚 Learning Modules
 
-### Week 4: Neural Network Foundations ✅
+### Week 4: Neural Network Foundations
 **[MNIST from Scratch](notebooks/week_04/mnist_from_scratch.ipynb)**
 - Built complete neural network using only `src/core` modules
 - Achieved >95% accuracy target
 - Visualized training curves, confusion matrix, sample predictions
 
-### Week 5: Convolutional Neural Networks ✅
-**[CNN Image Classifier Guide](docs/guide/week_05_cnn_image_classifier.md)**
+### Week 5: Convolutional Neural Networks
+**[CNN Image Classifier Guide](docs/04_tutorials/examples/week_05_cnn_image_classifier.md)**
 - ResNet blocks with skip connections
 - Batch Normalization implementation
 - CIFAR-10 training pipeline
 - FastAPI deployment strategy
 
-### Week 6: Sequence Modeling ✅
+### Week 6: Sequence Modeling
 **[LSTM Text Generator](notebooks/week_06/lstm_text_generator.ipynb)**
 - Character-level text generation with Shakespeare corpus
 - Multiple sampling strategies (greedy, temperature, top-k)
 - LSTM gate visualization
 - Comparison with vanilla RNNs
 
-### Week 7: Transformer Architecture ✅
+### Week 7: Transformer Architecture
 **[BERT from Scratch](notebooks/week_07/bert_from_scratch.ipynb)**
 - Complete transformer encoder implementation
 - Scaled dot-product attention
@@ -212,7 +220,7 @@ docker run -p 8000:8000 issue-classifier
 - Masked language model (MLM) pretraining
 - Classification fine-tuning
 
-### Week 8: LLM Engineering ✅
+### Week 8: LLM Engineering
 **[GPT-2 Pre-trained Models](notebooks/week_08/gpt2_pretrained.ipynb)**
 - Loading Hugging Face models
 - BPE tokenization
@@ -229,126 +237,126 @@ docker run -p 8000:8000 issue-classifier
 > [!NOTE]
 > Each design includes: requirements analysis, architecture diagrams, component deep dives, scaling strategies, cost estimates, and interview discussion points.
 
-### 1. [RAG at Scale](docs/system_design_solutions/01_rag_at_scale.md) ✅
+### 1. [RAG at Scale](docs/03_system_design/solutions/01_rag_at_scale.md)
 - **Scope**: 1M documents, 1000 QPS, <500ms p95 latency
 - **Architecture**: Hybrid search (semantic + BM25), multi-tier caching, cross-encoder re-ranking
 - **Tech Stack**: Qdrant, Elasticsearch, Redis, FastAPI
 - **Cost**: ~$5,850/month
 - **Key Insight**: Hybrid retrieval 15-20% better than pure semantic
 
-### 2. [Recommendation System](docs/system_design_solutions/02_recommendation_system.md) ✅
+### 2. [Recommendation System](docs/03_system_design/solutions/02_recommendation_system.md)
 - **Scope**: 100M users, 10M products, <100ms p95 latency
 - **Architecture**: Multi-strategy (Matrix Factorization + Content-based + DNN two-tower)
 - **Tech Stack**: Spark, Redis, TensorFlow Serving
 - **Cost**: ~$19,000/month
 - **Key Insight**: Offline batch + online real-time serving pattern
 
-### 3. [Fraud Detection Pipeline](docs/system_design_solutions/03_fraud_detection.md) ✅
+### 3. [Fraud Detection Pipeline](docs/03_system_design/solutions/03_fraud_detection.md)
 - **Scope**: 1M transactions/day, <100ms p2p latency, <0.1% false positives
 - **Architecture**: Multi-layer defense (rule engine + ML + anomaly detection)
 - **Tech Stack**: XGBoost, Isolation Forest, Kafka, PostgreSQL
 - **Cost**: ~$2,100/month
 - **Key Insight**: Explainability (SHAP) critical for fraud analyst trust
 
-### 4. [ML Model Serving at Scale](docs/system_design_solutions/04_model_serving.md) ✅ *NEW*
+### 4. [ML Model Serving at Scale](docs/03_system_design/solutions/04_ml_model_serving.md) *NEW*
 - **Scope**: 10,000 QPS, <50ms p95 latency
 - **Architecture**: Dynamic batching (21x throughput), blue-green + canary deployments
 - **Tech Stack**: Triton Inference Server, MLflow, Kubernetes HPA, Redis cache
 - **Cost**: ~$4,850/month (CPU) or ~$6,850/month (GPU)
 - **Key Insight**: Dynamic batching reduces per-request latency from 10ms → 0.47ms
 
-### 5. [A/B Testing Platform](docs/system_design_solutions/05_ab_testing.md) ✅ *NEW*
+### 5. [A/B Testing Platform](docs/03_system_design/solutions/05_ab_testing_framework.md) *NEW*
 - **Scope**: 10M daily active users, multi-variant experiments, statistical rigor
 - **Architecture**: Consistent hashing assignment, Kafka event streaming, Spark analytics
 - **Tech Stack**: Kafka, Spark, PostgreSQL, Redis (config cache)
 - **Cost**: ~$2,000/month
 - **Key Insight**: Thompson Sampling (Bayesian MAB) for adaptive traffic allocation
 
-### 6. [Advanced RAG Systems](docs/system_design_solutions/15_advanced_rag_systems.md) ✅
+### 6. [Advanced RAG Systems](docs/03_system_design/solutions/15_advanced_rag_systems.md)
 - **Scope**: Multi-source retrieval, agentic workflows, enterprise security
 - **Architecture**: Modular RAG, hybrid search, graph-based reasoning, semantic caching
 - **Tech Stack**: LangGraph, Qdrant, Elasticsearch, Neo4j, Redis
 - **Cost**: Variable based on LLM usage and data volume
 - **Key Insight**: Agentic RAG with planning and tool usage for complex queries
 
-### 7. [Real-Time RAG Systems](docs/system_design_solutions/16_realtime_rag_systems.md) ✅
+### 7. [Real-Time RAG Systems](docs/03_system_design/solutions/16_realtime_rag_systems.md)
 - **Scope**: Streaming data ingestion, sub-second latency, high throughput
 - **Architecture**: Stream processing, real-time indexing, multi-level caching
 - **Tech Stack**: Apache Flink, Kafka, FAISS, Redis, PyTorch
 - **Cost**: Variable based on data volume and processing requirements
 - **Key Insight**: Efficient batch processing balances freshness and resource usage
 
-### 8. [Federated RAG Systems](docs/system_design_solutions/17_federated_rag_systems.md) ✅
+### 8. [Federated RAG Systems](docs/03_system_design/solutions/17_federated_rag_systems.md)
 - **Scope**: Privacy-preserving collaboration, multi-organization knowledge sharing
 - **Architecture**: Local RAG nodes, secure aggregation, differential privacy
 - **Tech Stack**: Secure MPC, Differential Privacy, Local Vector Stores
 - **Cost**: Distributed across participating organizations
 - **Key Insight**: Collaborative intelligence without compromising data privacy
 
-### 9. [Quantum-Enhanced RAG Systems](docs/system_design_solutions/18_quantum_rag_systems.md) ✅
+### 9. [Quantum-Enhanced RAG Systems](docs/03_system_design/solutions/18_quantum_rag_systems.md)
 - **Scope**: Quantum code generation, UML-to-Qiskit conversion
 - **Architecture**: Quantum-classical hybrid processing, specialized encoders
 - **Tech Stack**: Qiskit, Quantum-aware LLMs, Quantum-specific evaluation
 - **Cost**: Variable based on quantum resource usage
 - **Key Insight**: Quantum-specific processing for quantum software development
 
-### 10. [Neuromorphic RAG Systems](docs/system_design_solutions/19_neuromorphic_rag_systems.md) ✅
+### 10. [Neuromorphic RAG Systems](docs/03_system_design/solutions/19_neuromorphic_rag_systems.md)
 - **Scope**: Brain-inspired computing, ultra-low power consumption
 - **Architecture**: Spiking neural networks, event-driven processing
 - **Tech Stack**: Intel Loihi, SpiNNaker, Lava framework, SNNs
 - **Cost**: Lower operational costs due to energy efficiency
 - **Key Insight**: Energy-efficient processing through brain-inspired architectures
 
-### 11. [Blockchain-Integrated RAG](docs/system_design_solutions/20_blockchain_rag_systems.md) ✅
+### 11. [Blockchain-Integrated RAG](docs/03_system_design/solutions/20_blockchain_rag_systems.md)
 - **Scope**: Decentralized systems, provenance tracking, trust verification
 - **Architecture**: Distributed ledger, smart contracts, decentralized retrieval
 - **Tech Stack**: Ethereum/Polygon, Smart Contracts, Decentralized Storage
 - **Cost**: Gas fees for blockchain operations
 - **Key Insight**: Transparent and verifiable information retrieval
 
-### 12. [Edge AI RAG for IoT](docs/system_design_solutions/21_edge_ai_rag_systems.md) ✅
+### 12. [Edge AI RAG for IoT](docs/03_system_design/solutions/21_edge_ai_rag_systems.md)
 - **Scope**: Resource-constrained environments, real-time processing
 - **Architecture**: Local processing, lightweight models, distributed knowledge
 - **Tech Stack**: Embedded systems, ONNX, FAISS, TinyML frameworks
 - **Cost**: Reduced cloud dependency and bandwidth usage
 - **Key Insight**: Intelligence at the edge for low-latency applications
 
-### 13. [Temporal RAG Systems](docs/system_design_solutions/22_temporal_rag_systems.md) ✅
+### 13. [Temporal RAG Systems](docs/03_system_design/solutions/22_temporal_rag_systems.md)
 - **Scope**: Time-series forecasting, temporal pattern recognition
 - **Architecture**: Time-aware encoders, temporal similarity matching
 - **Tech Stack**: Time series models, Temporal embeddings, Forecasting systems
 - **Cost**: Moderate computational requirements
 - **Key Insight**: Temporal context for time-dependent queries
 
-### 14. [Bio-Inspired RAG Systems](docs/system_design_solutions/23_bio_inspired_rag_systems.md) ✅
+### 14. [Bio-Inspired RAG Systems](docs/03_system_design/solutions/23_bio_inspired_rag_systems.md)
 - **Scope**: Nature-inspired design, creative problem solving
 - **Architecture**: Biological pattern matching, semantic fusion
 - **Tech Stack**: Bio-inspired algorithms, Evolutionary computation
 - **Cost**: Moderate computational requirements
 - **Key Insight**: Leveraging natural solutions for design challenges
 
-### 15. [Zero-Shot Learning RAG](docs/system_design_solutions/24_zero_shot_rag_systems.md) ✅
+### 15. [Zero-Shot Learning RAG](docs/03_system_design/solutions/24_zero_shot_rag_systems.md)
 - **Scope**: Cross-domain transfer, generalizable reasoning
 - **Architecture**: Generalizable encoders, cross-domain knowledge transfer
 - **Tech Stack**: Transfer learning, Generalizable models, Domain adaptation
 - **Cost**: Lower training costs due to generalization
 - **Key Insight**: Solving new tasks without task-specific training
 
-### 16. [Multi-Expert RAG (MoE)](docs/system_design_solutions/25_multi_expert_rag_systems.md) ✅
+### 16. [Multi-Expert RAG (MoE)](docs/03_system_design/solutions/25_multi_expert_rag_systems.md)
 - **Scope**: Specialized retrieval, dynamic routing
 - **Architecture**: Mixture of Experts, Specialized retrievers, Dynamic controllers
 - **Tech Stack**: Expert routing, Specialized models, Graph neural networks
 - **Cost**: Higher computational requirements but better performance
 - **Key Insight**: Specialized experts for different query types
 
-### 17. [Cognitive RAG Systems](docs/system_design_solutions/26_cognitive_rag_systems.md) ✅
+### 17. [Cognitive RAG Systems](docs/03_system_design/solutions/26_cognitive_rag_systems.md)
 - **Scope**: Associative memory, multi-hop reasoning
 - **Architecture**: Human memory emulation, multi-hop search
 - **Tech Stack**: Knowledge graphs, Associative memory, Reasoning engines
 - **Cost**: Moderate computational requirements
 - **Key Insight**: Human-like associative reasoning patterns
 
-### 18. [Green RAG Systems](docs/system_design_solutions/27_green_rag_systems.md) ✅
+### 18. [Green RAG Systems](docs/03_system_design/solutions/27_green_rag_systems.md)
 - **Scope**: Energy efficiency, carbon footprint optimization
 - **Architecture**: Efficient models, intelligent caching, renewable integration
 - **Tech Stack**: Small models, Efficient algorithms, Energy monitoring
@@ -365,19 +373,19 @@ docker run -p 8000:8000 issue-classifier
 
 **3 real-world ML projects with measurable business impact:**
 
-### 1. [Churn Prediction for SaaS](case_studies/01_churn_prediction.md)
+### 1. [Churn Prediction for SaaS](docs/06_case_studies/domain_specific/01_churn_prediction.md)
 - **Challenge**: 15% monthly churn costing $2M annually
 - **Solution**: XGBoost with 47 behavioral features + Airflow pipeline
 - **Impact**: **$800K savings**, 40% churn reduction (15% → 9%)
 - **Tech**: Time-series CV, SHAP explainability, daily batch scoring
 
-### 2. [Real-Time Fraud Detection](case_studies/02_fraud_detection.md)
+### 2. [Real-Time Fraud Detection](docs/06_case_studies/domain_specific/02_fraud_detection.md)
 - **Challenge**: $5M annual fraud losses, need <100ms latency
 - **Solution**: Multi-layer defense (rules + XGBoost + Isolation Forest)
 - **Impact**: **$4.2M prevented**, 84% precision, 81% recall
 - **Tech**: Redis feature store, Cassandra, SMOTE, threshold optimization
 
-### 3. [Personalized Recommender System](case_studies/03_recommender_system.md)
+### 3. [Personalized Recommender System](docs/06_case_studies/domain_specific/03_recommender_system.md)
 - **Challenge**: 45% users never engaged beyond homepage
 - **Solution**: Hybrid collaborative filtering + deep two-tower ranker
 - **Impact**: **+$17M revenue**, +32% watch time, +18% retention
@@ -389,25 +397,25 @@ docker run -p 8000:8000 issue-classifier
 
 | # | Case Study | Industry Reference | Key Topic |
 |---|------------|-------------------|-----------| 
-| 1 | [Uber Eats GNN Recommendations](case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md) | Uber | GraphSAGE, Two-Tower |
-| 2 | [Notion AI RAG Architecture](case_studies/full_stack_ai/02_notion_ai_rag_architecture.md) | Notion | Hybrid Retrieval, Model Routing |
-| 3 | [Intercom Fin Support Agent](case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
-| 4 | [Salesforce Trust Layer](case_studies/full_stack_ai/04_salesforce_trust_layer.md) | Salesforce | PII Masking, Audit |
-| 5 | [Pinterest Ranking Pipeline](case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
-| 6 | [DoorDash Feature Store](case_studies/full_stack_ai/06_doordash_feature_store.md) | DoorDash | Streaming Features, Freshness SLA |
-| 7 | [Siemens Edge AI](case_studies/full_stack_ai/07_siemens_edge_ai.md) | Siemens | Edge Deployment, OTA Updates |
-| 8 | [Manufacturing Quality Control](case_studies/full_stack_ai/08_manufacturing_quality_control.md) | Darwin/Intrinsics | **CNN+INT8, PLC (<20ms)** |
-| 9 | [Medical IoMT Devices](case_studies/full_stack_ai/09_medical_iomt_devices.md) | Intrinsics | **Neuro Core, Federated Learning** |
-| 10 | [Industrial IoT PdM](case_studies/full_stack_ai/10_industrial_iot_pdm.md) | Barbara IoT | **Autoencoder, RUL, DDIL** |
-| 11 | [Hybrid Edge-Cloud](case_studies/full_stack_ai/11_hybrid_edge_cloud.md) | AWS Greengrass | **Task Routing, Split Inference** |
+| 1 | [Uber Eats GNN Recommendations](docs/06_case_studies/full_stack_ai/01_uber_eats_gnn_recommendations.md) | Uber | GraphSAGE, Two-Tower |
+| 2 | [Notion AI RAG Architecture](docs/06_case_studies/full_stack_ai/02_notion_ai_rag_architecture.md) | Notion | Hybrid Retrieval, Model Routing |
+| 3 | [Intercom Fin Support Agent](docs/06_case_studies/full_stack_ai/03_intercom_fin_support_agent.md) | Intercom | Guardrails, CX Score |
+| 4 | [Salesforce Trust Layer](docs/06_case_studies/full_stack_ai/04_salesforce_trust_layer.md) | Salesforce | PII Masking, Audit |
+| 5 | [Pinterest Ranking Pipeline](docs/06_case_studies/full_stack_ai/05_pinterest_ranking_pipeline.md) | Pinterest | Multi-Stage Ranking |
+| 6 | [DoorDash Feature Store](docs/06_case_studies/full_stack_ai/06_doordash_feature_store.md) | DoorDash | Streaming Features, Freshness SLA |
+| 7 | [Siemens Edge AI](docs/06_case_studies/full_stack_ai/07_siemens_edge_ai.md) | Siemens | Edge Deployment, OTA Updates |
+| 8 | [Manufacturing Quality Control](docs/06_case_studies/full_stack_ai/08_manufacturing_quality_control.md) | Darwin/Intrinsics | **CNN+INT8, PLC (<20ms)** |
+| 9 | [Medical IoMT Devices](docs/06_case_studies/full_stack_ai/09_medical_iomt_devices.md) | Intrinsics | **Neuro Core, Federated Learning** |
+| 10 | [Industrial IoT PdM](docs/06_case_studies/full_stack_ai/10_industrial_iot_pdm.md) | Barbara IoT | **Autoencoder, RUL, DDIL** |
+| 11 | [Hybrid Edge-Cloud](docs/06_case_studies/full_stack_ai/11_hybrid_edge_cloud.md) | AWS Greengrass | **Task Routing, Split Inference** |
 
-**📚 Edge AI Engineer Roadmap**: [docs/edge_ai_engineer_roadmap.md](docs/edge_ai_engineer_roadmap.md)
+**📚 Edge AI Engineer Roadmap**: [docs/01_learning_roadmap/edge_ai_engineer_roadmap.md](docs/01_learning_roadmap/edge_ai_engineer_roadmap.md)
 
 ---
 
 ## 🎤 Interview Preparation
 
-**[Complete Interview Tracker](INTERVIEW_TRACKER.md)** with:
+**[Complete Interview Tracker](docs/05_interview_prep/INTERVIEW_TRACKER.md)** with:
 
 ### ✅ Technical Depth Checklists
 - ML fundamentals (bias-variance, regularization, cross-validation)
@@ -430,7 +438,7 @@ docker run -p 8000:8000 issue-classifier
 
 ## 📊 Case Studies
 
-### [Time Series Forecasting](case_studies/time_series_forecasting/README.md)
+### [Time Series Forecasting](docs/06_case_studies/time_series_forecasting/README.md)
 **Problem**: Retail sales forecasting for inventory optimization
 
 **Approaches Compared**:
@@ -439,6 +447,14 @@ docker run -p 8000:8000 issue-classifier
 - Prophet (hybrid): 7.8% MAPE
 
 **Production**: FastAPI service with confidence intervals
+
+### Additional Case Studies
+**New additions include**:
+- Computer Vision for Medical Diagnosis
+- NLP for Financial Document Analysis
+- Advanced Recommendation Systems
+- Multi-modal Retail Analytics
+- Time Series Forecasting for Supply Chain
 
 ---
 
@@ -515,10 +531,10 @@ docker-compose up -d --build
 
 ## 📖 Documentation
 
-*   **[User Guide](docs/USER_GUIDE.md)**: The bible of this project. Steps, params, and usage.
-*   **[Math Notes](docs/math_notes.md)**: Handwritten derivations of key algorithms.
-*   **[Interview Prep](docs/INTERVIEW_PREP.md)**: "How would you design a recommendation system?"
-*   **[Repo Documentation](docs/REPO_DOCUMENTATION.md)**: Full repository map and entry points.
+*   **[User Guide](docs/00_introduction/01_user_guide.md)**: The bible of this project. Steps, params, and usage.
+*   **[Math Notes](docs/02_core_concepts/fundamentals/math_notes.md)**: Handwritten derivations of key algorithms.
+*   **[Interview Prep](docs/05_interview_prep/README.md)**: "How would you design a recommendation system?"
+*   **[Repo Documentation](docs/00_introduction/REPO_DOCUMENTATION.md)**: Full repository map and entry points.
 
 ---
 

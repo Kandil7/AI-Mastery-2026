@@ -1,1 +1,0 @@
-# System design questions for interviews
