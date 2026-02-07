@@ -73,12 +73,12 @@ This section consolidates various project-oriented roadmaps, status updates, and
    - Request validation (Pydantic)
    - Model caching and error handling
 
-3. ✅ **Docker Deployment** ([[`Dockerfile.capstone`](../../Dockerfile.capstone)](../../Dockerfile.capstone))
+3. ✅ **Docker Deployment** ([[[`Dockerfile.capstone`](../../Dockerfile.capstone)](../../Dockerfile.capstone)](../../Dockerfile.capstone))
    - Optimized multi-stage build
    - Health checks
    - Production configuration (2 workers)
 
-4. ✅ **Documentation** ([[`docs/CAPSTONE_README.md`](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md))
+4. ✅ **Documentation** ([[[`docs/CAPSTONE_README.md`](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md))
    - Architecture diagrams
    - API documentation
    - Performance benchmarks
@@ -185,8 +185,8 @@ This section consolidates various project-oriented roadmaps, status updates, and
 #### Production Code (4 files, ~1,200 lines)
 1. [`scripts/capstone/train_issue_classifier.py`](../../scripts/capstone/train_issue_classifier.py)
 2. [[`src/production/issue_classifier_api.py`](../../src/production/api.py)](../../src/production/api.py)
-3. [[`Dockerfile.capstone`](../../Dockerfile.capstone)](../../Dockerfile.capstone)
-4. [[`docs/CAPSTONE_README.md`](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md)
+3. [[[`Dockerfile.capstone`](../../Dockerfile.capstone)](../../Dockerfile.capstone)](../../Dockerfile.capstone)
+4. [[[`docs/CAPSTONE_README.md`](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md)](../06_case_studies/CAPSTONE_README.md)
 
 #### Notebooks & Guides (3 files)
 5. [[`notebooks/week_04/mnist_from_scratch.ipynb`](../../notebooks/week_04/mnist_from_scratch.ipynb)](../../notebooks/week_04/mnist_from_scratch.ipynb)
@@ -326,7 +326,7 @@ This section consolidates various project-oriented roadmaps, status updates, and
 
 - **Week 1: Foundations & Linear Algebra**
     - *Concept:* Vectors, matrices, eigenvalues without NumPy (initially), then optimized usage.
-    - *Code:* [`src/core/math_operations.py`](../../src/core/math_operations.py), [`src/core/linear_algebra.py`](../../src/core/linear_algebra.py).
+    - *Code:* [`src/core/math_operations.py`](../../src/core/math_operations.py), [[`src/core/linear_algebra.py`](../../src/core/linear_algebra.py)](../../src/core/linear_algebra.py).
     - *Deliverable:* A "Numpy-lite" implementation and a benchmark script comparing it to real NumPy.
 
 - **Week 2: Optimization & Probability**
@@ -352,22 +352,22 @@ This section consolidates various project-oriented roadmaps, status updates, and
 
 - **Week 5: CNNs & Computer Vision**
     - *Concept:* Convolutions, kernels, pooling, ResNets.
-    - *Code:* `src/ml/vision.py`.
-    - *Deliverable:* An image classifier API using `src/production/api.py`.
+    - *Code:* [`src/ml/vision.py`](../../src/ml/vision.py).
+    - *Deliverable:* An image classifier API using [[`src/production/api.py`](../../src/production/api.py)](../../src/production/api.py).
 
 - **Week 6: Sequences & RNNs**
     - *Concept:* RNNs, LSTMs, Vanishing gradients.
-    - *Code:* `src/ml/sequence.py`.
+    - *Code:* [`src/ml/sequence.py`](../../src/ml/sequence.py).
     - *Deliverable:* A stock price predictor or text generator.
 
 - **Week 7: The Transformer Implementation**
     - *Concept:* Self-Attention, Multi-Head, Positional Encodings.
-    - *Code:* `src/llm/attention.py`, `src/llm/transformer.py`.
+    - *Code:* [`src/llm/attention.py`](../../src/llm/attention.py), [`src/llm/transformer.py`](../../src/llm/transformer.py).
     - *Deliverable:* A "Build BERT from scratch" notebook.
 
 - **Week 8: LLM Engineering**
     - *Concept:* Tokenization, RoPE, KV-Cache.
-    - *Code:* `src/llm/model.py`.
+    - *Code:* [`src/llm/model.py`](../../src/llm/model.py).
     - *Deliverable:* A script that loads pre-trained GPT-2 weights into your custom architecture.
 
 ---
@@ -378,17 +378,17 @@ This section consolidates various project-oriented roadmaps, status updates, and
 
 - **Week 9: Vector Search & Embeddings**
     - *Concept:* HNSW, LSH, Contrastive Loss.
-    - *Code:* `src/production/vector_db.py`.
+    - *Code:* [`src/production/vector_db.py`](../../src/production/vector_db.py).
     - *Deliverable:* A custom vector database that passes recall tests.
 
 - **Week 10: Advanced RAG Strategies**
     - *Concept:* Hybrid Search, Re-ranking, Context Window management.
-    - *Code:* `src/llm/rag.py`.
+    - *Code:* [`src/llm/rag.py`](../../src/llm/rag.py).
     - *Deliverable:* RAG Evaluation framework (Faithfulness/Relevance metrics).
 
 - **Week 11: MLOps & Orchestration**
     - *Concept:* Docker, CI/CD, Prometheus, Grafana.
-    - *Code:* `.github/workflows/`, `docker-compose.yml`.
+    - *Code:* [`workflows/`](../../../.github/workflows/), [`docker-compose.yml`](../../../docker-compose.yml).
     - *Deliverable:* A fully monitored deployment dashboard.
 
 - **Week 12: Capstone & Portfolio Polish**
@@ -948,43 +948,43 @@ Is cost the primary concern?
 ### 🟢 Level 1: Foundations (Stage 1)
 *   **Concepts**: Vector Embeddings, Cosine Similarity, SQL metadata.
 *   **Milestone**: Run `01_intro_and_setup.ipynb` and see your first RAG answer.
-*   **Study**: [Clean Architecture for AI](./docs/02_core_concepts/deep_dives/clean_architecture_for_ai.md).
+*   **Study**: [Clean Architecture for AI](../02_core_concepts/deep_dives/clean_architecture_for_ai.md).
 
 ### 🟡 Level 2: Production Readiness (Stage 2)
 *   **Concepts**: Background Task Queues, SSE Streaming, Parent-Child Chunking.
 *   **Milestone**: Upload a large document while the UI remains responsive.
-*   **Study**: [Scaling RAG Pipes](./docs/02_core_concepts/deep_dives/scaling_rag_pipelines.md).
+*   **Study**: [Scaling RAG Pipes](../02_core_concepts/deep_dives/scaling_rag_pipelines.md).
 
 ### 🟠 Level 3: Advanced Intelligence (Stage 3)
 *   **Concepts**: LLM-as-a-Judge, Self-Correction, Knowledge Graph Triplets.
 *   **Milestone**: Ask a question that the system refuses to answer because it failed the "Relvancy Grader."
-*   **Study**: [Self-Corrective RAG](./docs/02_core_concepts/deep_dives/stage_3_intelligence.md).
+*   **Study**: [Self-Corrective RAG](../02_core_concepts/deep_dives/stage_3_intelligence.md).
 
 ### 🔴 Level 4: Multi-Modal Mastery (Stage 4)
 *   **Concepts**: Structural Table Analysis, Vision-to-Text descriptors.
 *   **Milestone**: Run `06_multimodal_unstructured.ipynb`. Search for a chart by its description.
-*   **Study**: [Multi-Modal & Tables](./docs/02_core_concepts/deep_dives/stage_4_multimodal.md).
+*   **Study**: [Multi-Modal & Tables](../02_core_concepts/deep_dives/stage_4_multimodal.md).
 
 ### 🔥 Level 5: Autonomous Operations (Stage 5)
 *   **Concepts**: Semantic Routing, Web Search Fallback, PII Redaction.
 *   **Milestone**: Run `07_autonomous_routing_and_web.ipynb`. See system redact PII in real-time.
-*   **Study**: [Autonomous Agent](./docs/02_core_concepts/deep_dives/stage_5_autonomy.md).
+*   **Study**: [Autonomous Agent](../02_core_concepts/deep_dives/stage_5_autonomy.md).
 
 
 ### 💠 Level 6: LLM Ecosystem Mastery (Advanced)
 *   **Concepts**: Adapter Pattern, Multi-Provider Fallbacks, API Benchmarking.
 *   **Milestone**: Run `08_llm_provider_strategy.ipynb`. Compare latency between Gemini and OpenAI. [COMPLETED ✅]
-*   **Study**: [LLM Provider Strategy](./docs/02_core_concepts/deep_dives/llm_provider_strategy.md).
+*   **Study**: [LLM Provider Strategy](../02_core_concepts/deep_dives/llm_provider_strategy.md).
 
 ### 🏆 Level 7: The AI Architect Mindset
 *   **Concepts**: Semantic Chunking, Advanced Prompt Engineering (CO-STAR), Few-Shot stabilization.
 *   **Milestone**: Run `09_semantic_chunking.ipynb`. Implement a custom similarity threshold. [COMPLETED ✅]
-*   **Study**: [Advanced Prompt Engineering](./docs/02_core_concepts/deep_dives/advanced_prompt_engineering.md).
+*   **Study**: [Advanced Prompt Engineering](../02_core_concepts/deep_dives/advanced_prompt_engineering.md).
 
 ### 🚀 Level 8: The Performance Engineer (Mastery)
 *   **Concepts**: HNSW, Product Quantization, Dimensionality Reduction (PCA).
 *   **Milestone**: Run `10_vector_visualization.ipynb`. Identify clusters in 3D. [COMPLETED ✅]
-*   **Study**: [Vector Database Internals](./docs/02_core_concepts/deep_dives/vector_database_internals.md).
+*   **Study**: [Vector Database Internals](../02_core_concepts/deep_dives/vector_database_internals.md).
 
 ### 👑 Level 9: The Autonomous Agent Engineer (Pinnacle)
 *   **Concepts**: ReAct Pattern (Reasoning + Acting), Agentic Planning, Multi-Tool Orchestration.
@@ -994,52 +994,52 @@ Is cost the primary concern?
 ### 💎 Level 10: The Legend (Data Flywheel)
 *   **Concepts**: Synthetic Data Generation (SDG), AI-as-a-Teacher, Ground Truth Mining.
 *   **Milestone**: Run `12_synthetic_data_flywheel.ipynb`. Generate 50 test cases autonomously. [COMPLETED ✅]
-*   **Study**: [Synthetic Data Engineering](./docs/02_core_concepts/deep_dives/synthetic_data_engineering.md).
+*   **Study**: [Synthetic Data Engineering](../02_core_concepts/deep_dives/synthetic_data_engineering.md).
 
 ### 👑 Level 11: The Grand Finale (Agentic GraphRAG)
 *   **Concepts**: Global Reasoning, Entity-Relation Extraction, Graph Traversal Agents.
 *   **Milestone**: Run `13_agent_graph_rag_mastery.ipynb`. Discover non-obvious paths in the Knowledge Graph. [COMPLETED ✅]
-*   **Study**: [Agentic GraphRAG](./docs/02_core_concepts/deep_dives/agentic_graph_rag.md).
+*   **Study**: [Agentic GraphRAG](../02_core_concepts/deep_dives/agentic_graph_rag.md).
 
 ### 🚀 Level 12: The Master of Swarms (Architect Elite)
 *   **Concepts**: Multi-Agent Orchestration, Supervisor/Worker patterns, Specialized Personas.
 *   **Milestone**: Run `14_multi_agent_swarm_orchestration.ipynb`. Observe collaborative reasoning in action. [COMPLETED ✅]
-*   **Study**: [Multi-Agent Swarms](./docs/02_core_concepts/deep_dives/multi_agent_swarms.md).
+*   **Study**: [Multi-Agent Swarms](../02_core_concepts/deep_dives/multi_agent_swarms.md).
 
 ### 🛡️ Level 13: The Shield Architect (The Final Fortress)
 *   **Concepts**: Red Teaming, Indirect Prompt Injection, Output Guardrails.
 *   **Milestone**: Run `15_adversarial_ai_red_teaming.ipynb`. Successfully block a malicious prompt injection. [COMPLETED ✅]
-*   **Study**: [Adversarial RAG Security](./docs/02_core_concepts/deep_dives/adversarial_rag_security.md).
+*   **Study**: [Adversarial RAG Security](../02_core_concepts/deep_dives/adversarial_rag_security.md).
 
 ### 🧠 Level 14: The Digital Soul Architect (Ultimate Transcendence)
 *   **Concepts**: Long-Term Memory, User Personalization, Reflection Loops.
 *   **Milestone**: Run `16_long_term_memory_and_personalization.ipynb`. Build an AI that remembers your style across sessions. [COMPLETED ✅]
-*   **Study**: [Long-Term Memory Agents](./docs/02_core_concepts/deep_dives/long_term_memory_agents.md).
+*   **Study**: [Long-Term Memory Agents](../02_core_concepts/deep_dives/long_term_memory_agents.md).
 
 ### 📉 Level 15: The Efficiency Architect (The Grand Finale)
 *   **Concepts**: SLMs (Phi-3, Qwen), Model Quantization (GGUF), Local-First RAG.
 *   **Milestone**: Run `17_slm_quantization_mastery.ipynb`. Benchmark a 4-bit model against its cloud counterpart. [COMPLETED ✅]
-*   **Study**: [SLMs and Quantization](./docs/02_core_concepts/deep_dives/slms_and_quantization.md).
+*   **Study**: [SLMs and Quantization](../02_core_concepts/deep_dives/slms_and_quantization.md).
 
 ### 🧪 Level 16: The RAFT Specialist (The Summit)
 *   **Concepts**: Retrieval-Augmented Fine-Tuning, Distractor Inhibition, Dataset Synthesis.
 *   **Milestone**: Run `18_raft_fine_tuning_mastery.ipynb`. Generate a RAFT-formatted training sample. [COMPLETED ✅]
-*   **Study**: [RAFT Fine-Tuning for RAG](./docs/02_core_concepts/deep_dives/raft_fine_tuning_for_rag.md).
+*   **Study**: [RAFT Fine-Tuning for RAG](../02_core_concepts/deep_dives/raft_fine_tuning_for_rag.md).
 
 ### 👁️ Level 17: The Visionary Architect (The Infinite Sight)
 *   **Concepts**: Multimodal RAG, Vision-Language Models (VLMs), Layout-Aware Chunking.
 *   **Milestone**: Run `19_multimodal_rag_vision_mastery.ipynb`. Perform visual reasoning on a document chart. [COMPLETED ✅]
-*   **Study**: [Multimodal RAG & Vision](./docs/02_core_concepts/deep_dives/multimodal_rag_vision.md).
+*   **Study**: [Multimodal RAG & Vision](../02_core_concepts/deep_dives/multimodal_rag_vision.md).
 
 ### 🧠⚡ Level 18: The Reasoning Architect (The Thinking Machine)
 *   **Concepts**: Test-Time Compute, Thinking Loops, CoT Verification, System 2 AI.
 *   **Milestone**: Run `20_reasoning_models_thinking_loops.ipynb`. Implement a self-correcting logic chain. [COMPLETED ✅]
-*   **Study**: [Reasoning Models & Thinking Loops](./docs/02_core_concepts/deep_dives/reasoning_models_thinking_loops.md).
+*   **Study**: [Reasoning Models & Thinking Loops](../02_core_concepts/deep_dives/reasoning_models_thinking_loops.md).
 
 ### 🧪✨ Level 19: The Data Alchemist (Knowledge Creation)
 *   **Concepts**: Synthetic Data, Evol-Instruct, Knowledge Distillation.
 *   **Milestone**: Run `21_synthetic_data_distillation_mastery.ipynb`. Generate a fine-tuning dataset from scratch. [COMPLETED ✅]
-*   **Study**: [Synthetic Data & Distillation](./docs/02_core_concepts/deep_dives/synthetic_data_generation.md).
+*   **Study**: [Synthetic Data & Distillation](../02_core_concepts/deep_dives/synthetic_data_generation.md).
 
 ## 🚀 Post-Completion: The Future (Endless Horizon)
 *   **Self-Improving Loops**: Automated fine-tuning based on user feedback.
@@ -1067,39 +1067,39 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 
 #### ⚡ Daily Deep Work Ritual
 *   **07:00 - 08:30**: **Top-Down Learning (Context)**
-    *   *Rule*: **Projects First**. Pick the "Shippable Artifact" from [`docs/01_learning_roadmap/project_Q1_ROADMAP.md`](./project_Q1_ROADMAP.md).
-    *   Example: "I need to build a Linear Algebra library." -> Read about Matrix Multiplication -> Implement [`src/core/linear_algebra.py`](../../src/core/linear_algebra.py).
+    *   *Rule*: **Projects First**. Pick the "Shippable Artifact" from [[`docs/01_learning_roadmap/project_Q1_ROADMAP.md`](./project_Q1_ROADMAP.md)](./project_Q1_ROADMAP.md).
+    *   Example: "I need to build a Linear Algebra library." -> Read about Matrix Multiplication -> Implement [[`src/core/linear_algebra.py`](../../src/core/linear_algebra.py)](../../src/core/linear_algebra.py).
 *   **08:30 - 08:45**: break
 *   **08:45 - 10:15**: **Bottom-Up Construction (Code)**
     *   Write the 'Core Algorithm' from scratch (no libraries).
     *   Write unit tests to verify your math.
     *   **Focus**: 1 Unit of Progress (1 feature/algo working).
-*   **Closing Ritual**: Log entry in `docs/reports/LEARNING_LOG.md`, push to GitHub.
+*   **Closing Ritual**: Log entry in [`docs/reports/LEARNING_LOG.md`](../../reports/LEARNING_LOG.md), push to GitHub.
 
 ### Weekly Review (Sunday, 30 min)
 - [ ] What shipped this week? (commit count, files changed)
 - [ ] What blocked progress?
 - [ ] Single focus for next week?
-- [ ] Update [`docs/05_interview_prep/INTERVIEW_TRACKER.md`](../05_interview_prep/INTERVIEW_TRACKER.md)
+- [ ] Update [[`docs/05_interview_prep/INTERVIEW_TRACKER.md`](../05_interview_prep/INTERVIEW_TRACKER.md)](../05_interview_prep/INTERVIEW_TRACKER.md)
 
 ### Entry Ritual
 1. Same time, same place
 2. Notifications off (phone on DND)
 3. Only these tabs open: VS Code, Terminal, AI-Mastery-2026
-4. Start with: `git status` → review [`docs/01_learning_roadmap/project_Q1_ROADMAP.md`](./project_Q1_ROADMAP.md) → pick first task
+4. Start with: `git status` → review [[`docs/01_learning_roadmap/project_Q1_ROADMAP.md`](./project_Q1_ROADMAP.md)](./project_Q1_ROADMAP.md) → pick first task
 
 ---
 
 ### Phase 1: Foundational Backend and MLOps Integration ✅
 
 - [x] **Task 1.1: Integrate a Real Pre-trained Model**
-    - [x] Created `scripts/train_save_models.py`
-    - [x] Modified `src/production/api.py` with `ModelCache` class
+    - [x] Created [`scripts/train_save_models.py`](../../scripts/train_save_models.py)
+    - [x] Modified [[`src/production/api.py`](../../src/production/api.py)](../../src/production/api.py) with `ModelCache` class
     - [x] Updated `/predict` endpoint for real inference
     - [x] All three models trained and saved (RF, GB, Logistic)
 
 - [x] **Task 1.2: Set Up PostgreSQL Database**
-    - [x] Created `scripts/setup_database.py` with full schema
+    - [x] Created [`scripts/setup_database.py`](../../scripts/setup_database.py) with full schema
     - [x] Tables for predictions, experiments, training runs, metrics
     - [x] Views for prediction_stats and api_health
 
@@ -1134,7 +1134,7 @@ This document outlines the tasks required to transform the `AI-Mastery-2026` rep
 - [x] **Task 2.4: Connect Front-End to Backend**
     - [x] API integration with requests library
     - [x] Streaming response display
-    - [x] Added Streamlit service to `docker-compose.yml`
+    - [x] Added Streamlit service to [`docker-compose.yml`](../../../docker-compose.yml)
 
 ---
 
