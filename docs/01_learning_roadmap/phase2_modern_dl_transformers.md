@@ -4,13 +4,13 @@
 
 ## Key Topics:
 
-*   **PyTorch Fundamentals:** Tensors, autograd, building custom layers and models.
-*   **CNNs:** Architectures (ResNet, VGG), transfer learning, image classification.
-*   **RNNs/LSTMs:** Sequence modeling basics.
-*   **Transformers:** Self-attention mechanism, Encoder-Decoder architecture, common models (BERT, GPT variants).
+*   **PyTorch Fundamentals:** Mastering the basics of PyTorch, including tensor operations, automatic differentiation (`autograd`), and constructing custom layers and models. Focus on building an intuition for the framework's design.
+*   **CNNs:** Understanding Convolutional Neural Networks, exploring popular architectures like ResNet and VGG, and applying concepts like transfer learning for image classification tasks. Implement a basic CNN from scratch using PyTorch.
+*   **RNNs/LSTMs:** Grasping the fundamentals of sequence modeling with Recurrent Neural Networks (RNNs) and Long Short-Term Memory (LSTM) networks, essential for processing sequential data like text.
+*   **Transformers:** Deep diving into the Transformer architecture, focusing on the self-attention mechanism, multi-head attention, and the Encoder-Decoder structure. Study common models like BERT for understanding and GPT variants for generation.
 
 ## Deliverables:
 
-*   PyTorch implementations in [`src/llm/`](../../src/llm/) (attention mechanism) and [`src/ml/`](../../src/ml/) (CNNs).
-*   Notebooks in [`notebooks/03_deep_learning/`](../../notebooks/03_deep_learning/).
-*   Documentation on Transformers ([`docs/04_tutorials/examples/TRANSFORMER_EXAMPLES.md`](../04_tutorials/examples/TRANSFORMER_EXAMPLES.md)) and Vision ([`docs/04_tutorials/examples/VISION_EXAMPLES.md`](../04_tutorials/examples/VISION_EXAMPLES.md)).
+*   PyTorch implementations of attention mechanisms in [`src/llm/`](../../src/llm/) and CNN architectures in [`src/ml/`](../../src/ml/). This includes building custom layers and models using PyTorch.
+*   Completion of key notebooks in [`notebooks/03_deep_learning/`](../../notebooks/03_deep_learning/), focusing on practical exercises for CNNs, RNNs/LSTMs, and Transformers.
+*   In-depth documentation and examples related to Transformers ([`docs/04_tutorials/examples/TRANSFORMER_EXAMPLES.md`](../04_tutorials/examples/TRANSFORMER_EXAMPLES.md)) and Computer Vision ([`docs/04_tutorials/examples/VISION_EXAMPLES.md`](../04_tutorials/examples/VISION_EXAMPLES.md)) within the tutorials section.
