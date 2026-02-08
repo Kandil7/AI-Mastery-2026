@@ -12,10 +12,10 @@ AI-Mastery-2026 is a comprehensive AI Engineer Toolkit and learning repository. 
 
 Before you begin, ensure you have the following installed on your system:
 
-*   **Python 3.10+**: The primary language for this project. You can download it from [python.org](https://www.python.org/).
-*   **Git**: For version control and cloning the repository.
-*   **Make**: A build automation tool used to streamline various development tasks.
-*   **Docker (Optional but Recommended)**: For containerized development and deployment.
+*   **Python 3.10+**: The primary language for this project, essential for running all AI/ML models and applications. You can download it from [python.org](https://www.python.org/).
+*   **Git**: A version control system necessary for cloning the repository and managing code changes.
+*   **Make**: A build automation tool that simplifies complex commands for setting up the environment, running tests, and managing applications.
+*   **Docker (Optional but Recommended)**: A platform for developing, shipping, and running applications in containers, ensuring consistent environments across different machines.
 
 ### 2.2. Environment Setup
 
@@ -40,6 +40,12 @@ The project uses a `Makefile` to streamline environment setup.
     make test
     ```
     This runs the unit tests and ensures your environment is correctly configured. A successful run confirms readiness.
+
+### Troubleshooting `make install`
+
+*   **`make` command not found:** If you see an error like "`make` is not recognized...", ensure that `make` is installed and added to your system's PATH. On Windows, you might need to install build tools like MinGW or Cygwin.
+*   **Python package installation errors:** If `requirements.txt` packages fail to install, try updating `pip` (`python -m pip install --upgrade pip`) or resolving dependency conflicts manually. Ensure you have a stable internet connection.
+*   **Virtual environment issues:** If `.venv` is not created or activated correctly, try deleting the `.venv` directory and running `make install` again.
 
 ### 2.3. Running the Application
 
@@ -76,7 +82,7 @@ The `Makefile` is central to managing this project. It encapsulates common comma
 
 ## 3. Repository Structure & Navigation
 
-The repository is highly organized, with the `docs/` directory serving as the central hub for all documentation. It's structured into distinct, numbered sections to facilitate a structured learning and development path.
+The repository is highly organized, with the `docs/` directory serving as the central hub for all documentation. It's structured into distinct, numbered sections to facilitate a structured learning and development path. To effectively navigate the documentation, start with the "Docs Entry Point" in the main `docs/README.md` file. Each numbered section below provides a focused area of learning or project aspect, guiding you progressively through the AI-Mastery-2026 curriculum.
 
 *   **[Docs Entry Point](../README.md)**: Start here for an overview of the entire documentation suite.
 *   **[00. Introduction](./README.md)**: Project overview, setup, contribution guide.
