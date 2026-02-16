@@ -243,12 +243,16 @@ Designed for storing and searching high-dimensional vector embeddings, essential
 - **High-dimensional support**: Optimized for 100s-1000s dimensions
 - **Similarity metrics**: Cosine, Euclidean, Manhattan distance
 - **Scalable search**: Approximate nearest neighbor algorithms
+- **Hybrid search capabilities**: Integration with traditional keyword search
+- **Multi-modal support**: Storage of heterogeneous embeddings (text, image, audio)
 
 ### Best For
 - AI/ML embeddings storage
 - Semantic search
 - Similarity matching
 - RAG applications
+- Multi-modal AI systems
+- Real-time inference databases
 
 ### Common Examples
 - Pinecone (managed service)
@@ -256,31 +260,80 @@ Designed for storing and searching high-dimensional vector embeddings, essential
 - Milvus (open-source, scalable)
 - pgvector (PostgreSQL extension)
 - Chroma (lightweight, Python-native)
+- Qdrant, Vespa, Valkey (emerging alternatives)
 
-### Example - pgvector (PostgreSQL Extension)
+### Advanced Vector Database Patterns
+
+For production AI/ML systems, consider these advanced patterns:
+
+#### Hybrid Search Implementation
+Modern vector databases support hybrid search combining vector similarity with traditional keyword search and metadata filtering:
+
 ```sql
--- Enable pgvector extension
-CREATE EXTENSION vector;
-
--- Create table with vector column
-CREATE TABLE documents (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    content TEXT,
-    embedding vector(1536)  -- OpenAI embeddings are 1536 dimensions
-);
-
--- Create index for fast similarity search
-CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
-
--- Query for similar documents
-SELECT id, title,
-       1 - (embedding <=> $1) AS similarity
+-- Example: Hybrid search with pgvector + full-text search
+SELECT id, title, content,
+       1 - (embedding <=> $1) AS vector_similarity,
+       ts_rank(to_tsvector('english', content), to_tsquery('english', $2)) AS text_relevance,
+       (1 - (embedding <=> $1)) * 0.7 + 
+       ts_rank(to_tsvector('english', content), to_tsquery('english', $2)) * 0.3 AS combined_score
 FROM documents
-ORDER BY embedding <=> $1
-LIMIT 5;
+WHERE content @@ to_tsquery('english', $2)
+ORDER BY combined_score DESC
+LIMIT 10;
 ```
+
+#### Multi-Modal Embedding Storage
+Store embeddings from different modalities in unified spaces:
+
+```python
+# Example: Unified multi-modal storage structure
+class MultiModalDocument:
+    def __init__(self):
+        self.id = str(uuid.uuid4())
+        self.metadata = {
+            'source': 'product_catalog_2024.csv',
+            'modality': 'multi-modal',
+            'created_at': datetime.now().isoformat()
+        }
+        self.embeddings = {
+            'text': None,      # Text embedding (e.g., sentence-transformers)
+            'image': None,     # Image embedding (e.g., CLIP)
+            'audio': None,     # Audio embedding (e.g., Wav2Vec)
+            'combined': None   # Unified embedding space
+        }
+        self.features = {}   # Traditional structured features
+```
+
+#### Real-Time Vector Updates
+For real-time AI applications, implement efficient vector updates:
+
+```sql
+-- Efficient vector updates for real-time systems
+-- Use UPSERT pattern for incremental updates
+INSERT INTO documents (id, title, content, embedding)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET 
+    title = EXCLUDED.title,
+    content = EXCLUDED.content,
+    embedding = EXCLUDED.embedding,
+    updated_at = NOW();
+```
+
+### Comprehensive Vector Database Guidance
+
+For detailed implementation guidance on vector databases in AI/ML systems, see:
+- [**Feature Store Patterns**](../../03_advanced/01_ai_ml_integration/05_feature_store_patterns.md) - Comprehensive guide to feature store architectures including vector-based features
+- [**RAG System Implementation**](../../03_advanced/01_ai_ml_integration/06_rag_system_implementation.md) - End-to-end RAG system design with hybrid search patterns
+- [**Multi-Modal Databases**](../../03_advanced/01_ai_ml_integration/07_multi_modal_databases.md) - Storing and querying heterogeneous embeddings across modalities
+- [**Real-Time Inference Databases**](../../03_advanced/01_ai_ml_integration/08_realtime_inference_databases.md) - Low-latency serving architectures for vector search
+
+Also see related resources:
+- [**Database Fundamentals**](../../02_core_concepts/database/database_fundamentals.md) - Core concepts and architecture
+- [**Database Types Overview**](./02_database_types.md) - Broader context of database categories
+- [**Learning Path Index**](../../DATABASE_LEARNING_PATH_INDEX.md) - Complete structured progression
+
+These resources provide production-grade implementation details, performance optimization strategies, and real-world case studies for deploying vector databases at scale.
 
 ## Choosing the Right Database for AI/ML Applications
 
