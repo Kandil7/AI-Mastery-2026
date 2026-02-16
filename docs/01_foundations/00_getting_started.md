@@ -376,6 +376,44 @@ Install SQLite (lightweight, file-based database) and repeat the exercises. Comp
 
 ---
 
+## 🧠 Knowledge Check: Quick Quiz
+
+Test your understanding with these multiple-choice questions:
+
+1. **What does CRUD stand for?**
+   - A) Create, Retrieve, Update, Delete
+   - B) Create, Read, Update, Delete ✅
+   - C) Connect, Read, Use, Delete
+   - D) Control, Record, Update, Destroy
+
+2. **Which SQL command creates a new database?**
+   - A) `NEW DATABASE` 
+   - B) `CREATE DB`
+   - C) `CREATE DATABASE` ✅
+   - D) `MAKE DATABASE`
+
+3. **What does `SERIAL PRIMARY KEY` do in PostgreSQL?**
+   - A) Creates a text field that auto-increments
+   - B) Creates an auto-incrementing integer that's unique ✅
+   - C) Creates a random UUID identifier
+   - D) Creates a foreign key relationship
+
+4. **Which constraint ensures no duplicate values in a column?**
+   - A) `NOT NULL`
+   - B) `CHECK`
+   - C) `UNIQUE` ✅
+   - D) `DEFAULT`
+
+5. **What happens when you run `SELECT * FROM students WHERE age > 20;`?**
+   - A) Returns all students regardless of age
+   - B) Returns only students older than 20 ✅
+   - C) Returns students younger than 20
+   - D) Returns an error because age is not indexed
+
+**Answers**: 1-B, 2-C, 3-B, 4-C, 5-B
+
+---
+
 ## Next Steps
 
 Congratulations! You've taken your first steps in database mastery. In the next document, we'll dive deep into data types—the building blocks of your database schema.
