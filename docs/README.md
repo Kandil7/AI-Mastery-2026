@@ -13,6 +13,7 @@ The documentation is organized into the following main sections:
 2.  ### [01. Learning Roadmap](./01_learning_roadmap/README.md)
     *   **Purpose:** Outlines the detailed learning path for AI engineering, from foundational readiness to advanced specializations and capstone projects. Includes project management roadmaps.
     *   **Key Files:** Phase-specific roadmap documents (e.g., `phase0_setup.md`), `project_roadmap.md`.
+    *   **Database Learning Path:** Structured guide from beginner to expert with [Database Learning Path](./01_learning_roadmap/database_learning_path.md) including prerequisites, milestones, hands-on projects, and assessment criteria.
 
 3.  ### [02. Core Concepts](./02_core_concepts/README.md)
     *   **Purpose:** Deep dives into fundamental mathematical concepts, core ML/DL algorithms, and advanced theoretical aspects of AI engineering.
@@ -37,8 +38,34 @@ The documentation is organized into the following main sections:
 
 ---
 
+## Database Documentation
+
+Comprehensive database documentation is available through the dedicated **Database Documentation Index**:
+
+*   **[Database Documentation Index](./database/README.md)** - Complete overview of all database resources organized by topic, learning path, and skill level.
+
+### Database Documentation Highlights
+
+| Section | Description | Key Resources |
+|---------|-------------|----------------|
+| **Learning Path** | Structured 16-week curriculum from fundamentals to production | [Database Learning Path](./01_learning_roadmap/database_learning_path.md) |
+| **Core Concepts** | Theory and design patterns for database systems | [Database Fundamentals](./02_core_concepts/database/database_fundamentals.md), [Database Design](./02_core_concepts/database/database_design.md) |
+| **AI/ML Integration** | Vector databases, RAG systems, feature stores | [Database AI/ML Patterns](./02_core_concepts/database/database_ai_ml_patterns.md), [Qdrant Tutorial](./04_tutorials/tutorial_qdrant_for_vector_search.md) |
+| **Tutorials** | Hands-on implementation guides | [PostgreSQL Basics](./04_tutorials/tutorial_postgresql_basics.md), [Redis for Real-Time](./04_tutorials/tutorial_redis_for_real_time.md) |
+| **Case Studies** | Real-world industry applications | [E-Commerce](./06_case_studies/database/database_ecommerce_architecture.md), [FinTech](./06_case_studies/database/database_fintech_architecture.md) |
+| **Interview Prep** | Testing strategies and validation | [Database Testing Strategies](./05_interview_prep/database_testing/database_testing_strategies.md) |
+
+### Quick Start for Databases
+
+1. **Beginner**: Start with [Database Fundamentals](./02_core_concepts/database/database_fundamentals.md) and follow the [Learning Path](./01_learning_roadmap/database_learning_path.md#phase-1-foundations-weeks-1-3)
+2. **Intermediate**: Review [Database Performance Tuning](./02_core_concepts/database/database_performance_tuning.md) and [Cloud Architecture](./02_core_concepts/database/cloud_database_architecture.md)
+3. **Advanced**: Study [Database AI/ML Patterns](./02_core_concepts/database/database_ai_ml_patterns.md) and complete [Vector Search Tutorial](./04_tutorials/tutorial_qdrant_for_vector_search.md)
+
+---
+
 ## Other Important Directories
 
+*   **`database/`**: Centralized database documentation index with learning paths, tutorials, case studies, and quick reference guides.
 *   **`AGENTS.md`**: Instructions and context specifically tailored for AI agents interacting with this repository.
 *   **`assets/`**: Contains images and other static assets used throughout the documentation.
 *   **`legacy_or_misc/`**: A holding area for files that require review, translation, or re-categorization.
