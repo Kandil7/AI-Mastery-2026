@@ -22,6 +22,10 @@ This section outlines the detailed learning path for becoming a proficient AI En
 *   ### [Phase 5: MLOps & Production Deployment](./phase5_mlops_production_deployment.md)
     *   **Objective:** Implement robust MLOps practices and deploy AI models to production environments.
 
+*   ### [Database Systems Mastery](../case_studies/database_systems/README.md)
+    *   **Objective:** Master all database types for production AI systems - from relational to vector databases.
+    *   **Covers:** Relational, Document, Key-Value, Wide-Column, Graph, Columnar/OLAP, Time-Series, In-Memory, NewSQL/HTAP, Vector
+
 *   ### [Phase 6: Advanced Topics & Specializations](./phase6_advanced_topics_specializations.md)
     *   **Objective:** Explore cutting-edge and specialized areas of AI engineering.
 

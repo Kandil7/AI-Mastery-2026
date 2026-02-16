@@ -455,6 +455,7 @@ docker run -p 8000:8000 issue-classifier
 - Advanced Recommendation Systems
 - Multi-modal Retail Analytics
 - Time Series Forecasting for Supply Chain
+- Database Systems Mastery (Relational, NoSQL, OLAP, Vector, and more)
 
 ---
 

@@ -47,6 +47,13 @@ This directory contains comprehensive case studies demonstrating the application
    - Solution: Multi-modal fusion network with edge deployment capabilities
    - Impact: $3.4M savings, 45% operational efficiency gain, 38% customer satisfaction improvement
 
+### Database Systems Module (NEW)
+
+9. **[Database Systems Mastery](database_systems_mastery.md)**
+   - Comprehensive guide for experienced engineers to master all database types
+   - Covers: Relational, Document, Key-Value, Wide-Column, Graph, Columnar/OLAP, Time-Series, In-Memory, NewSQL/HTAP, Vector databases
+   - Features: Deep dives, comparison tables, polyglot persistence patterns, learning roadmap, 10 mini-projects
+
 ### Full Stack AI Case Studies
 Located in [full_stack_ai/](full_stack_ai/) directory:
 - Uber Eats GNN Recommendations

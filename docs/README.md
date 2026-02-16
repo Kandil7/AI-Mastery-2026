@@ -16,7 +16,8 @@ The documentation is organized into the following main sections:
 
 3.  ### [02. Core Concepts](./02_core_concepts/README.md)
     *   **Purpose:** Deep dives into fundamental mathematical concepts, core ML/DL algorithms, and advanced theoretical aspects of AI engineering.
-    *   **Key Files:** `math_foundations.md`, `ml_fundamentals.md`, `deep_dives/`, `modules/`.
+    *   **Key Files:** `math_foundations.md`, `ml_fundamentals.md`, `deep_dives/`, `modules/`, `database/`.
+    *   **Database Resources:** Comprehensive guides on [Database Fundamentals](./02_core_concepts/database/database_fundamentals.md) (ACID, indexing, query processing) and [Database Design](./02_core_concepts/database/database_design.md) (ER modeling, normalization, schema patterns).
 
 4.  ### [03. System Design](./03_system_design/README.md)
     *   **Purpose:** Covers architectural decisions, system design solutions, deployment strategies, and MLOps practices for building production-ready AI systems.
