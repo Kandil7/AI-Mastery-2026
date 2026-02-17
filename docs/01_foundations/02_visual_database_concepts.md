@@ -226,3 +226,51 @@ Remove partial dependencies - all non-key attributes depend on the whole primary
                                                                                                                                                     │  └─────────────┘  │  M:N  │
                                                                                                                                                     └───────────────────┘       │
                                                                                                                                                                                   │
+
+---
+
+## 🧠 Knowledge Check: Visual Concepts Quiz
+
+Test your understanding with these multiple-choice questions:
+
+1. **What color represents a One-to-Many (1:N) relationship in ER diagrams?**
+   - A) 🔵 Blue
+   - B) 🟢 Green ✅
+   - C) 🔴 Red
+   - D) 🟡 Yellow
+
+2. **Which normalization step eliminates repeating groups?**
+   - A) UNF → 1NF ✅
+   - B) 1NF → 2NF
+   - C) 2NF → 3NF
+   - D) 3NF → BCNF
+
+3. **In the query plan example, what operation comes first?**
+   - A) HashAggregate
+   - B) Index Scan ✅
+   - C) Sequential Scan
+   - D) Nested Loop
+
+4. **What does the symbol "●───▶" represent in ER diagrams?**
+   - A) One-to-One relationship
+   - B) One-to-Many relationship ✅
+   - C) Many-to-Many relationship
+   - D) Optional relationship
+
+5. **Which table would you create to resolve a Many-to-Many relationship?**
+   - A) Junction table ✅
+   - B) Parent table
+   - C) Child table
+   - D) Lookup table
+
+**Answers**: 1-B, 2-A, 3-B, 4-B, 5-A
+
+---
+
+## Next Steps
+
+You've mastered visual database concepts! In the next section, we'll dive into advanced query optimization techniques and performance engineering.
+
+**Recommended next reading**: [`01_foundations/03_query_optimization_basics.md`](03_query_optimization_basics.md)
+
+> 💡 **Pro Tip**: Draw your ER diagrams by hand first, then refine them digitally. The physical act of drawing helps cement the relationships in your memory.
