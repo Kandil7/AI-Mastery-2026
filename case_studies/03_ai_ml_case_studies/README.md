@@ -20,5 +20,6 @@ These case studies are designed for senior AI/ML engineers who want to understan
 2. **Vector Database Scaling** - Production-grade scaling of vector database for AI search platform (1.2B+ vectors, 12,500 QPS)
 3. **Feature Store Production** - Enterprise-grade feature store implementation for financial services (4.2B features/day, 8.2ms p95 latency)
 4. **Multi-Modal Search System** - Production implementation of unified search across text, image, audio, and video (8.4B queries/month, 142ms p50 latency, 0.78 NDCG@10)
+5. **Real-Time Inference Database** - Production-grade real-time inference system for high-frequency AI services (2.4B requests/day, 8.7ms p99 latency, 99.998% availability)
 
 Each case study follows a standardized format to ensure consistency and ease of comparison across different AI/ML applications.
