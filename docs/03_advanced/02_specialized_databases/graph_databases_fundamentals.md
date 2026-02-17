@@ -1,7 +1,5 @@
 # Graph Databases Fundamentals
 
-> **Note**: This document covers fundamental graph database concepts. For system design patterns and AI/ML integration, see [graph_database_patterns_ai_ml.md](./graph_database_patterns_ai_ml.md).
-
 Graph databases are specialized database systems designed for storing and querying highly connected data. They excel at representing relationships between entities, making them ideal for AI/ML applications involving knowledge graphs, recommendation systems, and complex relationship analysis.
 
 ## Overview
@@ -143,9 +141,9 @@ RETURN gds.util.asNode(nodeId).name AS person, score
 - **Sharding by relationship type**: Separate storage for different relationship types
 - **Horizontal scaling**: Clustered deployments for large graphs
 - **Read replicas**: Scale query capacity
-- **Edge partitioning**: Distribute edges across nodes
+- **Edge edges across nodes
 
-## Implementation Examples
+ partitioning**: Distribute## Implementation Examples
 
 ### Neo4j with Python
 ```python
@@ -241,7 +239,7 @@ similarity_matrix = 1 - pairwise_distances(embeddings.detach().numpy(), metric='
 
 ## Related Resources
 
-- [Database Design] - General database design principles
-- [Index Optimization] - Advanced indexing techniques
-- [AI/ML System Design] - Graph databases in ML system architecture
-- [Knowledge Graphs] - Comprehensive knowledge graph guide
+- [Graph Database Patterns for AI/ML](./graph_database_patterns_ai_ml.md) - System design and advanced patterns
+- [Database Design](./02_core_concepts/database/database_design.md) - General database design principles
+- [Index Optimization](./02_intermediate/02_performance_optimization/01_index_optimization.md) - Advanced indexing techniques
+- [AI/ML System Design](./03_advanced/01_ai_ml_integration/) - Graph databases in ML system architecture

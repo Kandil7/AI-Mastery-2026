@@ -1,3 +1,13 @@
+---
+title: "Database Storage Architectures"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["storage", "row-oriented", "column-oriented", "hybrid", "performance"]
+related: ["01_acid_properties.md", "02_database_types.md", "04_indexing_fundamentals.md"]
+difficulty: "intermediate"
+estimated_reading_time: 20
+---
+
 # Database Storage Architectures
 
 Understanding how databases store data internally helps in making better design decisions and optimizing performance. This document covers the fundamental storage architectures used by modern database systems.

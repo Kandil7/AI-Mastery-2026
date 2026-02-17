@@ -1,3 +1,13 @@
+---
+title: "Database Fundamentals"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["fundamentals", "acid", "database_types", "indexing", "query_processing"]
+related: ["01_acid_properties.md", "02_database_types.md", "03_storage_architectures.md", "04_indexing_fundamentals.md"]
+difficulty: "beginner"
+estimated_reading_time: 45
+---
+
 # Database Fundamentals
 
 This document provides a comprehensive introduction to database fundamentals, covering ACID properties, transaction management, database types, indexing strategies, and query processing basics. This knowledge is essential for building robust, scalable AI applications that rely on persistent data storage.
@@ -12,6 +22,8 @@ This document provides a comprehensive introduction to database fundamentals, co
 4. [Indexing Strategies](#4-indexing-strategies)
 5. [Query Processing Basics](#5-query-processing-basics)
 6. [Concurrency Control](#6-concurrency-control)
+7. [First Steps: Guided Exercises](#7-first-steps-guided-exercises)
+8. [Beginner-Friendly Glossary](#8-beginner-friendly-glossary)
 
 ---
 
@@ -655,6 +667,226 @@ MVCC allows readers to see consistent snapshots without blocking writers. Each t
 -- PostgreSQL: See data as of a specific time
 SELECT * FROM orders AS OF SYSTEM TIME '2024-01-01 10:00:00';
 ```
+
+---
+
+## 7. First Steps: Guided Exercises
+
+Complete these hands-on exercises to solidify your understanding of database fundamentals. These exercises build on the concepts covered in the previous sections.
+
+### Exercise 1: ACID Properties Lab
+
+**Objective**: Understand how ACID properties protect data integrity.
+
+1. Create a simple bank account table:
+```sql
+CREATE TABLE accounts (
+    account_id VARCHAR(10) PRIMARY KEY,
+    balance DECIMAL(10,2) NOT NULL CHECK (balance >= 0)
+);
+```
+
+2. Insert two accounts:
+```sql
+INSERT INTO accounts VALUES ('ACC001', 1000.00), ('ACC002', 500.00);
+```
+
+3. Simulate a transfer with explicit transaction:
+```sql
+BEGIN;
+-- Try to transfer $200 from ACC001 to ACC002
+UPDATE accounts SET balance = balance - 200 WHERE account_id = 'ACC001';
+-- Intentionally cause an error (e.g., divide by zero)
+SELECT 1/0;
+ROLLBACK;
+```
+
+4. Check balances - they should remain unchanged due to atomicity.
+
+5. Now try without transaction:
+```sql
+UPDATE accounts SET balance = balance - 200 WHERE account_id = 'ACC001';
+-- Crash the system or kill the connection
+-- Check balances afterward - notice inconsistency!
+```
+
+### Exercise 2: Constraint Enforcement
+
+**Objective**: Practice creating and testing database constraints.
+
+1. Create a products table with various constraints:
+```sql
+CREATE TABLE products (
+    product_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2) NOT NULL CHECK (price > 0),
+    category VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (name, category)  -- Prevent duplicate product names in same category
+);
+```
+
+2. Test constraint violations:
+   - Try inserting a product with negative price
+   - Try inserting duplicate product name in same category
+   - Try inserting NULL name
+
+3. Add a foreign key constraint to orders table:
+```sql
+CREATE TABLE orders (
+    order_id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+```
+
+4. Test referential integrity:
+   - Try inserting order with non-existent product_id
+   - Try deleting product that has orders
+
+### Exercise 3: Index Performance Comparison
+
+**Objective**: Measure the impact of indexing on query performance.
+
+1. Create a large table (100,000 rows):
+```sql
+CREATE TABLE large_table (
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(20) NOT NULL,
+    value INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert sample data
+INSERT INTO large_table (category, value)
+SELECT 
+    CASE WHEN i % 3 = 0 THEN 'A'
+         WHEN i % 3 = 1 THEN 'B'
+         ELSE 'C' END,
+    i % 1000
+FROM generate_series(1, 100000) AS i;
+```
+
+2. Time a query without index:
+```sql
+EXPLAIN ANALYZE SELECT COUNT(*) FROM large_table WHERE category = 'A';
+```
+
+3. Create an index and time again:
+```sql
+CREATE INDEX idx_large_table_category ON large_table(category);
+EXPLAIN ANALYZE SELECT COUNT(*) FROM large_table WHERE category = 'A';
+```
+
+4. Compare execution times and plan operations.
+
+### Exercise 4: Concurrency Simulation
+
+**Objective**: Observe concurrency control in action.
+
+1. Create a simple counter table:
+```sql
+CREATE TABLE counters (
+    name VARCHAR(50) PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO counters VALUES ('hits', 0);
+```
+
+2. In two separate database sessions:
+   - Session 1: `BEGIN; SELECT value FROM counters WHERE name = 'hits' FOR UPDATE;`
+   - Session 2: `SELECT value FROM counters WHERE name = 'hits';` (should wait)
+   - Session 1: `UPDATE counters SET value = value + 1 WHERE name = 'hits'; COMMIT;`
+   - Session 2: Should now complete with correct value
+
+3. Try optimistic concurrency:
+```sql
+-- Add version column
+ALTER TABLE counters ADD COLUMN version INTEGER DEFAULT 0;
+
+-- Update with version check
+UPDATE counters 
+SET value = value + 1, version = version + 1 
+WHERE name = 'hits' AND version = 0;
+```
+
+### Exercise 5: Query Optimization Challenge
+
+**Objective**: Apply optimization techniques to improve query performance.
+
+Given this slow query:
+```sql
+SELECT 
+    c.customer_id,
+    c.name,
+    COUNT(o.order_id) as order_count,
+    SUM(o.total_amount) as total_spent
+FROM customers c
+LEFT JOIN orders o ON c.customer_id = o.customer_id
+WHERE c.created_at > '2023-01-01'
+GROUP BY c.customer_id, c.name
+ORDER BY total_spent DESC
+LIMIT 10;
+```
+
+1. Identify potential bottlenecks
+2. Create appropriate indexes
+3. Rewrite the query for better performance
+4. Measure before/after performance
+
+---
+
+## 8. Beginner-Friendly Glossary
+
+Here's a simple glossary of essential database terms for beginners:
+
+### Core Concepts
+- **Database**: A structured collection of data stored electronically
+- **Table**: A collection of related data organized in rows and columns
+- **Row/Record**: A single entry in a table (one instance of data)
+- **Column/Field**: A specific attribute or characteristic of the data
+- **Primary Key**: A unique identifier for each row in a table
+- **Foreign Key**: A field that links to the primary key of another table
+- **Schema**: The structure of a database (tables, columns, relationships)
+
+### Operations
+- **CRUD**: Create, Read, Update, Delete - the four basic data operations
+- **Query**: A request for data from the database
+- **Transaction**: A sequence of operations treated as a single unit
+- **Commit**: Make transaction changes permanent
+- **Rollback**: Undo transaction changes
+
+### Data Integrity
+- **ACID**: Atomicity, Consistency, Isolation, Durability - properties ensuring reliable transactions
+- **Constraint**: A rule that enforces data validity (NOT NULL, UNIQUE, CHECK, FOREIGN KEY)
+- **Normalization**: Process of organizing data to reduce redundancy
+- **Index**: A data structure that speeds up data retrieval
+
+### Performance Terms
+- **Index**: Like a book's index - helps find data quickly
+- **Join**: Combining data from multiple tables
+- **Query Plan**: The strategy the database uses to execute a query
+- **Buffer Pool**: Memory area where frequently accessed data is cached
+- **WAL (Write-Ahead Logging)**: Technique to ensure data durability
+
+### Database Types
+- **SQL/Relational**: Tables with defined relationships (PostgreSQL, MySQL)
+- **NoSQL**: Flexible data models (MongoDB, Redis, Cassandra)
+- **Document Database**: Stores data as JSON-like documents
+- **Key-Value Store**: Simple pair of key and value (like a dictionary)
+- **Graph Database**: Optimized for relationship-based data
+
+### Common Abbreviations
+- **OLTP**: Online Transaction Processing (transactional workloads)
+- **OLAP**: Online Analytical Processing (analytical workloads)
+- **ETL**: Extract, Transform, Load (data integration process)
+- **RDBMS**: Relational Database Management System
+- **DDL**: Data Definition Language (CREATE, ALTER, DROP)
+- **DML**: Data Manipulation Language (SELECT, INSERT, UPDATE, DELETE)
+
+> 💡 **Pro Tip**: Keep this glossary handy as you work through the documentation. Refer back to it whenever you encounter unfamiliar terms.
 
 ---
 

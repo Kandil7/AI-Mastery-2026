@@ -532,10 +532,23 @@ docker-compose up -d --build
 
 ## 📖 Documentation
 
+### Core Documentation
 *   **[User Guide](docs/00_introduction/01_user_guide.md)**: The bible of this project. Steps, params, and usage.
 *   **[Math Notes](docs/02_core_concepts/fundamentals/math_notes.md)**: Handwritten derivations of key algorithms.
 *   **[Interview Prep](docs/05_interview_prep/README.md)**: "How would you design a recommendation system?"
 *   **[Repo Documentation](docs/00_introduction/REPO_DOCUMENTATION.md)**: Full repository map and entry points.
+
+### Enhanced Database Documentation
+*   **[Database Learning Path Index](docs/DATABASE_LEARNING_PATH_INDEX.md)**: Complete structured learning path from fundamentals to production
+*   **[Comprehensive Database Documentation Enhancement Summary](docs/COMPREHENSIVE_DATABASE_DOCUMENTATION_ENHANCEMENT_SUMMARY.md)**: Overview of all new database documentation
+*   **Foundations**: [Getting Started](docs/01_foundations/00_getting_started.md), [Data Types](docs/01_foundations/01_data_types_fundamentals.md), [Visual Concepts](docs/01_foundations/02_visual_database_concepts.md)
+*   **AI/ML Integration**: [Feature Store Patterns](docs/03_advanced/01_ai_ml_integration/05_feature_store_patterns.md), [RAG System Implementation](docs/03_advanced/01_ai_ml_integration/06_rag_system_implementation.md), [Multi-Modal Databases](docs/03_advanced/01_ai_ml_integration/07_multi_modal_databases.md), [Real-Time Inference Databases](docs/03_advanced/01_ai_ml_integration/08_realtime_inference_databases.md)
+*   **Production Practices**: [Compliance Frameworks](docs/04_production/01_security/02_compliance_frameworks.md), [Data Quality Management](docs/04_production/03_governance/02_data_quality_management.md), [Cloud Cost Management](docs/04_production/04_economics/02_cloud_cost_management.md), [Database CI/CD](docs/04_production/05_devops/02_database_ci_cd.md)
+
+### Database-Specific Resources
+*   **[Database Fundamentals](docs/02_core_concepts/database/database_fundamentals.md)**: Comprehensive core concepts with enhanced vector database sections
+*   **[Database Types](docs/01_foundations/01_database_basics/02_database_types.md)**: Updated with advanced vector database patterns
+*   **[Learning Roadmap](docs/01_learning_roadmap/README.md)**: Includes database learning path integration
 
 ---
 

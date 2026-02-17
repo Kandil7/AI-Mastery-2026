@@ -77,6 +77,10 @@ The learning path is organized into 6 progressive levels:
 - [Embedding Storage](03_advanced/01_ai_ml_integration/03_embedding_storage.md) - Efficient embedding management
 - [Model Serving Infrastructure](03_advanced/01_ai_ml_integration/04_model_serving.md) - Database-backed model serving
 - [Real-time Analytics](03_advanced/01_ai_ml_integration/05_real_time_analytics.md) - Streaming analytics with databases
+- [**Feature Store Patterns**](03_advanced/01_ai_ml_integration/05_feature_store_patterns.md) - Comprehensive guide to feature store architectures including vector-based features
+- [**RAG System Implementation**](03_advanced/01_ai_ml_integration/06_rag_system_implementation.md) - End-to-end RAG system design with hybrid search patterns
+- [**Multi-Modal Databases**](03_advanced/01_ai_ml_integration/07_multi_modal_databases.md) - Storing and querying heterogeneous embeddings across modalities
+- [**Real-Time Inference Databases**](03_advanced/01_ai_ml_integration/08_realtime_inference_databases.md) - Low-latency serving architectures for vector search
 
 ### Specialized Databases
 - [Time-Series Databases](03_advanced/02_specialized_databases/01_time_series_databases.md) - Optimized for time-stamped data
@@ -102,6 +106,7 @@ The learning path is organized into 6 progressive levels:
 - [Authentication & Authorization](04_production/01_security/03_authz_authn.md) - RBAC, ABAC, zero trust implementation
 - [Vulnerability Management](04_production/01_security/04_vulnerability_management.md) - SQL injection prevention, security scanning
 - [Compliance Implementation](04_production/01_security/05_compliance_implementation.md) - GDPR, HIPAA, SOC 2 requirements
+- [**Compliance Frameworks**](04_production/01_security/02_compliance_frameworks.md) - Detailed implementation guides for GDPR, HIPAA, PCI DSS, and SOC 2 with technical specifications
 
 ### Operations
 - [Database Operations](04_production/02_operations/01_database_operations.md) - Day-to-day management and monitoring
@@ -116,6 +121,7 @@ The learning path is organized into 6 progressive levels:
 - [Data Lineage](04_production/03_governance/03_data_lineage.md) - End-to-end tracking and impact analysis
 - [Metadata Management](04_production/03_governance/04_metadata_management.md) - Data catalog and discovery
 - [Regulatory Compliance](04_production/03_governance/05_regulatory_compliance.md) - Legal and regulatory requirements
+- [**Data Quality Management**](04_production/03_governance/02_data_quality_management.md) - Comprehensive data quality framework covering profiling, anomaly detection, schema validation, and lineage tracking
 
 ### Economics
 - [Database Economics](04_production/04_economics/01_database_economics.md) - Cost structure and optimization
@@ -123,6 +129,7 @@ The learning path is organized into 6 progressive levels:
 - [TCO Analysis](04_production/04_economics/03_tco_analysis.md) - Total cost of ownership calculation
 - [ROI Calculation](04_production/04_economics/04_roi_calculation.md) - Cost-benefit analysis framework
 - [Budgeting & Forecasting](04_production/04_economics/05_budgeting_forecasting.md) - Financial planning for databases
+- [**Cloud Cost Management**](04_production/04_economics/02_cloud_cost_management.md) - Enhanced cloud database cost optimization covering analysis methodology, compute/storage optimization, and multi-cloud strategies
 
 ### DevOps
 - [Database DevOps](04_production/05_devops/01_database_devops.md) - CI/CD for databases
@@ -130,6 +137,7 @@ The learning path is organized into 6 progressive levels:
 - [Testing Strategies](04_production/05_devops/03_testing_strategies.md) - Unit, integration, chaos testing
 - [Deployment Automation](04_production/05_devops/04_deployment_automation.md) - Safe deployments and rollbacks
 - [Observability Integration](04_production/05_devops/05_observability_integration.md) - Monitoring and tracing
+- [**Database CI/CD**](04_production/05_devops/02_database_ci_cd.md) - Comprehensive database CI/CD practices covering migration strategies, testing, safe deployments, and automated rollbacks
 
 ---
 
