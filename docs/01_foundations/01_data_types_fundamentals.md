@@ -551,6 +551,44 @@ What kind of data?
 
 ---
 
+## 🧠 Knowledge Check: Data Types Quiz
+
+Test your understanding with these multiple-choice questions:
+
+1. **Which data type should you use for storing monetary values?**
+   - A) `FLOAT`
+   - B) `DOUBLE`
+   - C) `DECIMAL` ✅
+   - D) `INTEGER`
+
+2. **What's the main advantage of `JSONB` over `JSON`?**
+   - A) Smaller storage size
+   - B) Better indexing support ✅
+   - C) Preserves duplicate keys
+   - D) Faster text parsing
+
+3. **When should you use `TIMESTAMPTZ` instead of `TIMESTAMP`?**
+   - A) When you need timezone awareness ✅
+   - B) When you want smaller storage
+   - C) When you're storing dates only
+   - D) When you need faster queries
+
+4. **How do you check for NULL values in SQL?**
+   - A) `column = NULL`
+   - B) `column == NULL`
+   - C) `column IS NULL` ✅
+   - D) `NULL(column)`
+
+5. **Which operator extracts JSON data as text in PostgreSQL?**
+   - A) `->`
+   - B) `->>`
+   - C) `@>` ✅
+   - D) `?`
+
+**Answers**: 1-C, 2-B, 3-A, 4-C, 5-B
+
+---
+
 ## Next Steps
 
 You now have a solid foundation in database data types. In the next document, we'll explore visual database concepts including ER diagrams, schema evolution, and query execution plans.
