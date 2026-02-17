@@ -63,7 +63,61 @@ This LMS documentation is organized into seven main sections, taking you from ba
 - Troubleshooting guide
 - Emergency checklists
 
-## Learning Path
+---
+
+## Advanced Topics (2026)
+
+### 🤖 [08. Modern Architecture](./08_modern_architecture/README.md)
+- Headless/Decoupled LMS architecture
+- API-first design patterns
+- Microservices vs Monolithic
+- Serverless LMS implementations
+- Edge computing for learning
+- Event-driven architecture
+- Real-time learning architecture
+
+### 🧠 [09. AI/ML Integration](./09_ai_ml_integration/README.md)
+- LLM integration for learning
+- Generative AI for content creation
+- Intelligent Tutoring Systems (ITS)
+- Adaptive learning algorithms
+- Predictive analytics for student success
+- MLOps for learning platforms
+- AI ethics and fairness
+
+### 🔗 [10. Enterprise Integrations](./10_enterprise_integrations/README.md)
+- HCM system integrations (Workday, SAP)
+- CRM and ERP integrations
+- Single Sign-On and Federation
+- Event-driven architecture
+- Extended enterprise learning
+- API ecosystem development
+
+### ⚡ [11. Performance Optimization](./11_performance/README.md)
+- Performance architecture and targets
+- Database optimization
+- Caching strategies (Redis, CDN)
+- Video streaming and media delivery
+- Horizontal scaling patterns
+- Auto-scaling configuration
+
+### 📦 [12. Content Standards](./12_content_standards/README.md)
+- xAPI/Tin Can deep dive
+- cmi5 implementation
+- Open Badges 3.0 and Verifiable Credentials
+- H5P interactive content
+- Video streaming standards (HLS/DASH)
+- WCAG accessibility compliance
+
+### 🛡️ [13. Security & Compliance](./13_security_compliance/README.md)
+- Zero Trust architecture
+- Data privacy and protection
+- GDPR/CCPA compliance
+- Advanced threat protection
+- Security monitoring
+- Incident response
+
+## Learning Paths
 
 ### Beginner Track
 1. Start with [Fundamentals](./01_fundamentals/README.md)
