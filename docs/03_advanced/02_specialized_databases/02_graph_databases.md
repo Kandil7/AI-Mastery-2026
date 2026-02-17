@@ -1,4 +1,6 @@
-# Graph Databases
+# Graph Databases Fundamentals
+
+> **Note**: This document covers fundamental graph database concepts. For system design patterns and AI/ML integration, see [graph_database_patterns_ai_ml.md](./graph_database_patterns_ai_ml.md).
 
 Graph databases are specialized database systems designed for storing and querying highly connected data. They excel at representing relationships between entities, making them ideal for AI/ML applications involving knowledge graphs, recommendation systems, and complex relationship analysis.
 
