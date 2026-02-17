@@ -846,3 +846,10 @@ When designing database APIs and integration patterns, follow these core princip
 8. **Design for failure** by implementing circuit breakers and fallback behaviors.
 
 These patterns provide a foundation for building robust database integrations that scale with your application requirements.
+
+## See Also
+
+- [Database Troubleshooting and Debugging](../04_tutorials/troubleshooting/02_database_troubleshooting_debugging.md) - Diagnosing performance issues in database APIs
+- [Database Architecture Patterns](../03_system_design/database_architecture_patterns.md) - CQRS and Event Sourcing patterns
+- [Real-time Streaming Patterns](../02_intermediate/05_realtime_streaming_database_patterns.md) - Streaming data integration
+- [SQLite Deep Dive](../02_core_concepts/sqlite_deep_dive.md) - Embedded database patterns
