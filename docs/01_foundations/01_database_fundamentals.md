@@ -1,3 +1,13 @@
+---
+title: "Database Fundamentals"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["fundamentals", "acid", "database_types", "indexing", "query_processing"]
+related: ["01_acid_properties.md", "02_database_types.md", "03_storage_architectures.md", "04_indexing_fundamentals.md"]
+difficulty: "beginner"
+estimated_reading_time: 45
+---
+
 # Database Fundamentals
 
 This document provides a comprehensive introduction to database fundamentals, covering ACID properties, transaction management, database types, indexing strategies, and query processing basics. This knowledge is essential for building robust, scalable AI applications that rely on persistent data storage.

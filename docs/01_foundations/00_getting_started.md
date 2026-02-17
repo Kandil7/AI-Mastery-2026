@@ -1,3 +1,13 @@
+---
+title: "Getting Started with Databases"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["beginner", "getting_started", "installation", "crud", "tutorial"]
+related: ["01_acid_properties.md", "02_database_types.md", "01_data_types_fundamentals.md"]
+difficulty: "beginner"
+estimated_reading_time: 25
+---
+
 # Getting Started with Databases
 
 This beginner-friendly guide will walk you through the fundamentals of databases, from basic concepts to your first hands-on experience. No prior database knowledge is required—just curiosity and a willingness to learn!

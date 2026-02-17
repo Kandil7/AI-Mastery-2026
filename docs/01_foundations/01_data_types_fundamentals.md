@@ -1,3 +1,13 @@
+---
+title: "Data Types Fundamentals"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["data types", "numeric", "string", "datetime", "json", "boolean"]
+related: ["01_acid_properties.md", "02_database_types.md", "03_storage_architectures.md"]
+difficulty: "beginner"
+estimated_reading_time: 30
+---
+
 # Data Types Fundamentals
 
 Understanding data types is crucial for designing efficient, reliable databases. The right data type choice affects storage efficiency, query performance, data integrity, and application correctness.

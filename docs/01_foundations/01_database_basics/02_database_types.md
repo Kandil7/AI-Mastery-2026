@@ -1,3 +1,13 @@
+---
+title: "Database Types"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["database", "sql", "nosql", "vector", "time-series", "graph"]
+related: ["01_acid_properties.md", "03_storage_architectures.md", "04_indexing_fundamentals.md"]
+difficulty: "beginner"
+estimated_reading_time: 25
+---
+
 # Database Types
 
 Understanding the different types of databases and their use cases is crucial for selecting the right technology for your AI application. This document covers the major database categories and their characteristics.

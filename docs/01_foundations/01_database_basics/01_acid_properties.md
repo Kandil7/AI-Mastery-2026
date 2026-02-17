@@ -1,3 +1,13 @@
+---
+title: "ACID Properties and Transactions"
+category: "foundations"
+subcategory: "database_basics"
+tags: ["database", "transactions", "acid", "consistency"]
+related: ["02_database_types.md", "03_concurrency_control.md"]
+difficulty: "beginner"
+estimated_reading_time: 15
+---
+
 # ACID Properties and Transactions
 
 This document provides a comprehensive introduction to ACID properties, which form the foundation of reliable database transaction processing. These four properties ensure that database operations are processed reliably, maintaining data integrity even in the face of system failures, power outages, or concurrent access.
