@@ -38,6 +38,47 @@ The documentation is organized into the following main sections:
 
 ---
 
+## Learning Management System (LMS) Documentation
+
+Comprehensive documentation for Learning Management Systems is now available, covering everything from basic concepts to production-ready implementations.
+
+*   **[LMS Documentation Index](./07_learning_management_system/README.md)** - Complete overview of all LMS resources organized by topic and learning path.
+
+### LMS Documentation Highlights
+
+| Section | Description | Key Resources |
+|---------|-------------|---------------|
+| **Fundamentals** | Introduction, core concepts, types of LMS | [01_fundamentals](./07_learning_management_system/01_fundamentals/README.md) |
+| **Technical Architecture** | Frontend, backend, database, authentication | [02_technical_architecture](./07_learning_management_system/02_technical_architecture/README.md) |
+| **Implementation** | Planning, phases, migration | [03_implementation](./07_learning_management_system/03_implementation/README.md) |
+| **Production** | Security, scalability, monitoring | [04_production](./07_learning_management_system/04_production/README.md) |
+| **Platform Comparison** | Moodle, Canvas, Blackboard, Cornerstone | [05_platforms](./07_learning_management_system/05_platforms/README.md) |
+| **Emerging Trends** | AI, VR/AR, blockchain | [06_trends](./07_learning_management_system/06_trends/README.md) |
+| **Quick Reference** | Terminology, metrics, troubleshooting | [07_reference](./07_learning_management_system/07_reference/README.md) |
+
+### Quick Start for LMS
+
+1. **Beginner**: Start with [LMS Fundamentals](./07_learning_management_system/01_fundamentals/README.md) to understand core concepts
+2. **Technical**: Review [Technical Architecture](./07_learning_management_system/02_technical_architecture/README.md) for system design
+3. **Implementation**: Follow the [Implementation Guide](./07_learning_management_system/03_implementation/README.md) for project planning
+4. **Production**: Study [Production Readiness](./07_learning_management_system/04_production/README.md) for operations
+
+### LMS Documentation Organization
+
+```
+docs/07_learning_management_system/
+├── README.md                    # Documentation index
+├── 01_fundamentals/            # Introduction and core concepts
+├── 02_technical_architecture/  # System design and architecture
+├── 03_implementation/          # Planning and execution
+├── 04_production/             # Security, scalability, operations
+├── 05_platforms/              # Platform comparison
+├── 06_trends/                 # Future trends and AI
+└── 07_reference/              # Quick reference guide
+```
+
+---
+
 ## Database Documentation
 
 Comprehensive database documentation is available through the dedicated **Database Documentation Index**:
