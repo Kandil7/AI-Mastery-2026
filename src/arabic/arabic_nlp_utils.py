@@ -142,8 +142,8 @@ class ArabicDialectDetector:
         # Get highest scoring dialect
         if max(scores.values()) == 0:
             return 'msa'  # Modern Standard Arabic
-        
-        best_dialect = max(arg1:scores, key=scores.get)
+
+        best_dialect = max(scores, key=scores.get)
         return best_dialect
     
     def detect_batch(self, texts: List[str]) -> List[str]:
