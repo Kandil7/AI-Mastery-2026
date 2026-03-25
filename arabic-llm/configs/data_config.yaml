@@ -21,11 +21,12 @@ dataset:
 
 # =============================================================================
 # Role Distribution (must sum to 1.0)
+# Updated based on dataset analysis - rich poetry and grammar corpus
 # =============================================================================
 role_distribution:
-  tutor: 0.40          # Language teacher (نحو، بلاغة، تعليم)
+  tutor: 0.35          # Language teacher (نحو، بلاغة، تعليم) - reduced for balance
   proofreader: 0.25    # Grammar corrector (تصحيح لغوي)
-  poet: 0.15           # Poetry composition (شعر، نظم، نقد)
+  poet: 0.20           # Poetry composition (شعر، نظم، نقد) - increased (rich corpus)
   muhhaqiq: 0.15       # Text investigator (تحقيق، تراث)
   assistant_general: 0.05  # General assistant
 
@@ -63,19 +64,24 @@ level_distribution:
 
 # =============================================================================
 # Source Categories from Shamela
+# Based on analysis of 8,423 books (see docs/dataset_analysis.md)
 # =============================================================================
 source_categories:
-  - "كتب اللغة"           # Language books (primary)
-  - "التفسير"             # Quranic exegesis (classical Arabic)
-  - "كتب السنة"           # Hadith (Prophetic Arabic)
-  - "الأدب"              # Literature
-  - "الشعر"              # Poetry
-  - "البلاغة"            # Rhetoric
-  - "النحو"              # Grammar
-  - "التجويد والقراءات"   # Quranic recitation
-  - "العقيدة"            # Theology (classical prose)
-  - "الفقه العام"        # Jurisprudence
-  - "التراجم والطبقات"    # Biographies
+  # Primary categories (70% of data) - Core linguistic sciences
+  - "كتب اللغة"           # Language books (~400 books) - dictionaries, vocabulary
+  - "النحو والصرف"        # Grammar & morphology (~150 books) - Sibawayh, Ibn Malik
+  - "البلاغة"            # Rhetoric (~100 books) - Jurjani, Sakkaki
+  - "الدواوين الشعرية"    # Poetry diwans (~200 books) - Mutannabi, Abu Tammam
+  - "العروض والقوافي"     # Poetry meters (~50 books) - Prosody science
+  
+  # Secondary categories (25% of data) - Classical Arabic
+  - "الأدب"              # Literature (~415 books) - Classical prose
+  - "التفسير"            # Quranic exegesis (270 books) - Classical Arabic
+  - "كتب السنة"          # Hadith (1,226 books) - Prophetic traditions
+  
+  # Tertiary categories (5% of data) - Supporting texts
+  - "التراجم والطبقات"    # Biographies (555 books) - Classical texts
+  - "السيرة النبوية"      # Prophet's biography (~200 books)
 
 # =============================================================================
 # Data Split Configuration
@@ -139,20 +145,25 @@ quality_filters:
 
 # =============================================================================
 # Book Selection Weights
+# Based on dataset analysis - prioritize linguistic sciences
+# Higher weight = more likely to be selected
 # =============================================================================
 book_weights:
-  # Higher weight = more likely to be selected
-  "كتب اللغة": 3.0
-  "البلاغة": 2.5
-  "النحو": 2.5
-  "الشعر": 2.0
-  "الأدب": 1.5
-  "التفسير": 1.5
-  "كتب السنة": 1.5
-  "التجويد والقراءات": 1.0
-  "العقيدة": 1.0
-  "الفقه العام": 1.0
-  "التراجم والطبقات": 1.0
+  # Primary categories (highest priority)
+  "كتب اللغة": 3.0       # Core linguistics
+  "النحو والصرف": 3.0    # Grammar foundation
+  "البلاغة": 2.5         # Rhetoric science
+  "الدواوين الشعرية": 2.0  # Poetry corpus
+  "العروض والقوافي": 2.0   # Poetry meters
+  
+  # Secondary categories
+  "الأدب": 1.5           # Literary Arabic
+  "التفسير": 1.0         # Classical Arabic
+  "كتب السنة": 1.0       # Prophetic Arabic
+  
+  # Tertiary categories
+  "التراجم والطبقات": 0.5  # Biographical texts
+  "السيرة النبوية": 0.5    # Prophetic biography
 
 # =============================================================================
 # Output Configuration
