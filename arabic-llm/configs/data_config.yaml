@@ -1,0 +1,174 @@
+# Data Configuration for Arabic LLM Dataset
+
+# =============================================================================
+# Dataset Configuration
+# =============================================================================
+dataset:
+  # Target number of training examples
+  target_examples: 50000
+  
+  # Minimum segment length (characters)
+  min_segment_length: 50
+  
+  # Maximum segment length (characters)
+  max_segment_length: 500
+  
+  # Minimum segments per book
+  min_segments_per_book: 10
+  
+  # Maximum segments per book
+  max_segments_per_book: 100
+
+# =============================================================================
+# Role Distribution (must sum to 1.0)
+# =============================================================================
+role_distribution:
+  tutor: 0.40          # Language teacher (نحو، بلاغة، تعليم)
+  proofreader: 0.25    # Grammar corrector (تصحيح لغوي)
+  poet: 0.15           # Poetry composition (شعر، نظم، نقد)
+  muhhaqiq: 0.15       # Text investigator (تحقيق، تراث)
+  assistant_general: 0.05  # General assistant
+
+# =============================================================================
+# Skill Distribution within Roles
+# =============================================================================
+skill_distribution:
+  tutor:
+    nahw: 0.40         # Grammar
+    balagha: 0.30      # Rhetoric
+    sarf: 0.20         # Morphology
+    qa: 0.10           # Q&A
+  proofreader:
+    orthography: 0.40  # Spelling
+    nahw: 0.40         # Grammar
+    style_editing: 0.20  # Style
+  poet:
+    poetry: 0.70       # Poetry
+    balagha: 0.30      # Rhetoric
+  muhhaqiq:
+    heritage: 0.40     # Classical texts
+    nahw: 0.30         # Grammar
+    balagha: 0.30      # Rhetoric
+  assistant_general:
+    nahw: 0.50         # Grammar
+    qa: 0.50           # Q&A
+
+# =============================================================================
+# Level Distribution
+# =============================================================================
+level_distribution:
+  beginner: 0.30       # مبتدئ
+  intermediate: 0.50   # متوسط
+  advanced: 0.20       # متقدم
+
+# =============================================================================
+# Source Categories from Shamela
+# =============================================================================
+source_categories:
+  - "كتب اللغة"           # Language books (primary)
+  - "التفسير"             # Quranic exegesis (classical Arabic)
+  - "كتب السنة"           # Hadith (Prophetic Arabic)
+  - "الأدب"              # Literature
+  - "الشعر"              # Poetry
+  - "البلاغة"            # Rhetoric
+  - "النحو"              # Grammar
+  - "التجويد والقراءات"   # Quranic recitation
+  - "العقيدة"            # Theology (classical prose)
+  - "الفقه العام"        # Jurisprudence
+  - "التراجم والطبقات"    # Biographies
+
+# =============================================================================
+# Data Split Configuration
+# =============================================================================
+data_split:
+  # Training set ratio
+  train_ratio: 0.90
+  
+  # Validation set ratio
+  val_ratio: 0.05
+  
+  # Test set ratio
+  test_ratio: 0.05
+
+# =============================================================================
+# Data Augmentation
+# =============================================================================
+augmentation:
+  # Enable synthetic data generation
+  enable_synthetic: true
+  
+  # Ratio of synthetic to real data
+  synthetic_ratio: 0.20
+  
+  # Use LLM for output generation
+  llm_generated_outputs: true
+  
+  # Apply back-translation
+  back_translation: false
+  
+  # Apply paraphrasing
+  paraphrasing: true
+
+# =============================================================================
+# Data Quality Filters
+# =============================================================================
+quality_filters:
+  # Minimum Arabic character ratio
+  min_arabic_ratio: 0.70
+  
+  # Maximum repetition ratio
+  max_repetition_ratio: 0.30
+  
+  # Minimum unique words ratio
+  min_unique_words_ratio: 0.20
+  
+  # Maximum sentence length (words)
+  max_sentence_length: 100
+  
+  # Minimum instruction length (characters)
+  min_instruction_length: 20
+  
+  # Maximum instruction length (characters)
+  max_instruction_length: 500
+  
+  # Minimum output length (characters)
+  min_output_length: 50
+  
+  # Maximum output length (characters)
+  max_output_length: 2000
+
+# =============================================================================
+# Book Selection Weights
+# =============================================================================
+book_weights:
+  # Higher weight = more likely to be selected
+  "كتب اللغة": 3.0
+  "البلاغة": 2.5
+  "النحو": 2.5
+  "الشعر": 2.0
+  "الأدب": 1.5
+  "التفسير": 1.5
+  "كتب السنة": 1.5
+  "التجويد والقراءات": 1.0
+  "العقيدة": 1.0
+  "الفقه العام": 1.0
+  "التراجم والطبقات": 1.0
+
+# =============================================================================
+# Output Configuration
+# =============================================================================
+output:
+  # Output directory for processed data
+  output_dir: "data/jsonl"
+  
+  # Save intermediate processed segments
+  save_processed: true
+  
+  # Save statistics
+  save_statistics: true
+  
+  # Generate sample file
+  generate_sample: true
+  
+  # Sample size
+  sample_size: 100

@@ -1,0 +1,194 @@
+# Arabic LLM Fine-Tuning Configuration
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Base model selection
+  # Options: ALLaM-7B-Instruct, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-8B-Instruct
+  base: "Qwen/Qwen2.5-7B-Instruct"
+  
+  # Model dtype for loading
+  dtype: "float16"
+  
+  # Trust remote code (required for some models)
+  trust_remote_code: true
+  
+  # Use Flash Attention 2 if available
+  use_flash_attention: true
+
+# =============================================================================
+# LoRA Configuration (QLoRA)
+# =============================================================================
+lora:
+  # LoRA rank
+  r: 64
+  
+  # LoRA alpha (scaling factor)
+  alpha: 128
+  
+  # LoRA dropout
+  dropout: 0.05
+  
+  # Target modules for LoRA
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  
+  # Task type
+  task_type: "CAUSAL_LM"
+  
+  # Bias type
+  bias: "none"
+
+# =============================================================================
+# Quantization Configuration (QLoRA)
+# =============================================================================
+quantization:
+  # Load in 4-bit
+  load_in_4bit: true
+  
+  # Quantization type
+  bnb_4bit_quant_type: "nf4"
+  
+  # Compute dtype
+  bnb_4bit_compute_dtype: "float16"
+  
+  # Nested quantization
+  bnb_4bit_use_double_quant: true
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Batch size per device
+  batch_size: 4
+  
+  # Gradient accumulation steps
+  gradient_accumulation: 4
+  
+  # Learning rate
+  learning_rate: 2.0e-4
+  
+  # Number of epochs
+  epochs: 3
+  
+  # Maximum sequence length
+  max_seq_length: 2048
+  
+  # Warmup ratio
+  warmup_ratio: 0.03
+  
+  # Learning rate scheduler
+  lr_scheduler: "cosine"
+  
+  # Weight decay
+  weight_decay: 0.01
+  
+  # Gradient clipping
+  max_grad_norm: 1.0
+  
+  # Logging steps
+  logging_steps: 10
+  
+  # Save steps
+  save_steps: 500
+  
+  # Evaluation steps
+  eval_steps: 500
+  
+  # Save total limit
+  save_total_limit: 3
+
+# =============================================================================
+# Optimization Configuration
+# =============================================================================
+optimization:
+  # Optimizer type
+  optimizer: "adamw_torch"
+  
+  # Enable gradient checkpointing
+  gradient_checkpointing: true
+  
+  # Enable mixed precision
+  fp16: true
+  
+  # BF16 (if supported)
+  bf16: false
+  
+  # Number of workers for data loading
+  num_workers: 4
+  
+  # Pin memory for data loading
+  pin_memory: true
+
+# =============================================================================
+# Hardware Configuration
+# =============================================================================
+hardware:
+  # Device
+  device: "cuda"
+  
+  # Number of GPUs
+  num_gpus: 1
+  
+  # GPU memory allocation
+  gpu_memory_fraction: 0.9
+  
+  # CPU offload for optimizer
+  offload_optimizer: false
+  
+  # CPU offload for parameters
+  offload_params: false
+
+# =============================================================================
+# Output Configuration
+# =============================================================================
+output:
+  # Output directory
+  output_dir: "models/arabic-linguist-v1"
+  
+  # Overwrite output directory
+  overwrite_output_dir: true
+  
+  # Save model weights
+  save_model: true
+  
+  # Save tokenizer
+  save_tokenizer: true
+  
+  # Push to hub (HuggingFace)
+  push_to_hub: false
+  
+  # Hub model ID
+  hub_model_id: null
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  # Log level
+  level: "INFO"
+  
+  # Log to file
+  log_to_file: true
+  
+  # Log file path
+  log_file: "training.log"
+  
+  # Tensorboard logging
+  tensorboard: true
+  
+  # Tensorboard directory
+  tensorboard_dir: "runs/arabic-llm"
+  
+  # WandB logging
+  wandb: false
+  
+  # WandB project
+  wandb_project: "arabic-llm-finetuning"
