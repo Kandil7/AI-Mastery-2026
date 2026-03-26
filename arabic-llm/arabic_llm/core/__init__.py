@@ -25,7 +25,8 @@ from .schema import (
 )
 
 from .schema_enhanced import (
-    # Additional roles if needed
+    # Enhanced roles (15 total)
+    # Enhanced skills (48+ total)
     pass
 )
 

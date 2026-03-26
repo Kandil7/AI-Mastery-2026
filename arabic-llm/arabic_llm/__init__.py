@@ -71,6 +71,15 @@ from .agents import (
     ExperimentProposal,
 )
 
+# Import utilities
+from .utils import (
+    setup_logging,
+    read_jsonl,
+    write_jsonl,
+    count_arabic_chars,
+    get_arabic_ratio,
+)
+
 # Define public API
 __all__ = [
     # Version
@@ -79,14 +88,11 @@ __all__ = [
     "__author__",
     "__email__",
     "__license__",
-    # Core
+    # Core (most commonly used)
     "TrainingExample",
     "Role",
     "Skill",
     "Level",
-    "Domain",
-    "Style",
-    "TaskType",
     "DatasetConfig",
     "DatasetStatistics",
     "validate_example",
@@ -106,6 +112,12 @@ __all__ = [
     # Agents
     "ResearchAgent",
     "ExperimentProposal",
+    # Utils
+    "setup_logging",
+    "read_jsonl",
+    "write_jsonl",
+    "count_arabic_chars",
+    "get_arabic_ratio",
 ]
 
 # Package metadata

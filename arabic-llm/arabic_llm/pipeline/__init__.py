@@ -2,7 +2,7 @@
 Arabic LLM - Data Processing Pipelines
 
 This subpackage contains data processing pipelines:
-- Text cleaning and normalization
+- Text cleaning and normalization (7-stage pipeline)
 - Text segmentation
 - Quality validation
 """
@@ -14,19 +14,20 @@ from .cleaning import (
     Page,
     Chapter,
     CleanedBook,
+    setup_logging,
 )
 
-from .segmentation import (
-    Segmenter,
-    segment_by_page,
-    segment_by_chapter,
-)
-
-from .validation import (
-    QualityValidator,
-    validate_arabic_ratio,
-    validate_completeness,
-)
+# Segmentation and validation (TODO: implement)
+# from .segmentation import (
+#     Segmenter,
+#     segment_by_page,
+#     segment_by_chapter,
+# )
+# from .validation import (
+#     QualityValidator,
+#     validate_arabic_ratio,
+#     validate_completeness,
+# )
 
 __all__ = [
     # Cleaning
@@ -36,12 +37,13 @@ __all__ = [
     "Page",
     "Chapter",
     "CleanedBook",
-    # Segmentation
-    "Segmenter",
-    "segment_by_page",
-    "segment_by_chapter",
-    # Validation
-    "QualityValidator",
-    "validate_arabic_ratio",
-    "validate_completeness",
+    "setup_logging",
+    # Segmentation (TODO)
+    # "Segmenter",
+    # "segment_by_page",
+    # "segment_by_chapter",
+    # Validation (TODO)
+    # "QualityValidator",
+    # "validate_arabic_ratio",
+    # "validate_completeness",
 ]

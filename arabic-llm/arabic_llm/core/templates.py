@@ -1,0 +1,618 @@
+"""
+Instruction Templates for Arabic LLM Fine-Tuning
+
+This module contains instruction templates for all roles and skills,
+designed to generate diverse training examples from Arabic books.
+
+Templates are organized by:
+- Role (tutor, proofreader, poet, muhhaqiq, assistant_general)
+- Skill (nahw, balagha, sarf, poetry, etc.)
+- Level (beginner, intermediate, advanced)
+- Content Type (verse, prose, hadith, poetry, etc.)
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Callable
+import random
+
+
+@dataclass
+class Template:
+    """A single instruction template"""
+    id: str
+    role: str
+    skill: str
+    level: str
+    instruction_template: str
+    output_format: str = ""
+    tags: List[str] = field(default_factory=list)
+    
+    def format_instruction(self, **kwargs) -> str:
+        """Format the instruction with provided variables"""
+        try:
+            return self.instruction_template.format(**kwargs)
+        except KeyError as e:
+            raise ValueError(f"Missing template variable: {e}")
+
+
+# ============================================================================
+# TUTOR ROLE - معلم اللغة العربية
+# ============================================================================
+
+TUTOR_TEMPLATES = [
+    # Grammar (Nahw) Templates
+    Template(
+        id="tutor_nahw_001",
+        role="tutor",
+        skill="nahw",
+        level="beginner",
+        instruction_template="أعرب الجملة التالية إعراباً مبسطاً لطالب مبتدئ: \"{sentence}\"",
+        output_format="الإعراب: [كلمة بكلمة مع ذكر النوع والإعراب]",
+        tags=["i3rab", "basic_grammar"],
+    ),
+    Template(
+        id="tutor_nahw_002",
+        role="tutor",
+        skill="nahw",
+        level="intermediate",
+        instruction_template="أعرب الجملة التالية إعراباً مفصلاً مع بيان العامل والعللة: \"{sentence}\"",
+        output_format="الإعراب المفصل: [كلمة بكلمة مع العامل والعلامة والتقدير]",
+        tags=["i3rab", "detailed_grammar"],
+    ),
+    Template(
+        id="tutor_nahw_003",
+        role="tutor",
+        skill="nahw",
+        level="advanced",
+        instruction_template="حلّل التركيب النحوي للنص التالي تحليلاً دقيقاً مع ذكر الشواهد النحوية: \"{text}\"",
+        output_format="التحليل النحوي: [تحليل شامل مع الشواهد]",
+        tags=["nahw", "advanced_analysis"],
+    ),
+    Template(
+        id="tutor_nahw_004",
+        role="tutor",
+        skill="nahw",
+        level="intermediate",
+        instruction_template="بيّن نوع الجملة التالية (اسمية/فعلية) واذكر مكوناتها: \"{sentence}\"",
+        output_format="نوع الجملة: [اسمية/فعلية]\nالمكونات: [الفاعل، المفعول، ...]",
+        tags=["sentence_type", "grammar"],
+    ),
+    Template(
+        id="tutor_nahw_005",
+        role="tutor",
+        skill="nahw",
+        level="beginner",
+        instruction_template="استخرج من النص التالي: المبتدأ، الخبر، الفاعل، المفعول به: \"{text}\"",
+        output_format="المبتدأ: ...\nالخبر: ...\nالفاعل: ...\nالمفعول به: ...",
+        tags=["grammar_extraction"],
+    ),
+    
+    # Rhetoric (Balagha) Templates
+    Template(
+        id="tutor_balagha_001",
+        role="tutor",
+        skill="balagha",
+        level="beginner",
+        instruction_template="هل في الجملة التالية صورة بلاغية؟ إذا نعم، فسمّها واشرحها: \"{sentence}\"",
+        output_format="نوع الصورة: [تشبيه/استعارة/كناية]\nالشرح: [توضيح مبسط]",
+        tags=["balagha", "figures_of_speech"],
+    ),
+    Template(
+        id="tutor_balagha_002",
+        role="tutor",
+        skill="balagha",
+        level="intermediate",
+        instruction_template="حدّد نوع التشبيه في قوله: \"{quote}\" واذكر أركانه",
+        output_format="نوع التشبيه: [تام/مجمل/مفصل/بليغ]\nالأركان: [المشبه، المشبه به، وجه الشبه، أداة التشبيه]",
+        tags=["tashbih", "balagha"],
+    ),
+    Template(
+        id="tutor_balagha_003",
+        role="tutor",
+        skill="balagha",
+        level="intermediate",
+        instruction_template="ما نوع الاستعارة في قوله: \"{quote}\"؟ وبيّن وجه الاستعارة",
+        output_format="نوع الاستعارة: [تصريحية/مكنية/تخيلية]\nوجه الاستعارة: [الشرح]",
+        tags=["isti3ara", "balagha"],
+    ),
+    Template(
+        id="tutor_balagha_004",
+        role="tutor",
+        skill="balagha",
+        level="advanced",
+        instruction_template="حلّل الصور البيانية في النص التالي تحليلاً بلاغياً: \"{text}\"",
+        output_format="التحليل البلاغي: [ذكر جميع الصور مع الشرح]",
+        tags=["balagha", "analysis"],
+    ),
+    Template(
+        id="tutor_balagha_005",
+        role="tutor",
+        skill="balagha",
+        level="intermediate",
+        instruction_template="بيّن الفرق في البلاغة بين الجملتين: \"{sentence1}\" و \"{sentence2}\"",
+        output_format="الجملة الأولى: [التحليل]\nالجملة الثانية: [التحليل]\nالفرق: [الوجه البلاغي]",
+        tags=["balagha", "comparison"],
+    ),
+    
+    # Combined Grammar + Rhetoric Templates
+    Template(
+        id="tutor_combined_001",
+        role="tutor",
+        skill="nahw",
+        level="intermediate",
+        instruction_template="أعرب الجملة التالية ثم وضّح الصورة البلاغية فيها: \"{sentence}\"",
+        output_format="أولاً: الإعراب: [...]\nثانياً: البلاغة: [...]",
+        tags=["i3rab", "balagha", "combined"],
+    ),
+    Template(
+        id="tutor_combined_002",
+        role="tutor",
+        skill="balagha",
+        level="advanced",
+        instruction_template="اقرأ النص التالي، ثم: 1) أعرب الكلمات المُشار إليها، 2) اذكر الصور البلاغية: \"{text}\"",
+        output_format="1) الإعراب: [...]\n2) البلاغة: [...]",
+        tags=["combined", "advanced"],
+    ),
+    
+    # Morphology (Sarf) Templates
+    Template(
+        id="tutor_sarf_001",
+        role="tutor",
+        skill="sarf",
+        level="beginner",
+        instruction_template="ما وزن الكلمة التالية: \"{word}\"؟",
+        output_format="الوزن: [على وزن فعل]",
+        tags=["sarf", "wazn"],
+    ),
+    Template(
+        id="tutor_sarf_002",
+        role="tutor",
+        skill="sarf",
+        level="intermediate",
+        instruction_template="صرّف الفعل \"{verb}\" في المضارع والأمر مع الضبط",
+        output_format="المضارع: [أفعل، تفعل، ...]\nالأمر: [افعل، ...]",
+        tags=["sarf", "tasreef"],
+    ),
+    Template(
+        id="tutor_sarf_003",
+        role="tutor",
+        skill="sarf",
+        level="intermediate",
+        instruction_template="بيّن نوع الاشتقاق في الكلمة التالية واذكر مادتها: \"{word}\"",
+        output_format="المادة: [الجذر]\nنوع الاشتقاق: [مجرد/مزيد]",
+        tags=["sarf", "ishtiqaq"],
+    ),
+    
+    # Q&A Templates
+    Template(
+        id="tutor_qa_001",
+        role="tutor",
+        skill="qa",
+        level="beginner",
+        instruction_template="ما هو الفاعل في اللغة العربية؟ اشرح بإيجاز",
+        output_format="الفاعل: [تعريف مبسط مع مثال]",
+        tags=["qa", "definition"],
+    ),
+    Template(
+        id="tutor_qa_002",
+        role="tutor",
+        skill="qa",
+        level="intermediate",
+        instruction_template="ما الفرق بين المبتدأ والفاعل؟",
+        output_format="الفرق: [الفرق مع أمثلة]",
+        tags=["qa", "difference"],
+    ),
+    Template(
+        id="tutor_qa_003",
+        role="tutor",
+        skill="qa",
+        level="advanced",
+        instruction_template="اشرح بالتفصيل أنواع الخبر في الجملة الاسمية",
+        output_format="أنواع الخبر: [مفرد، جملة، شبه جملة مع الأمثلة]",
+        tags=["qa", "detailed"],
+    ),
+]
+
+# ============================================================================
+# PROOFREADER ROLE - المصحح اللغوي
+# ============================================================================
+
+PROOFREADER_TEMPLATES = [
+    # Spelling Correction Templates
+    Template(
+        id="proof_ortho_001",
+        role="proofreader",
+        skill="orthography",
+        level="beginner",
+        instruction_template="صحّح الأخطاء الإملائية في النص التالي: \"{text}\"",
+        output_format="النص المصحَّح: [النص بعد التصحيح]",
+        tags=["imla", "correction"],
+    ),
+    Template(
+        id="proof_ortho_002",
+        role="proofreader",
+        skill="orthography",
+        level="intermediate",
+        instruction_template="صحّح الأخطاء الإملائية في النص التالي مع شرح الأخطاء: \"{text}\"",
+        output_format="النص المصحَّح: [...]\nشرح الأخطاء: [1) ... 2) ...]",
+        tags=["imla", "correction", "explanation"],
+    ),
+    Template(
+        id="proof_ortho_003",
+        role="proofreader",
+        skill="orthography",
+        level="intermediate",
+        instruction_template="أي الكلمتين أصح إملائياً: \"{word1}\" أم \"{word2}\"؟ ولماذا؟",
+        output_format="الأصح: [الكلمة]\nالسبب: [القاعدة الإملائية]",
+        tags=["imla", "comparison"],
+    ),
+    
+    # Grammar Correction Templates
+    Template(
+        id="proof_nahw_001",
+        role="proofreader",
+        skill="nahw",
+        level="intermediate",
+        instruction_template="صحّح الأخطاء النحوية في الجملة التالية: \"{sentence}\"",
+        output_format="الجملة المصحَّحة: [بعد التصحيح]",
+        tags=["nahw", "correction"],
+    ),
+    Template(
+        id="proof_nahw_002",
+        role="proofreader",
+        skill="nahw",
+        level="advanced",
+        instruction_template="صحّح الأخطاء النحوية في النص التالي مع بيان نوع كل خطأ: \"{text}\"",
+        output_format="النص المصحَّح: [...]\nالأخطاء: [1) نوع الخطأ: ... 2) ...]",
+        tags=["nahw", "correction", "analysis"],
+    ),
+    Template(
+        id="proof_nahw_003",
+        role="proofreader",
+        skill="nahw",
+        level="intermediate",
+        instruction_template="بيّن الخطأ النحوي في الجملة التالية وصحّحه: \"{sentence}\"",
+        output_format="الخطأ: [تحديد الخطأ]\nالتصحيح: [الجملة الصحيحة]\nالسبب: [القاعدة]",
+        tags=["nahw", "error_identification"],
+    ),
+    
+    # Style Editing Templates
+    Template(
+        id="proof_style_001",
+        role="proofreader",
+        skill="style_editing",
+        level="intermediate",
+        instruction_template="حسّن صياغة الجملة التالية مع الحفاظ على المعنى: \"{sentence}\"",
+        output_format="الصياغة المحسَّنة: [النص المحسّن]",
+        tags=["style", "improvement"],
+    ),
+    Template(
+        id="proof_style_002",
+        role="proofreader",
+        skill="style_editing",
+        level="advanced",
+        instruction_template="أعد صياغة النص التالي ليكون أكثر فصاحة وبلاغة: \"{text}\"",
+        output_format="النص المُعاد صياغته: [النص المحسّن]",
+        tags=["style", "balagha"],
+    ),
+    Template(
+        id="proof_style_003",
+        role="proofreader",
+        skill="style_editing",
+        level="intermediate",
+        instruction_template="اختصر النص التالي مع الحفاظ على المعنى: \"{text}\"",
+        output_format="النص المختصر: [النص بعد الاختصار]",
+        tags=["style", "summarization"],
+    ),
+]
+
+# ============================================================================
+# POET ROLE - الشاعر والناقد الأدبي
+# ============================================================================
+
+POET_TEMPLATES = [
+    # Poetry Composition Templates
+    Template(
+        id="poet_compose_001",
+        role="poet",
+        skill="poetry",
+        level="intermediate",
+        instruction_template="انظم بيتاً من الشعر على بحر {meter} عن موضوع: {topic}",
+        output_format="البيت:\n[الشعر الموزون]",
+        tags=["poetry", "composition", "meter"],
+    ),
+    Template(
+        id="poet_compose_002",
+        role="poet",
+        skill="poetry",
+        level="advanced",
+        instruction_template="انظم قصيدة قصيرة (4 أبيات) على بحر {meter} في مدح: {topic}",
+        output_format="القصيدة:\n[الأبيات الأربعة]",
+        tags=["poetry", "composition", "qasida"],
+    ),
+    Template(
+        id="poet_compose_003",
+        role="poet",
+        skill="poetry",
+        level="intermediate",
+        instruction_template="أكمل البيت التالي بما يناسب المعنى والوزن: \"{partial_verse}\"",
+        output_format="البيت الكامل:\n[البيت تاماً]",
+        tags=["poetry", "completion"],
+    ),
+    
+    # Poetry Criticism Templates
+    Template(
+        id="poet_critique_001",
+        role="poet",
+        skill="poetry",
+        level="intermediate",
+        instruction_template="حلّل البيت التالي تحليلاً عروضياً: \"{verse}\"",
+        output_format="البحر: [اسم البحر]\nالتفعيلة: [التفعيلات]",
+        tags=["poetry", "analysis", "arud"],
+    ),
+    Template(
+        id="poet_critique_002",
+        role="poet",
+        skill="poetry",
+        level="advanced",
+        instruction_template="انقد القصيدة التالية نقداً أدبياً من حيث المعنى والمبنى: \"{poem}\"",
+        output_format="النقد:\n- المعنى: [...]\n- المبنى: [...]\n- الصور البلاغية: [...]",
+        tags=["poetry", "criticism"],
+    ),
+    Template(
+        id="poet_critique_003",
+        role="poet",
+        skill="balagha",
+        level="advanced",
+        instruction_template="ما الصور البلاغية في قول الشاعر: \"{verse}\"؟",
+        output_format="الصور البلاغية: [الشرح]",
+        tags=["poetry", "balagha"],
+    ),
+    
+    # Poetry Explanation Templates
+    Template(
+        id="poet_explain_001",
+        role="poet",
+        skill="poetry",
+        level="intermediate",
+        instruction_template="اشرح معنى البيت التالي بلغة معاصرة: \"{verse}\"",
+        output_format="الشرح: [الشرح المبسّط]",
+        tags=["poetry", "explanation"],
+    ),
+    Template(
+        id="poet_explain_002",
+        role="poet",
+        skill="heritage",
+        level="advanced",
+        instruction_template="بيّن السياق التاريخي والأدبي لهذا البيت: \"{verse}\"",
+        output_format="السياق: [الشرح التاريخي والأدبي]",
+        tags=["poetry", "heritage", "context"],
+    ),
+]
+
+# ============================================================================
+# MUHHAQIQ ROLE - المحقق اللغوي
+# ============================================================================
+
+MUHHAQIQ_TEMPLATES = [
+    # Text Verification Templates
+    Template(
+        id="muhhaqiq_verify_001",
+        role="muhhaqiq",
+        skill="heritage",
+        level="advanced",
+        instruction_template="اقرأ النص التراثي التالي، ثم: 1) أعرب الكلمات الرئيسة، 2) وضّح المعنى العام: \"{text}\"",
+        output_format="1) الإعراب: [...]\n2) المعنى: [...]",
+        tags=["heritage", "verification", "i3rab"],
+    ),
+    Template(
+        id="muhhaqiq_verify_002",
+        role="muhhaqiq",
+        skill="nahw",
+        level="advanced",
+        instruction_template="حقّق النص التالي تحقيقاً لغوياً مع ضبط الكلمات: \"{text}\"",
+        output_format="النص المحقَّق: [النص مضبوطاً]",
+        tags=["tahqiq", "nahw"],
+    ),
+    Template(
+        id="muhhaqiq_verify_003",
+        role="muhhaqiq",
+        skill="heritage",
+        level="advanced",
+        instruction_template="بيّن ما في النص التالي من ألفاظ قديمة واشرح معانيها: \"{text}\"",
+        output_format="الألفاظ القديمة: [الكلمة: المعنى]",
+        tags=["heritage", "vocabulary"],
+    ),
+    
+    # Manuscript Analysis Templates
+    Template(
+        id="muhhaqiq_manuscript_001",
+        role="muhhaqiq",
+        skill="heritage",
+        level="advanced",
+        instruction_template="قارن بين الروايتين التين واختر الأصح لغوياً: \"{version1}\" / \"{version2}\"",
+        output_format="الأصح: [الرواية]\nالسبب: [التعليل اللغوي]",
+        tags=["manuscript", "comparison"],
+    ),
+    Template(
+        id="muhhaqiq_manuscript_002",
+        role="muhhaqiq",
+        skill="nahw",
+        level="advanced",
+        instruction_template="ما الوجه الإعرابي الراجح في قوله: \"{quote}\"؟ ولماذا؟",
+        output_format="الوجه الراجح: [الإعراب]\nالسبب: [التعليل]",
+        tags=["nahw", "manuscript"],
+    ),
+    
+    # Classical Text Analysis Templates
+    Template(
+        id="muhhaqiq_classical_001",
+        role="muhhaqiq",
+        skill="heritage",
+        level="advanced",
+        instruction_template="اشرح هذا النص التراثي شرحاً مفصلاً مع ذكر الفوائد اللغوية: \"{text}\"",
+        output_format="الشرح: [...]\nالفوائد اللغوية: [...]",
+        tags=["heritage", "explanation"],
+    ),
+    Template(
+        id="muhhaqiq_classical_002",
+        role="muhhaqiq",
+        skill="balagha",
+        level="advanced",
+        instruction_template="بيّن مظاهر البلاغة في هذا النص القديم: \"{text}\"",
+        output_format="مظاهر البلاغة: [الشرح]",
+        tags=["heritage", "balagha"],
+    ),
+]
+
+# ============================================================================
+# ASSISTANT GENERAL ROLE - المساعد العام
+# ============================================================================
+
+ASSISTANT_TEMPLATES = [
+    # General Q&A Templates
+    Template(
+        id="assistant_qa_001",
+        role="assistant_general",
+        skill="nahw",
+        level="beginner",
+        instruction_template="ما الفرق بين الجملة الاسمية والجملة الفعلية؟",
+        output_format="الفرق: [الشرح مع الأمثلة]",
+        tags=["qa", "basic_grammar"],
+    ),
+    Template(
+        id="assistant_qa_002",
+        role="assistant_general",
+        skill="qa",
+        level="beginner",
+        instruction_template="ما هي أقسام الكلمة في اللغة العربية؟",
+        output_format="الأقسام: [اسم، فعل، حرف مع الشرح]",
+        tags=["qa", "definition"],
+    ),
+    Template(
+        id="assistant_qa_003",
+        role="assistant_general",
+        skill="qa",
+        level="intermediate",
+        instruction_template="كيف أتميَّز بين المفعول المطلق والنائب عن المفعول المطلق؟",
+        output_format="التمييز: [الشرح مع الأمثلة]",
+        tags=["qa", "distinction"],
+    ),
+    
+    # Writing Assistance Templates
+    Template(
+        id="assistant_write_001",
+        role="assistant_general",
+        skill="style_editing",
+        level="intermediate",
+        instruction_template="اكتب مقدمة موضوعية عن: {topic}",
+        output_format="المقدمة: [النص]",
+        tags=["writing", "introduction"],
+    ),
+    Template(
+        id="assistant_write_002",
+        role="assistant_general",
+        skill="style_editing",
+        level="intermediate",
+        instruction_template="لخّص النص التالي في فقرة واحدة: \"{text}\"",
+        output_format="الملخّص: [الفقرة]",
+        tags=["summarization"],
+    ),
+]
+
+# ============================================================================
+# TEMPLATE REGISTRY
+# ============================================================================
+
+ALL_TEMPLATES = {
+    "tutor": TUTOR_TEMPLATES,
+    "proofreader": PROOFREADER_TEMPLATES,
+    "poet": POET_TEMPLATES,
+    "muhhaqiq": MUHHAQIQ_TEMPLATES,
+    "assistant_general": ASSISTANT_TEMPLATES,
+}
+
+# Skill to templates mapping
+SKILL_TEMPLATES = {}
+for role, templates in ALL_TEMPLATES.items():
+    for template in templates:
+        if template.skill not in SKILL_TEMPLATES:
+            SKILL_TEMPLATES[template.skill] = []
+        SKILL_TEMPLATES[template.skill].append(template)
+
+
+def get_templates(role: str = None, skill: str = None, level: str = None) -> List[Template]:
+    """
+    Get templates filtered by role, skill, and/or level.
+    
+    Args:
+        role: Filter by role (optional)
+        skill: Filter by skill (optional)
+        level: Filter by level (optional)
+        
+    Returns:
+        List of matching templates
+    """
+    if role:
+        templates = ALL_TEMPLATES.get(role, [])
+    elif skill:
+        templates = SKILL_TEMPLATES.get(skill, [])
+    else:
+        templates = [t for role_templates in ALL_TEMPLATES.values() for t in role_templates]
+    
+    if level:
+        templates = [t for t in templates if t.level == level]
+    
+    return templates
+
+
+def get_random_template(role: str = None, skill: str = None, level: str = None) -> Template:
+    """Get a random template matching the criteria"""
+    templates = get_templates(role, skill, level)
+    if not templates:
+        raise ValueError(f"No templates found for role={role}, skill={skill}, level={level}")
+    return random.choice(templates)
+
+
+def get_template_by_id(template_id: str) -> Template:
+    """Get a template by its ID"""
+    for role, templates in ALL_TEMPLATES.items():
+        for template in templates:
+            if template.id == template_id:
+                return template
+    raise ValueError(f"Template not found: {template_id}")
+
+
+# Poetry meters for template filling
+POETRY_METERS = [
+    "الطويل", "المديد", "البسيط", "الوافر", "الكامل",
+    "الهزج", "الرجز", "الرمل", "السريع", "المنسرح",
+    "الخفيف", "المضارع", "المقتضب", "المجتث", "المتقارب", "المتدارك"
+]
+
+# Common topics for poetry
+POETRY_TOPICS = [
+    "طلب العلم", "الحكمة", "مدح الرسول", "الوصف", "الرثاء",
+    "الفخر", "الغزل العفيف", "الزهد", "الشوق للوطن", "الصبر"
+]
+
+
+if __name__ == "__main__":
+    # Test template retrieval
+    print("=== Template Statistics ===\n")
+    
+    for role, templates in ALL_TEMPLATES.items():
+        print(f"{role}: {len(templates)} templates")
+        skill_counts = {}
+        for t in templates:
+            skill_counts[t.skill] = skill_counts.get(t.skill, 0) + 1
+        for skill, count in skill_counts.items():
+            print(f"  - {skill}: {count}")
+    
+    print("\n=== Sample Templates ===\n")
+    
+    # Show sample templates
+    sample = get_random_template(role="tutor", skill="nahw")
+    print(f"ID: {sample.id}")
+    print(f"Instruction: {sample.instruction_template}")
+    print(f"Output Format: {sample.output_format}")
