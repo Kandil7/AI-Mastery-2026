@@ -151,8 +151,10 @@ class ArabicTextProcessor:
 
     def _init_patterns(self):
         """Initialize regex patterns."""
-        # Pattern for Arabic text (letters + spaces + punctuation)
-        self.arabic_pattern = re.compile(r"[\u0600-\u06FF\s\p{P}]+")
+        # Pattern for Arabic text (letters + spaces + Arabic punctuation)
+        # Use explicit punctuation instead of \p{P} which isn't supported in basic re
+        arabic_punct = "،؛؟!.…«»"  # Arabic punctuation
+        self.arabic_pattern = re.compile(f"[\\u0600-\\u06FF\\s{arabic_punct}]+")
 
         # Pattern for non-Arabic text
         self.non_arabic_pattern = re.compile(r"[^\u0600-\u06FF]")
