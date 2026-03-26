@@ -1,12 +1,23 @@
 [project]
 name = "arabic-llm"
-version = "1.0.0"
+version = "2.0.0"
 description = "Arabic LLM Engineering Mastery - Autonomous Fine-tuning System"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Arabic LLM Project Team"}
+    {name = "Arabic LLM Project Team", email = "arabic-llm@example.com"}
+]
+keywords = [
+    "arabic",
+    "llm",
+    "nlp",
+    "transformers",
+    "qlora",
+    "fine-tuning",
+    "islamic",
+    "quran",
+    "hadith",
 ]
 
 dependencies = [
@@ -61,10 +72,21 @@ dev = [
 ]
 
 [project.scripts]
+# Data processing
 arabic-llm-audit = "arabic_llm.scripts.audit_datasets:main"
-arabic-llm-clean = "arabic_llm.src.data_cleaning_pipeline:main"
+arabic-llm-process = "arabic_llm.scripts.process_books:main"
 arabic-llm-generate = "arabic_llm.scripts.generate_dataset:main"
-arabic-llm-train = "arabic_llm.train:train"
+
+# Training
+arabic-llm-train = "arabic_llm.scripts.train_model:main"
+arabic-llm-prepare = "arabic_llm.scripts.prepare:main"
+
+# Autonomous research
+arabic-llm-agent = "arabic_llm.scripts.agent:main"
+
+# Utilities
+arabic-llm-clean = "arabic_llm.pipeline.cleaning:main"
+arabic-llm-evaluate = "arabic_llm.agents.evaluator:main"
 
 [build-system]
 requires = ["setuptools>=68.0.0", "wheel"]
