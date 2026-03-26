@@ -36,6 +36,21 @@ The documentation is organized into the following main sections:
     *   **Purpose:** In-depth real-world application examples demonstrating the practical implementation of AI engineering concepts.
     *   **Key Files:** Individual case study documents (e.g., `01_churn_prediction/`).
 
+## LLM Mastery Series
+
+A comprehensive, code-first curriculum for mastering Large Language Models, from mathematical foundations to production-grade agents.
+
+*   **[LLM Mastery Index](./04_tutorials/llm_mastery/index.md)** - Complete overview of the 4-chapter hands-on series.
+
+### LLM Series Highlights
+
+| Chapter | Description | Key Topics |
+|---------|-------------|------------|
+| **1. Attention & Transformers** | The heart of modern LLMs | [Scaled Dot-Product, BERT, GPT-2](./04_tutorials/llm_mastery/01_attention_and_transformers.md) |
+| **2. Enterprise RAG** | Scaling knowledge with your data | [Semantic Chunking, Hybrid Retrieval](./04_tutorials/llm_mastery/02_enterprise_rag.md) |
+| **3. AI Agents** | Building the reasoning engine | [ReAct Loop, Multi-Agent Systems](./04_tutorials/llm_mastery/03_ai_agents.md) |
+| **4. Production Guardrails** | Shipping safe and reliable AI | [Hallucination Prevention, CX Scoring](./04_tutorials/llm_mastery/04_production_guardrails.md) |
+
 ---
 
 ## Learning Management System (LMS) Documentation

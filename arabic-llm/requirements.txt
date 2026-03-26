@@ -1,0 +1,40 @@
+# Arabic LLM Fine-Tuning Requirements
+
+# Core ML/NLP
+transformers>=4.40.0
+datasets>=2.18.0
+accelerate>=0.28.0
+peft>=0.10.0
+bitsandbytes>=0.43.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+
+# PyTorch
+torch>=2.2.0
+torchvision>=0.17.0
+
+# Data processing
+pyyaml>=6.0
+tqdm>=4.66.0
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Evaluation
+rouge-score>=0.1.2
+bert-score>=0.3.13
+sacrebleu>=2.4.0
+
+# Utilities
+python-dotenv>=1.0.0
+rich>=13.7.0
+
+# Optional: For better performance
+# flash-attn>=2.5.0  # Requires CUDA
+
+# Optional: For experiment tracking
+# wandb>=0.16.0
+# tensorboard>=2.16.0
+
+# Optional: For API deployment
+# fastapi>=0.110.0
+# uvicorn>=0.27.0

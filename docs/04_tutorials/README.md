@@ -6,6 +6,9 @@ This section provides practical, hands-on guides and examples for various aspect
 
 ## Main Subsections:
 
+*   ### [LLM Mastery Series](./llm_mastery/index.md)
+    *   A comprehensive, code-first curriculum for mastering Large Language Models, from attention to agents.
+
 *   ### [API Usage](./api_usage/README.md)
     *   Guides and examples for effectively interacting with the project's API.
 
