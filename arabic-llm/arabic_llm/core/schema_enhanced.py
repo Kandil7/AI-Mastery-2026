@@ -17,22 +17,25 @@ from datetime import datetime
 
 
 # =============================================================================
-# EXPANDED ROLES (15 total)
+# EXPANDED ROLES (19 total)
 # =============================================================================
 
 class Role(Enum):
     """
     Comprehensive roles for Arabic LLM covering all Islamic and Arabic sciences.
-    
+
     Primary Roles (Linguistic):
     - tutor, proofreader, poet, muhhaqiq, assistant_general
-    
+
     Secondary Roles (Islamic Sciences):
     - faqih (jurist), muhaddith (hadith scholar), mufassir (quran exegete)
     - aqeedah_specialist (theologian), sufi (spiritual guide)
-    
+
     Tertiary Roles (Specialized Knowledge):
     - historian, genealogist, geographer, physician, logician, adab_specialist
+
+    Modern Application Roles (New):
+    - dataengineer_ar, rag_assistant, edtech_tutor, fatwa_assistant_safe
     """
     
     # Primary Linguistic Roles (Original 5)
@@ -60,15 +63,21 @@ class Role(Enum):
     ADAB_SPECIALIST = "adab_specialist"  # متخصص الأدب - Literature/ethics specialist
     QURAN_RECITER = "quran_reciter"      # القارئ - Quran recitation specialist
 
+    # Modern Application Roles (4 new) - From plan.md
+    DATAENGINEER_AR = "dataengineer_ar"  # مهندس بيانات عربي - Arabic Data Engineer
+    RAG_ASSISTANT = "rag_assistant"      # مساعد RAG - RAG Assistant
+    EDTECH_TUTOR = "edtech_tutor"        # معلم تقني تعليمي - EdTech Tutor
+    FATWA_ASSISTANT_SAFE = "fatwa_assistant_safe"  # مساعد فتاوى حذر - Safe Fatwa Assistant
+
 
 # =============================================================================
-# EXPANDED SKILLS (40+ total)
+# EXPANDED SKILLS (45+ total)
 # =============================================================================
 
 class Skill(Enum):
     """
     Comprehensive skills covering all Islamic and Arabic sciences.
-    
+
     Organized by domain:
     - Linguistic Sciences (8)
     - Islamic Sciences (12)
@@ -76,6 +85,8 @@ class Skill(Enum):
     - Historical Sciences (5)
     - Rational Sciences (4)
     - Other Specialized (5)
+    - Heritage & Verification (2)
+    - Modern Application Skills (5)
     """
     
     # --- Linguistic Sciences (8) ---
@@ -129,10 +140,17 @@ class Skill(Enum):
     TAJWID = "tajwid"                      # التجويد - Quranic elocution
     QA = "qa"                              # أسئلة وأجوبة - Q&A
     STYLE_EDITING = "style_editing"        # تحرير الأسلوب - Style editing
-    
+
     # --- Heritage & Verification (2) ---
     HERITAGE = "heritage"                  # التراث - Classical heritage
     MANUSCRIPT = "manuscript"              # المخطوطات - Manuscript studies
+
+    # --- Modern Application Skills (5 new) - From plan.md
+    ERROR_ANALYSIS_AR = "error_analysis_ar"  # تحليل الأخطاء العربية - Arabic Error Analysis
+    RAG_GROUNDED_ANSWERING = "rag_grounded_answering"  # إجابات مبنية على مصادر - RAG Grounded Answering
+    CURRICULUM_ALIGNED_AR = "curriculum_aligned_ar"  # منهج تعليمي عربي - Curriculum Aligned Arabic
+    DIALECT_HANDLING_EGY = "dialect_handling_egy"  # اللهجة المصرية - Egyptian Dialect Handling
+    LEGAL_ARABIC_DRAFTING = "legal_arabic_drafting"  # صياغة قانونية عربية - Legal Arabic Drafting
 
 
 # =============================================================================
