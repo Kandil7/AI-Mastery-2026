@@ -20,11 +20,10 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add arabic_llm to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from dataset_generator import DatasetGenerator
-from schema import DatasetConfig
+from arabic_llm.core import DatasetGenerator, DatasetConfig
 
 
 def load_config(config_path: str) -> dict:
@@ -177,13 +176,13 @@ def main():
     # Save sample examples
     sample_file = output_dir / "sample_examples.jsonl"
     import random
-    from schema import read_jsonl
+    from arabic_llm.core import read_jsonl
     
     all_examples = read_jsonl(str(output_dir / "training_data.jsonl"))
     sample_size = min(100, len(all_examples))
     sample_examples = random.sample(all_examples, sample_size)
     
-    from schema import write_jsonl
+    from arabic_llm.core import write_jsonl
     write_jsonl(sample_examples, str(sample_file))
     print(f"Saved {sample_size} sample examples to {sample_file}")
     

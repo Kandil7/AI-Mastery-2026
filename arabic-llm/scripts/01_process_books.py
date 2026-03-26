@@ -19,11 +19,10 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add arabic_llm to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from book_processor import BookProcessor, process_all_books
-from schema import DatasetConfig
+from arabic_llm.core import BookProcessor, process_all_books, DatasetConfig
 
 
 def main():
