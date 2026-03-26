@@ -583,8 +583,287 @@ def get_template_by_id(template_id: str) -> Template:
     raise ValueError(f"Template not found: {template_id}")
 
 
-# Poetry meters for template filling
-POETRY_METERS = [
+# ============================================================================
+# MODERN APPLICATION ROLES - الأدوار التطبيقية الحديثة
+# ============================================================================
+
+# DATAENGINEER_AR TEMPLATES - مهندس البيانات العربي
+# ============================================================================
+
+DATAENGINEER_AR_TEMPLATES = [
+    # Data Extraction Templates
+    Template(
+        id="dataengineer_extract_001",
+        role="dataengineer_ar",
+        skill="rag_grounded_answering",
+        level="intermediate",
+        instruction_template="استخرج جميع الآيات القرآنية من النص التالي مع ذكر السورة ورقم الآية: \"{text}\"",
+        output_format="قائمة الآيات:\n- الآية: [...] | السورة: [...] | الرقم: [...]",
+        tags=["extraction", "quran", "structured_data"],
+    ),
+    Template(
+        id="dataengineer_extract_002",
+        role="dataengineer_ar",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="استخرج الأحاديث النبوية من النص مع توثيق المخرج ورقم الحديث: \"{text}\"",
+        output_format="قائمة الأحاديث:\n- الحديث: [...] | المخرج: [...] | الرقم: [...]",
+        tags=["extraction", "hadith", "structured_data"],
+    ),
+    Template(
+        id="dataengineer_summarize_001",
+        role="dataengineer_ar",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="لخّص الكتاب التالي في شكل outline منظم مع الفصول الرئيسية والفرعية: \"{book_title}\"",
+        output_format="هيكل الكتاب:\nأولاً: [الفصل الأول]\n  1. [المبحث الأول]\n  2. [المبحث الثاني]",
+        tags=["summarization", "structured_outline"],
+    ),
+    Template(
+        id="dataengineer_entity_001",
+        role="dataengineer_ar",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="استخرج الكيانات المسماة (الأشخاص، الأماكن، التواريخ) من النص: \"{text}\"",
+        output_format="الكيانات:\n- الأشخاص: [...]\n- الأماكن: [...]\n- التواريخ: [...]",
+        tags=["ner", "entity_extraction", "structured_data"],
+    ),
+]
+
+# RAG_ASSISTANT TEMPLATES - مساعد RAG
+# ============================================================================
+
+RAG_ASSISTANT_TEMPLATES = [
+    # Q&A with Citations
+    Template(
+        id="rag_qa_001",
+        role="rag_assistant",
+        skill="rag_grounded_answering",
+        level="intermediate",
+        instruction_template="أجب عن السؤال التالي بناءً على المصادر المعطاة مع ذكر المراجع: \"{question}\"\n\nالمصادر: \"{context}\"",
+        output_format="الإجابة: [...]\n\nالمراجع:\n- [اسم المصدر، الصفحة/الرقم]",
+        tags=["qa", "citations", "grounded"],
+    ),
+    Template(
+        id="rag_compare_001",
+        role="rag_assistant",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="قارن بين القولين التاليين مع توثيق المصادر: \"{opinion1}\" و \"{opinion2}\"",
+        output_format="أوجه التشابه: [...]\nأوجه الاختلاف: [...]\nالمصادر: [...]",
+        tags=["comparison", "citations", "grounded"],
+    ),
+    Template(
+        id="rag_evidence_001",
+        role="rag_assistant",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="ما الدليل على الحكم التالي من المصادر المعطاة؟ \"{ruling}\"\n\nالمصادر: \"{context}\"",
+        output_format="الدليل: [...]\nنص الدليل: [...]\nالمصدر: [...]",
+        tags=["evidence", "citations", "grounded"],
+    ),
+]
+
+# EDTECH_TUTOR TEMPLATES - المعلم التقني التعليمي
+# ============================================================================
+
+EDTECH_TUTOR_TEMPLATES = [
+    # Curriculum-Aligned Lessons
+    Template(
+        id="edtech_lesson_001",
+        role="edtech_tutor",
+        skill="curriculum_aligned_ar",
+        level="intermediate",
+        instruction_template="اشرح درس \"{lesson_topic}\" من منهج \"{curriculum}\" للصف \"{grade_level}\" بطريقة مبسطة",
+        output_format="أهداف الدرس: [...]\nالشرح: [...]\nأمثلة: [...]",
+        tags=["lesson", "curriculum", "explanation"],
+    ),
+    Template(
+        id="edtech_mcq_001",
+        role="edtech_tutor",
+        skill="curriculum_aligned_ar",
+        level="intermediate",
+        instruction_template="ضع 5 أسئلة اختيار من متعدد على درس \"{lesson_topic}\" مع نموذج الإجابة",
+        output_format="الأسئلة:\n1. [السؤال]\n   أ) [...]\n   ب) [...]\n   ج) [...]\n   الإجابة الصحيحة: [...]",
+        tags=["mcq", "assessment", "curriculum"],
+    ),
+    Template(
+        id="edtech_exercise_001",
+        role="edtech_tutor",
+        skill="curriculum_aligned_ar",
+        level="intermediate",
+        instruction_template="صمم تمريناً تعليمياً على \"{skill}\" مع نموذج الحل",
+        output_format="التمرين: [...]\nتعليمات الحل: [...]\nنموذج الحل: [...]",
+        tags=["exercise", "practice", "curriculum"],
+    ),
+    Template(
+        id="edtech_feedback_001",
+        role="edtech_tutor",
+        skill="error_analysis_ar",
+        level="intermediate",
+        instruction_template="حلّل الخطأ التالي للطالب واشرح السبب وطريقة التصحيح: \"{student_answer}\"",
+        output_format="نوع الخطأ: [...]\nالسبب: [...]\nالتصحيح: [...]\nشرح للطالب: [...]",
+        tags=["error_analysis", "feedback", "pedagogy"],
+    ),
+]
+
+# FATWA_ASSISTANT_SAFE TEMPLATES - مساعد الفتاوى الحذر
+# ============================================================================
+
+FATWA_ASSISTANT_SAFE_TEMPLATES = [
+    # Safe Fatwa Guidance
+    Template(
+        id="fatwa_safe_001",
+        role="fatwa_assistant_safe",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="لخّص أقوال المذاهب الأربعة في المسألة التالية: \"{question}\"",
+        output_format="المذهب الحنفي: [...]\nالمذهب المالكي: [...]\nالمذهب الشافعي: [...]\nالمذهب الحنبلي: [...]\n\nتنبيه: هذه مجرد ملخصات وليست فتوى. راجع دار الإفتاء للفتوى الرسمية.",
+        tags=["madhhab", "comparison", "safe_fatwa"],
+    ),
+    Template(
+        id="fatwa_safe_002",
+        role="fatwa_assistant_safe",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="ما الحكم الشرعي في: \"{question}\" مع ذكر أقوال العلماء",
+        output_format="أقوال العلماء:\n- [...]\n- [...]\n\nالأدلة: [...]\n\nتنبيه: استشر مفتياً معتمداً للحالة الشخصية.",
+        tags=["ruling", "scholars", "safe_fatwa"],
+    ),
+    Template(
+        id="fatwa_safe_003",
+        role="fatwa_assistant_safe",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="أرشدني لمصادر الفتوى الرسمية في مسألة: \"{question}\"",
+        output_format="المصادر الرسمية:\n- دار الإفتاء المصرية: [...]\n- الموقع الإلكتروني: [...]\n- رقم الهاتف: [...]\n\nتنبيه: هذه المصادر الرسمية المعتمدة.",
+        tags=["guidance", "official_sources", "safe_fatwa"],
+    ),
+    Template(
+        id="fatwa_safe_004",
+        role="fatwa_assistant_safe",
+        skill="rag_grounded_answering",
+        level="advanced",
+        instruction_template="هل هذه المسألة من مسائل الاجتهاد أم الإجماع؟ \"{question}\"",
+        output_format="نوع المسألة: [اجتهاد/إجماع]\nالقول الراجح: [...]\nتنبيه: المسائل الاجتهادية فيها سعة، راجع مفتياً.",
+        tags=["ijtihad", "ijma", "safe_fatwa"],
+    ),
+]
+
+# ERROR_ANALYSIS_AR TEMPLATES - تحليل الأخطاء العربية
+# ============================================================================
+
+ERROR_ANALYSIS_AR_TEMPLATES = [
+    # Error Analysis Templates
+    Template(
+        id="error_grammar_001",
+        role="proofreader",
+        skill="error_analysis_ar",
+        level="intermediate",
+        instruction_template="حلّل الأخطاء النحوية في الجملة التالية واشرح السبب وصحّحها: \"{sentence}\"",
+        output_format="الأخطاء:\n1. الخطأ: [...]\n   النوع: [...]\n   السبب: [...]\n   التصحيح: [...]",
+        tags=["error_analysis", "grammar", "correction"],
+    ),
+    Template(
+        id="error_spelling_001",
+        role="proofreader",
+        skill="error_analysis_ar",
+        level="beginner",
+        instruction_template="صحّح الأخطاء الإملائية في النص التالي مع شرح القاعدة: \"{text}\"",
+        output_format="الأخطاء المصححة:\n- الخطأ: [...] → الصواب: [...]\nالقاعدة: [...]",
+        tags=["error_analysis", "spelling", "correction"],
+    ),
+    Template(
+        id="error_style_001",
+        role="proofreader",
+        skill="error_analysis_ar",
+        level="advanced",
+        instruction_template="قيّم الأسلوب التالي واقترح تحسينات: \"{text}\"",
+        output_format="نقاط القوة: [...]\nنقاط الضعف: [...]\nالتحسينات المقترحة: [...]",
+        tags=["error_analysis", "style", "improvement"],
+    ),
+]
+
+# DIALECT_HANDLING_EGY TEMPLATES - اللهجة المصرية
+# ============================================================================
+
+DIALECT_HANDLING_EGY_TEMPLATES = [
+    # Dialect to MSA Conversion
+    Template(
+        id="dialect_convert_001",
+        role="assistant_general",
+        skill="dialect_handling_egy",
+        level="intermediate",
+        instruction_template="حوّل الجملة التالية من العامية المصرية للفصحى: \"{egyptian_dialect}\"",
+        output_format="بالفصحى: [...]",
+        tags=["dialect_conversion", "egyptian", "msa"],
+    ),
+    Template(
+        id="dialect_understand_001",
+        role="assistant_general",
+        skill="dialect_handling_egy",
+        level="intermediate",
+        instruction_template="افهم المعنى المقصود من الجملة العامية التالية: \"{egyptian_dialect}\"",
+        output_format="المعنى: [...]\nالكلمات الصعبة: [...]",
+        tags=["dialect_understanding", "egyptian"],
+    ),
+    Template(
+        id="dialect_respond_001",
+        role="assistant_general",
+        skill="dialect_handling_egy",
+        level="advanced",
+        instruction_template="أجب بالعامية المصرية على السؤال التالي مع الحفاظ على دقة المحتوى: \"{question}\"",
+        output_format="بالعامية: [...]",
+        tags=["dialect_response", "egyptian", "customer_support"],
+    ),
+]
+
+# LEGAL_ARABIC_DRAFTING TEMPLATES - الصياغة القانونية العربية
+# ============================================================================
+
+LEGAL_ARABIC_DRAFTING_TEMPLATES = [
+    # Legal Document Drafting
+    Template(
+        id="legal_letter_001",
+        role="dataengineer_ar",
+        skill="legal_arabic_drafting",
+        level="advanced",
+        instruction_template="اصغِ خطاباً رسمياً لـ \"{recipient}\" بخصوص: \"{subject}\"",
+        output_format="السادة/ [...]\nتحية طيبة،\nالموضوع: [...]\nنود إفادتكم بأن: [...]\nوتفضلوا بقبول فائق الاحترام.",
+        tags=["legal_drafting", "official_letter", "formal"],
+    ),
+    Template(
+        id="legal_complaint_001",
+        role="dataengineer_ar",
+        skill="legal_arabic_drafting",
+        level="advanced",
+        instruction_template="اصغِ شكوى رسمية لـ \"{authority}\" حول: \"{issue}\"",
+        output_format="إلى: [...]\nالموضوع: شكوى بخصوص [...]\nالوقائع: [...]\nالطلبات: [...]\nمقدم الشكوى: [...]",
+        tags=["legal_drafting", "complaint", "formal"],
+    ),
+    Template(
+        id="legal_contract_001",
+        role="dataengineer_ar",
+        skill="legal_arabic_drafting",
+        level="advanced",
+        instruction_template="اصغِ مسودة عقد مبسطة لـ \"{contract_type}\" بين طرفين",
+        output_format="عقد [...]\nبين: [...]\nوبين: [...]\nالمادة الأولى: موضوع العقد\nالمادة الثانية: الالتزامات\n...",
+        tags=["legal_drafting", "contract", "formal"],
+    ),
+]
+
+# Add all new templates to ALL_TEMPLATES dictionary
+ALL_TEMPLATES["dataengineer_ar"] = DATAENGINEER_AR_TEMPLATES
+ALL_TEMPLATES["rag_assistant"] = RAG_ASSISTANT_TEMPLATES
+ALL_TEMPLATES["edtech_tutor"] = EDTECH_TUTOR_TEMPLATES
+ALL_TEMPLATES["fatwa_assistant_safe"] = FATWA_ASSISTANT_SAFE_TEMPLATES
+ALL_TEMPLATES["error_analysis_ar"] = ERROR_ANALYSIS_AR_TEMPLATES
+ALL_TEMPLATES["dialect_handling_egy"] = DIALECT_HANDLING_EGY_TEMPLATES
+ALL_TEMPLATES["legal_arabic_drafting"] = LEGAL_ARABIC_DRAFTING_TEMPLATES
+
+# Also add to skill-based retrieval
+# Note: error_analysis_ar and rag_grounded_answering are skills, not roles
+# So we need to add them to the skill-based retrieval in get_templates()
     "الطويل", "المديد", "البسيط", "الوافر", "الكامل",
     "الهزج", "الرجز", "الرمل", "السريع", "المنسرح",
     "الخفيف", "المضارع", "المقتضب", "المجتث", "المتقارب", "المتدارك"
