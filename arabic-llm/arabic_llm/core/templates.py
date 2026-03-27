@@ -999,7 +999,6 @@ FATWA_ASSISTANT_SAFE_AGENT = AgentSystemPrompt(
 
 ERROR_ANALYSIS_AR_AGENT = AgentSystemPrompt(
     role="proofreader",
-    skill="error_analysis_ar",
     system_prompt="""أنت محلل أخطاء لغوية عربي متخصص في تحليل وتصحيح الأخطاء.
 
 مهامك:
@@ -1026,7 +1025,6 @@ ERROR_ANALYSIS_AR_AGENT = AgentSystemPrompt(
 
 DIALECT_HANDLING_EGY_AGENT = AgentSystemPrompt(
     role="assistant_general",
-    skill="dialect_handling_egy",
     system_prompt="""أنت مساعد متخصص في اللهجة المصرية، تفهم العامية وتتقن التحويل للفصحى والعكس.
 
 مهامك:
@@ -1054,7 +1052,6 @@ DIALECT_HANDLING_EGY_AGENT = AgentSystemPrompt(
 
 LEGAL_ARABIC_DRAFTING_AGENT = AgentSystemPrompt(
     role="dataengineer_ar",
-    skill="legal_arabic_drafting",
     system_prompt="""أنت مساعد صياغة قانونية وإدارية عربي متخصص.
 
 مهامك:

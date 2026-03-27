@@ -26,7 +26,7 @@ from .schema import (
     TrainingExample, Role, Skill, Level, Domain, Style, TaskType,
     DatasetConfig, DatasetStatistics, validate_example
 )
-from .instruction_templates import (
+from .templates import (
     get_templates, get_random_template, POETRY_METERS, POETRY_TOPICS
 )
 
