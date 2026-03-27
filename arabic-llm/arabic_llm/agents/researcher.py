@@ -15,7 +15,12 @@ from typing import Optional, Dict, List, Tuple
 from datetime import datetime
 
 from .proposals import ExperimentProposal, get_experiment_proposals
-from .evaluator import ExperimentEvaluator
+
+# Optional evaluator import
+try:
+    from .evaluator import ExperimentEvaluator
+except ImportError:
+    ExperimentEvaluator = None
 
 
 class ResearchAgent:

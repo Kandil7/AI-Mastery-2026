@@ -371,7 +371,7 @@ class ArabicTextCleaner:
         
         return text
     
-    def _normalize_punctuation(self, text: str) -> str: str:
+    def _normalize_punctuation(self, text: str) -> str:
         """Normalize punctuation"""
         original = text
         

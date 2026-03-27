@@ -8,12 +8,12 @@ This subpackage contains data processing pipelines:
 """
 
 from .cleaning import (
-    TextCleaner,
-    DataCleaningPipeline,
+    ArabicTextCleaner,
     BookMetadata,
     Page,
     Chapter,
     CleanedBook,
+    PipelineStats,
     setup_logging,
 )
 
@@ -31,12 +31,12 @@ from .cleaning import (
 
 __all__ = [
     # Cleaning
-    "TextCleaner",
-    "DataCleaningPipeline",
+    "ArabicTextCleaner",
     "BookMetadata",
     "Page",
     "Chapter",
     "CleanedBook",
+    "PipelineStats",
     "setup_logging",
     # Segmentation (TODO)
     # "Segmenter",
