@@ -17,6 +17,15 @@ from .cleaning import (
     setup_logging,
 )
 
+from .deduplication import (
+    Document,
+    DeduplicationStats,
+    ExactDeduplicator,
+    NearDuplicateDeduplicator,
+    SentenceDeduplicator,
+    ArabicDeduplicationPipeline,
+)
+
 # Segmentation and validation (TODO: implement)
 # from .segmentation import (
 #     Segmenter,
@@ -38,6 +47,13 @@ __all__ = [
     "CleanedBook",
     "PipelineStats",
     "setup_logging",
+    # Deduplication
+    "Document",
+    "DeduplicationStats",
+    "ExactDeduplicator",
+    "NearDuplicateDeduplicator",
+    "SentenceDeduplicator",
+    "ArabicDeduplicationPipeline",
     # Segmentation (TODO)
     # "Segmenter",
     # "segment_by_page",
