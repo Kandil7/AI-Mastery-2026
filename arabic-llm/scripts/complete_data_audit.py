@@ -603,15 +603,15 @@ def run_complete_audit() -> CompleteAuditReport:
         print(f"Auditing {name}...")
         result = audit_func(config)
         report.sources[name] = result
-        
-        status_icon = "✅" if result.status == "found" else "⚠️" if result.status == "partial" else "❌"
+
+        status_icon = "[OK]" if result.status == "found" else "[!]" if result.status == "partial" else "[X]"
         print(f"  {status_icon} {name}: {result.status}")
         print(f"     Files: {result.file_count:,}, Size: {result.total_size_gb:.2f} GB, Items: {result.item_count:,}")
         print(f"     Quality: {result.quality_score:.2f}")
-        
+
         if result.issues:
             for issue in result.issues[:2]:
-                print(f"     ⚠️  {issue}")
+                print(f"     [!] {issue}")
         print()
     
     # Calculate summary
@@ -635,21 +635,21 @@ def run_complete_audit() -> CompleteAuditReport:
     print()
     
     if actions:
-        print("📋 Priority Actions:")
+        print("- Priority Actions:")
         print()
         for action in actions[:10]:  # Show top 10
-            priority_icon = "🔴" if action["priority"] == 1 else "🟡" if action["priority"] == 2 else "🟢"
+            priority_icon = "[!]" if action["priority"] == 1 else "[~]" if action["priority"] == 2 else "[+]"
             print(f"  {priority_icon} [{action['category']}] {action['action']}")
             print(f"      {action['details']}")
             print()
-    
+
     # Save report
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     with open(config.REPORT_FILE, 'w', encoding='utf-8') as f:
         json.dump(report.to_dict(), f, ensure_ascii=False, indent=2)
-    
-    print(f"📄 Full audit report saved to: {config.REPORT_FILE}")
+
+    print(f"Full audit report saved to: {config.REPORT_FILE}")
     print()
     print("=" * 70)
     print("Audit Complete!")
