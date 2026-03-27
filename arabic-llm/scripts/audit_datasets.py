@@ -1,349 +1,491 @@
 """
-Comprehensive Dataset Examination and Verification Script
+Balygh Data Audit & Improvement Script
 
-This script performs a complete audit of all datasets to ensure:
-1. Zero data loss
-2. Complete metadata coverage
-3. Content integrity verification
-4. Quality issue identification
-5. Gap analysis
+This script audits your existing datasets and provides recommendations
+for improvements based on the complete implementation plan.
 
-Run this before processing to ensure data completeness.
+Usage:
+    python scripts/audit_datasets.py
 """
 
 import os
+import sys
 import json
-import sqlite3
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Tuple
 import hashlib
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+@dataclass
+class DataConfig:
+    """Dataset configuration and paths"""
+    
+    # Root directories
+    DATASETS_ROOT = Path("K:/learning/technical/ai-ml/AI-Mastery-2026/datasets")
+    ARABIC_LLM_ROOT = Path("K:/learning/technical/ai-ml/AI-Mastery-2026/arabic-llm")
+    
+    # Expected paths
+    EXTRACTED_BOOKS = DATASETS_ROOT / "extracted_books"
+    METADATA = DATASETS_ROOT / "metadata"
+    SANADSET = DATASETS_ROOT / "Sanadset 368K Data on Hadith Narrators"
+    SYSTEM_BOOKS = DATASETS_ROOT / "system_book_datasets"
+    
+    # Output paths
+    OUTPUT_DIR = ARABIC_LLM_ROOT / "data"
+    JSONL_DIR = OUTPUT_DIR / "jsonl"
+    EVAL_DIR = OUTPUT_DIR / "evaluation"
+    
+    # Target statistics
+    TARGET_EXAMPLES = 100000
+    TARGET_FIQH_PCT = 0.30
+    TARGET_LANG_PCT = 0.35
+    TARGET_RAG_PCT = 0.20
+    TARGET_OTHER_PCT = 0.15
 
 
-class DatasetAuditor:
-    """Complete dataset auditing system"""
+# ============================================================================
+# Data Audit Classes
+# ============================================================================
+
+@dataclass
+class AuditResult:
+    """Result of auditing a dataset"""
+    name: str
+    status: str  # "found", "missing", "partial"
+    count: int = 0
+    size_gb: float = 0.0
+    quality_score: float = 0.0
+    issues: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
     
-    def __init__(self, datasets_dir: str):
-        self.datasets_dir = Path(datasets_dir)
-        self.report = {
-            'timestamp': datetime.now().isoformat(),
-            'datasets': {},
-            'issues': [],
-            'gaps': [],
-            'recommendations': []
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "status": self.status,
+            "count": self.count,
+            "size_gb": round(self.size_gb, 2),
+            "quality_score": round(self.quality_score, 2),
+            "issues": self.issues,
+            "recommendations": self.recommendations,
         }
+
+
+@dataclass
+class CompleteAuditReport:
+    """Complete audit report"""
+    timestamp: str = ""
+    datasets: Dict[str, AuditResult] = field(default_factory=dict)
+    overall_quality: float = 0.0
+    readiness_score: float = 0.0
+    total_issues: int = 0
+    total_recommendations: int = 0
     
-    def audit_all(self):
-        """Run complete audit on all datasets"""
-        print("=" * 70)
-        print("COMPREHENSIVE DATASET AUDIT")
-        print("=" * 70)
-        
-        # Audit each dataset
-        self.audit_extracted_books()
-        self.audit_metadata()
-        self.audit_system_book_datasets()
-        
-        # Cross-reference verification
-        self.cross_reference_check()
-        
-        # Generate report
-        self.generate_report()
-        
-        return self.report
+    def __post_init__(self):
+        if not self.timestamp:
+            self.timestamp = datetime.now().isoformat()
     
-    def audit_extracted_books(self):
-        """Audit extracted_books directory"""
-        print("\n[1/3] Auditing extracted_books...")
-        
-        books_dir = self.datasets_dir / "extracted_books"
-        if not books_dir.exists():
-            self.report['issues'].append("extracted_books directory not found")
-            return
-        
-        # Count files
-        txt_files = [f for f in os.listdir(books_dir) if f.endswith('.txt')]
-        other_files = [f for f in os.listdir(books_dir) if not f.endswith('.txt')]
-        
-        print(f"  Total .txt files: {len(txt_files):,}")
-        print(f"  Other files: {len(other_files)}")
-        
-        # Analyze file sizes
-        sizes = []
-        empty_files = []
-        large_files = []
-        
-        for i, f in enumerate(txt_files[:1000]):  # Sample 1000
-            file_path = books_dir / f
-            size = file_path.stat().st_size
-            sizes.append(size)
-            
-            if size < 100:
-                empty_files.append(f)
-            if size > 10 * 1024 * 1024:  # > 10MB
-                large_files.append(f)
-        
-        avg_size = sum(sizes) / len(sizes) if sizes else 0
-        total_size = sum(os.path.getsize(books_dir / f) for f in txt_files)
-        
-        print(f"  Average size: {avg_size/1024:.2f} KB")
-        print(f"  Total size: {total_size/1024/1024:.2f} MB")
-        print(f"  Empty/small files: {len(empty_files)}")
-        print(f"  Large files (>10MB): {len(large_files)}")
-        
-        # Check content quality (sample 100 files)
-        content_issues = []
-        for f in txt_files[:100]:
-            try:
-                with open(books_dir / f, 'r', encoding='utf-8') as file:
-                    content = file.read()
-                    
-                    # Check Arabic ratio
-                    arabic_chars = sum(1 for c in content if '\u0600' <= c <= '\u06FF')
-                    arabic_ratio = arabic_chars / len(content) if content else 0
-                    
-                    if arabic_ratio < 0.5:
-                        content_issues.append(f"{f}: Low Arabic ratio ({arabic_ratio:.1%})")
-                    
-                    # Check for page markers
-                    if '[Page' not in content and len(content) > 1000:
-                        content_issues.append(f"{f}: No page markers")
-                        
-            except Exception as e:
-                content_issues.append(f"{f}: {str(e)}")
-        
-        print(f"  Content quality issues: {len(content_issues)}")
-        
-        self.report['datasets']['extracted_books'] = {
-            'total_files': len(txt_files),
-            'other_files': len(other_files),
-            'total_size_mb': total_size / 1024 / 1024,
-            'avg_size_kb': avg_size / 1024,
-            'empty_files': empty_files,
-            'large_files': large_files,
-            'content_issues': content_issues[:10]  # First 10
+    def to_dict(self) -> dict:
+        return {
+            "timestamp": self.timestamp,
+            "datasets": {k: v.to_dict() for k, v in self.datasets.items()},
+            "overall_quality": round(self.overall_quality, 2),
+            "readiness_score": round(self.readiness_score, 2),
+            "total_issues": self.total_issues,
+            "total_recommendations": self.total_recommendations,
         }
-        
-        if empty_files:
-            self.report['issues'].append(f"{len(empty_files)} empty/small files found")
-        if content_issues:
-            self.report['recommendations'].append(f"Review {len(content_issues)} content quality issues")
+
+
+# ============================================================================
+# Audit Functions
+# ============================================================================
+
+def audit_extracted_books(config: DataConfig) -> AuditResult:
+    """Audit extracted books dataset"""
+    result = AuditResult(name="extracted_books", status="missing")
     
-    def audit_metadata(self):
-        """Audit metadata directory"""
-        print("\n[2/3] Auditing metadata...")
-        
-        meta_dir = self.datasets_dir / "metadata"
-        if not meta_dir.exists():
-            self.report['issues'].append("metadata directory not found")
-            return
-        
-        # Check required files
-        required_files = ['books.json', 'authors.json', 'categories.json', 'guid_index.json', 'books.db']
-        existing_files = os.listdir(meta_dir)
-        
-        for req in required_files:
-            if req not in existing_files:
-                self.report['issues'].append(f"Missing metadata file: {req}")
-            else:
-                file_path = meta_dir / req
-                size_mb = file_path.stat().st_size / 1024 / 1024
-                print(f"  {req}: {size_mb:.2f} MB")
-        
-        # Analyze books.json
-        books_json = meta_dir / "books.json"
-        if books_json.exists():
+    if not config.EXTRACTED_BOOKS.exists():
+        result.issues.append("Extracted books directory not found")
+        result.recommendations.append(
+            "Run book extraction from PDFs or import from Shamela"
+        )
+        return result
+    
+    # Count files
+    txt_files = list(config.EXTRACTED_BOOKS.glob("*.txt"))
+    result.count = len(txt_files)
+    result.status = "found" if result.count > 0 else "partial"
+    
+    # Calculate size
+    total_size = sum(f.stat().st_size for f in txt_files)
+    result.size_gb = total_size / (1024**3)
+    
+    # Quality checks
+    if result.count < 100:
+        result.issues.append(f"Only {result.count} books found (target: 8,424)")
+        result.recommendations.append(
+            "Complete extraction of all 8,424 Shamela books"
+        )
+    elif result.count < 1000:
+        result.quality_score = 0.5
+        result.recommendations.append(
+            f"Extract more books (current: {result.count}, target: 8,424)"
+        )
+    elif result.count < 5000:
+        result.quality_score = 0.75
+        result.recommendations.append(
+            "Continue extraction to reach full corpus"
+        )
+    else:
+        result.quality_score = 0.9
+    
+    if result.size_gb < 1.0:
+        result.issues.append(f"Total size {result.size_gb:.2f} GB is low (target: 16.4 GB)")
+    
+    return result
+
+
+def audit_metadata(config: DataConfig) -> AuditResult:
+    """Audit metadata dataset"""
+    result = AuditResult(name="metadata", status="missing")
+    
+    if not config.METADATA.exists():
+        result.issues.append("Metadata directory not found")
+        result.recommendations.append(
+            "Create metadata directory with books.json, authors.json, categories.json"
+        )
+        return result
+    
+    # Check for books.json
+    books_json = config.METADATA / "books.json"
+    if books_json.exists():
+        result.status = "found"
+        try:
             with open(books_json, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            total = data.get('total', 0)
-            extracted = data.get('extracted', 0)
-            books_array = data.get('books', [])
+            if isinstance(data, dict):
+                result.count = data.get('total', data.get('extracted', 0))
+            elif isinstance(data, list):
+                result.count = len(data)
             
-            print(f"  Total books in metadata: {total:,}")
-            print(f"  Extracted books: {extracted:,}")
-            print(f"  Books in array: {len(books_array):,}")
+            result.quality_score = 0.9 if result.count > 5000 else 0.7
             
-            # Check for gaps
-            book_ids = sorted([b['id'] for b in books_array if b.get('extracted', False)])
-            if book_ids:
-                id_range = range(min(book_ids), max(book_ids) + 1)
-                missing_ids = set(id_range) - set(book_ids)
-                
-                print(f"  ID range: {min(book_ids)} - {max(book_ids)}")
-                print(f"  Missing IDs: {len(missing_ids)}")
-                
-                if missing_ids:
-                    self.report['gaps'].append(f"Missing book IDs: {sorted(missing_ids)[:20]}")
-            
-            # Category distribution
-            categories = {}
-            for b in books_array:
-                cat = b.get('cat_name', 'Unknown')
-                categories[cat] = categories.get(cat, 0) + 1
-            
-            print(f"  Categories: {len(categories)}")
-            print(f"  Top 5 categories:")
-            for cat, count in sorted(categories.items(), key=lambda x: -x[1])[:5]:
-                print(f"    {cat}: {count:,}")
-            
-            self.report['datasets']['metadata'] = {
-                'total_books': total,
-                'extracted_books': extracted,
-                'books_in_array': len(books_array),
-                'missing_ids_count': len(missing_ids) if book_ids else 0,
-                'categories': len(categories),
-                'category_distribution': dict(sorted(categories.items(), key=lambda x: -x[1])[:10])
-            }
+            if result.count < 8424:
+                result.recommendations.append(
+                    f"Add metadata for remaining {8424 - result.count} books"
+                )
+        except json.JSONDecodeError as e:
+            result.status = "partial"
+            result.issues.append(f"books.json is not valid JSON: {e}")
+            result.quality_score = 0.3
+    else:
+        result.issues.append("books.json not found")
+        result.recommendations.append(
+            "Create books.json with book metadata (id, title, category, author, etc.)"
+        )
     
-    def audit_system_book_datasets(self):
-        """Audit system_book_datasets directory"""
-        print("\n[3/3] Auditing system_book_datasets...")
-        
-        sys_dir = self.datasets_dir / "system_book_datasets"
-        if not sys_dir.exists():
-            self.report['issues'].append("system_book_datasets directory not found")
-            return
-        
-        # Check subdirectories
-        subdirs = ['service', 'store', 'book', 'user']
-        
-        for subdir in subdirs:
-            sub_path = sys_dir / subdir
-            if sub_path.exists():
-                items = os.listdir(sub_path)
-                print(f"  {subdir}/: {len(items):,} items")
-                
-                # Analyze databases in service/
-                if subdir == 'service':
-                    for db_file in items:
-                        if db_file.endswith('.db'):
-                            db_path = sub_path / db_file
-                            size_mb = db_path.stat().st_size / 1024 / 1024
-                            print(f"    {db_file}: {size_mb:.2f} MB")
-                            
-                            # Check database tables
-                            try:
-                                conn = sqlite3.connect(db_path)
-                                cursor = conn.cursor()
-                                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                                tables = [t[0] for t in cursor.fetchall()]
-                                print(f"      Tables: {tables}")
-                                conn.close()
-                            except Exception as e:
-                                print(f"      Error: {e}")
-                
-                # Analyze Lucene indexes in store/
-                if subdir == 'store':
-                    lucene_files = [f for f in items if f.startswith('_') or f.endswith('.cfe') or f.endswith('.cfs')]
-                    print(f"    Lucene index files: {len(lucene_files)}")
-                
-                # Count book segments
-                if subdir == 'book':
-                    numeric_dirs = [d for d in items if d.isdigit()]
-                    print(f"    Book segments: {len(numeric_dirs):,}")
-            
-            else:
-                self.report['issues'].append(f"Missing subdirectory: {subdir}")
-        
-        self.report['datasets']['system_book_datasets'] = {
-            'subdirectories': subdirs,
-            'status': 'complete' if all((sys_dir / s).exists() for s in subdirs) else 'incomplete'
-        }
-    
-    def cross_reference_check(self):
-        """Cross-reference check between datasets"""
-        print("\n[CROSS-REFERENCE] Checking consistency...")
-        
-        # Check if all extracted books have metadata
-        books_dir = self.datasets_dir / "extracted_books"
-        meta_dir = self.datasets_dir / "metadata"
-        
-        if books_dir.exists() and meta_dir.exists():
-            # Get extracted book IDs from filenames
-            txt_files = [f for f in os.listdir(books_dir) if f.endswith('.txt')]
-            extracted_ids = set()
-            for f in txt_files:
-                try:
-                    book_id = int(f.split('_')[0])
-                    extracted_ids.add(book_id)
-                except:
-                    pass
-            
-            # Get metadata book IDs
-            books_json = meta_dir / "books.json"
-            if books_json.exists():
-                with open(books_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
-                metadata_ids = set(b['id'] for b in data.get('books', []) if b.get('extracted', False))
-                
-                # Check for mismatches
-                in_extracted_not_metadata = extracted_ids - metadata_ids
-                in_metadata_not_extracted = metadata_ids - extracted_ids
-                
-                print(f"  Books in extracted_books: {len(extracted_ids):,}")
-                print(f"  Books in metadata: {len(metadata_ids):,}")
-                print(f"  In extracted but not metadata: {len(in_extracted_not_metadata)}")
-                print(f"  In metadata but not extracted: {len(in_metadata_not_extracted)}")
-                
-                if in_extracted_not_metadata:
-                    self.report['gaps'].append(f"Books without metadata: {sorted(in_extracted_not_metadata)[:20]}")
-                if in_metadata_not_extracted:
-                    self.report['gaps'].append(f"Books not extracted: {sorted(in_metadata_not_extracted)[:20]}")
-                
-                self.report['cross_reference'] = {
-                    'extracted_count': len(extracted_ids),
-                    'metadata_count': len(metadata_ids),
-                    'missing_metadata': len(in_extracted_not_metadata),
-                    'not_extracted': len(in_metadata_not_extracted)
-                }
-    
-    def generate_report(self):
-        """Generate comprehensive audit report"""
-        print("\n" + "=" * 70)
-        print("AUDIT SUMMARY")
-        print("=" * 70)
-        
-        # Save report
-        report_file = self.datasets_dir / "audit_report.json"
-        with open(report_file, 'w', encoding='utf-8') as f:
-            json.dump(self.report, f, ensure_ascii=False, indent=2)
-        
-        print(f"\nReport saved to: {report_file}")
-        print(f"\nIssues found: {len(self.report['issues'])}")
-        for issue in self.report['issues'][:5]:
-            print(f"  ⚠️  {issue}")
-        
-        print(f"\nGaps found: {len(self.report['gaps'])}")
-        for gap in self.report['gaps'][:5]:
-            print(f"  ◦  {gap}")
-        
-        print(f"\nRecommendations: {len(self.report['recommendations'])}")
-        for rec in self.report['recommendations'][:5]:
-            print(f"  →  {rec}")
-        
-        # Overall status
-        if not self.report['issues'] and not self.report['gaps']:
-            print("\n✅ DATASET STATUS: HEALTHY - Ready for processing")
-        elif len(self.report['issues']) <= 2 and len(self.report['gaps']) <= 2:
-            print("\n⚠️  DATASET STATUS: MINOR ISSUES - Can proceed with caution")
-        else:
-            print("\n❌ DATASET STATUS: ISSUES FOUND - Review before processing")
+    return result
 
 
-def main():
-    """Run comprehensive dataset audit"""
-    auditor = DatasetAuditor("datasets")
-    report = auditor.audit_all()
+def audit_sanadset(config: DataConfig) -> AuditResult:
+    """Audit Sanadset Hadith dataset"""
+    result = AuditResult(name="sanadset_hadith", status="missing")
     
-    print("\n" + "=" * 70)
-    print("AUDIT COMPLETE")
+    if not config.SANADSET.exists():
+        result.issues.append("Sanadset directory not found")
+        result.recommendations.append(
+            "Download Sanadset 368K Hadith narrators dataset from Mendeley Data"
+        )
+        return result
+    
+    # Count files
+    all_files = list(config.SANADSET.rglob("*"))
+    result.count = len(all_files)
+    result.status = "found" if result.count > 0 else "partial"
+    
+    # Calculate size
+    total_size = sum(f.stat().st_size for f in all_files if f.is_file())
+    result.size_gb = total_size / (1024**3)
+    
+    # Quality assessment
+    if result.count > 10:
+        result.quality_score = 0.85
+        result.recommendations.append(
+            "Integrate Sanadset data into hadith training examples"
+        )
+    else:
+        result.quality_score = 0.5
+        result.issues.append("Sanadset data appears incomplete")
+    
+    return result
+
+
+def audit_system_books(config: DataConfig) -> AuditResult:
+    """Audit system book datasets"""
+    result = AuditResult(name="system_books", status="missing")
+    
+    if not config.SYSTEM_BOOKS.exists():
+        result.issues.append("System books directory not found")
+        result.recommendations.append(
+            "Add structured databases (hadith.db, tafseer.db, etc.)"
+        )
+        return result
+    
+    # Count files
+    db_files = list(config.SYSTEM_BOOKS.glob("*.db"))
+    json_files = list(config.SYSTEM_BOOKS.glob("*.json"))
+    result.count = len(db_files) + len(json_files)
+    result.status = "found" if result.count > 0 else "partial"
+    
+    # Calculate size
+    all_files = list(config.SYSTEM_BOOKS.rglob("*"))
+    total_size = sum(f.stat().st_size for f in all_files if f.is_file())
+    result.size_gb = total_size / (1024**3)
+    
+    # Quality assessment
+    if len(db_files) >= 3:
+        result.quality_score = 0.8
+        result.recommendations.append(
+            "Good database coverage. Consider adding more specialized DBs"
+        )
+    elif len(db_files) > 0:
+        result.quality_score = 0.6
+        result.recommendations.append(
+            "Add more databases (target: hadith.db, tafseer.db, trajim.db)"
+        )
+    else:
+        result.quality_score = 0.4
+        result.issues.append("No database files found")
+    
+    return result
+
+
+def audit_generated_datasets(config: DataConfig) -> AuditResult:
+    """Audit generated SFT datasets"""
+    result = AuditResult(name="generated_sft", status="missing")
+    
+    if not config.JSONL_DIR.exists():
+        result.issues.append("JSONL output directory not found")
+        result.recommendations.append(
+            "Run build_balygh_sft_dataset.py to generate SFT examples"
+        )
+        return result
+    
+    # Count JSONL files
+    jsonl_files = list(config.JSONL_DIR.glob("*.jsonl"))
+    result.count = len(jsonl_files)
+    result.status = "found" if result.count > 0 else "partial"
+    
+    # Count total examples
+    total_examples = 0
+    for jsonl_file in jsonl_files:
+        with open(jsonl_file, 'r', encoding='utf-8') as f:
+            total_examples += sum(1 for _ in f)
+    
+    # Quality assessment
+    if total_examples >= config.TARGET_EXAMPLES:
+        result.quality_score = 0.95
+        result.recommendations.append(
+            f"Excellent! {total_examples:,} examples generated. Ready for training."
+        )
+    elif total_examples >= 50000:
+        result.quality_score = 0.8
+        result.recommendations.append(
+            f"Good progress ({total_examples:,} examples). Generate more to reach {config.TARGET_EXAMPLES:,}"
+        )
+    elif total_examples >= 10000:
+        result.quality_score = 0.6
+        result.recommendations.append(
+            f"Continue generation (current: {total_examples:,}, target: {config.TARGET_EXAMPLES:,})"
+        )
+    else:
+        result.quality_score = 0.4
+        result.issues.append(
+            f"Only {total_examples:,} examples generated (target: {config.TARGET_EXAMPLES:,})"
+        )
+    
+    return result
+
+
+def audit_evaluation_datasets(config: DataConfig) -> AuditResult:
+    """Audit evaluation datasets"""
+    result = AuditResult(name="evaluation", status="missing")
+    
+    if not config.EVAL_DIR.exists():
+        result.issues.append("Evaluation directory not found")
+        result.recommendations.append(
+            "Create evaluation datasets (fiqh_eval.jsonl, nahw_eval.jsonl, etc.)"
+        )
+        return result
+    
+    # Check for required eval files
+    required_files = [
+        "fiqh_eval.jsonl",
+        "hadith_eval.jsonl",
+        "nahw_eval.jsonl",
+        "balagha_eval.jsonl",
+        "scraping_eval.jsonl",
+    ]
+    
+    found_files = []
+    for req_file in required_files:
+        if (config.EVAL_DIR / req_file).exists():
+            found_files.append(req_file)
+    
+    result.count = len(found_files)
+    result.status = "found" if len(found_files) >= 3 else "partial"
+    
+    # Quality assessment
+    if len(found_files) >= 5:
+        result.quality_score = 0.9
+        result.recommendations.append(
+            "Complete evaluation suite ready. Add more specialized tests if needed."
+        )
+    elif len(found_files) >= 3:
+        result.quality_score = 0.7
+        missing = set(required_files) - set(found_files)
+        result.issues.append(f"Missing eval files: {missing}")
+        result.recommendations.append(
+            f"Create missing evaluation files: {missing}"
+        )
+    else:
+        result.quality_score = 0.4
+        result.issues.append("Insufficient evaluation datasets")
+        result.recommendations.append(
+            "Create comprehensive evaluation sets for all roles"
+        )
+    
+    return result
+
+
+# ============================================================================
+# Improvement Recommendations
+# ============================================================================
+
+def generate_improvement_plan(audit_report: CompleteAuditReport) -> List[Dict]:
+    """Generate prioritized improvement plan based on audit"""
+    improvements = []
+    
+    # Priority 1: Critical missing data
+    for name, result in audit_report.datasets.items():
+        if result.status == "missing":
+            improvements.append({
+                "priority": 1,
+                "category": "Critical",
+                "action": f"Create {name} dataset",
+                "details": result.recommendations[0] if result.recommendations else "No details",
+                "impact": "Required for training",
+            })
+    
+    # Priority 2: Quality improvements
+    for name, result in audit_report.datasets.items():
+        if result.quality_score < 0.7 and result.status != "missing":
+            improvements.append({
+                "priority": 2,
+                "category": "High",
+                "action": f"Improve {name} quality",
+                "details": result.recommendations[0] if result.recommendations else "Quality enhancement needed",
+                "impact": f"Current quality: {result.quality_score:.2f}",
+            })
+    
+    # Priority 3: Completeness
+    for name, result in audit_report.datasets.items():
+        if result.quality_score >= 0.7 and result.status == "found":
+            improvements.append({
+                "priority": 3,
+                "category": "Medium",
+                "action": f"Complete {name}",
+                "details": result.recommendations[0] if result.recommendations else "Add more data",
+                "impact": "Enhance coverage",
+            })
+    
+    return improvements
+
+
+# ============================================================================
+# Main Audit Function
+# ============================================================================
+
+def run_complete_audit() -> CompleteAuditReport:
+    """Run complete data audit"""
+    config = DataConfig()
+    report = CompleteAuditReport()
+    
     print("=" * 70)
+    print("Balygh Data Audit")
+    print("=" * 70)
+    print()
     
-    return 0
+    # Audit each dataset
+    audits = [
+        ("Extracted Books", audit_extracted_books),
+        ("Metadata", audit_metadata),
+        ("Sanadset Hadith", audit_sanadset),
+        ("System Books", audit_system_books),
+        ("Generated SFT", audit_generated_datasets),
+        ("Evaluation", audit_evaluation_datasets),
+    ]
+    
+    for name, audit_func in audits:
+        print(f"Auditing {name}...")
+        result = audit_func(config)
+        report.datasets[name] = result
+        report.total_issues += len(result.issues)
+        report.total_recommendations += len(result.recommendations)
+        
+        status_icon = "✅" if result.status == "found" else "⚠️" if result.status == "partial" else "❌"
+        print(f"  {status_icon} {name}: {result.status}")
+        print(f"     Count: {result.count:,}, Size: {result.size_gb:.2f} GB, Quality: {result.quality_score:.2f}")
+        
+        if result.issues:
+            for issue in result.issues[:2]:
+                print(f"     ⚠️  {issue}")
+        print()
+    
+    # Calculate overall scores
+    quality_scores = [r.quality_score for r in report.datasets.values() if r.status != "missing"]
+    if quality_scores:
+        report.overall_quality = sum(quality_scores) / len(quality_scores)
+    
+    found_count = sum(1 for r in report.datasets.values() if r.status == "found")
+    report.readiness_score = found_count / len(report.datasets)
+    
+    # Generate improvement plan
+    improvements = generate_improvement_plan(report)
+    
+    print("=" * 70)
+    print(f"Overall Quality: {report.overall_quality:.2f}")
+    print(f"Readiness Score: {report.readiness_score:.2f}")
+    print(f"Total Issues: {report.total_issues}")
+    print(f"Total Recommendations: {report.total_recommendations}")
+    print("=" * 70)
+    print()
+    
+    if improvements:
+        print("📋 Improvement Plan:")
+        print()
+        for imp in improvements[:10]:  # Show top 10
+            priority_icon = "🔴" if imp["priority"] == 1 else "🟡" if imp["priority"] == 2 else "🟢"
+            print(f"  {priority_icon} [{imp['category']}] {imp['action']}")
+            print(f"      {imp['details']}")
+            print()
+    
+    # Save report
+    output_file = Path("data/audit_report.json")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(report.to_dict(), f, ensure_ascii=False, indent=2)
+    
+    print(f"📄 Full audit report saved to: {output_file}")
+    
+    return report
 
 
 if __name__ == "__main__":
-    import sys
-    sys.exit(main())
+    run_complete_audit()

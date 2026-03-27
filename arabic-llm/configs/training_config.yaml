@@ -1,12 +1,24 @@
-# Arabic LLM Fine-Tuning Configuration
+# Balygh (بليغ) - Arabic Linguist LLM Training Configuration
+# Version: 2.0 - Extended for 29 Roles and 76 Skills
+# Based on llm_arabic_plan.md implementation plan
 
 # =============================================================================
-# Model Configuration
+# MODEL CONFIGURATION
 # =============================================================================
 model:
-  # Base model selection
-  # Options: ALLaM-7B-Instruct, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-8B-Instruct
+  # ──────────────────────────────────────────────────────────────────────────
+  # Base Model Selection
+  # Recommended for Balygh v2.0:
+  # - Qwen/Qwen2.5-7B-Instruct (best Arabic support + reasoning)
+  # - ALLaM-7B-Instruct (1.2T Arabic tokens)
+  # - Qwen/Qwen2.5-8B-Instruct (slightly larger)
+  # ──────────────────────────────────────────────────────────────────────────
   base: "Qwen/Qwen2.5-7B-Instruct"
+  
+  # Alternative bases (comment/uncomment as needed)
+  # base: "Qwen/Qwen2.5-8B-Instruct"
+  # base: "mistralai/Mistral-7B-Instruct-v0.3"
+  # base: "meta-llama/Llama-3-8B-Instruct"
   
   # Model dtype for loading
   dtype: "float16"
@@ -14,23 +26,34 @@ model:
   # Trust remote code (required for some models)
   trust_remote_code: true
   
-  # Use Flash Attention 2 if available
+  # Use Flash Attention 2 if available (2x speedup)
   use_flash_attention: true
+  
+  # Model max length (4096 for Qwen2.5)
+  model_max_length: 4096
+  
+  # Cache directory
+  cache_dir: ".cache/huggingface"
 
 # =============================================================================
-# LoRA Configuration (QLoRA)
+# LORA CONFIGURATION (QLoRA) - Enhanced for 29 Roles
 # =============================================================================
 lora:
-  # LoRA rank
+  # ──────────────────────────────────────────────────────────────────────────
+  # LoRA Hyperparameters
+  # Higher r=64, alpha=128 for multi-role training
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # LoRA rank (higher = more capacity, more VRAM)
   r: 64
   
-  # LoRA alpha (scaling factor)
+  # LoRA alpha (scaling factor, typically 2*r)
   alpha: 128
   
-  # LoRA dropout
+  # LoRA dropout (prevent overfitting)
   dropout: 0.05
   
-  # Target modules for LoRA
+  # Target modules - all attention + MLP for maximum capacity
   target_modules:
     - "q_proj"
     - "k_proj"
@@ -45,116 +68,316 @@ lora:
   
   # Bias type
   bias: "none"
+  
+  # Use RSLora (Rank-Stabilized LoRA)
+  use_rslora: true
+  
+  # Use gradient checkpointing (saves VRAM)
+  use_gradient_checkpointing: "unsloth"  # Options: true, false, "unsloth"
+  
+  # Random seed for reproducibility
+  random_state: 42
+  
+  # Modules to save
+  modules_to_save: null
 
 # =============================================================================
-# Quantization Configuration (QLoRA)
+# QUANTIZATION CONFIGURATION (QLoRA)
 # =============================================================================
 quantization:
-  # Load in 4-bit
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4-bit quantization for 7B models on 24GB VRAM
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Load in 4-bit (QLoRA)
   load_in_4bit: true
   
-  # Quantization type
+  # Quantization type (nf4 = normalized float 4-bit)
   bnb_4bit_quant_type: "nf4"
   
-  # Compute dtype
+  # Compute dtype for quantized layers
   bnb_4bit_compute_dtype: "float16"
   
-  # Nested quantization
+  # Nested quantization (saves more VRAM)
   bnb_4bit_use_double_quant: true
+  
+  # LLM.int8() threshold
+  llm_int8_threshold: 6.0
+  
+  # LLM.int8() has FP16 weights
+  llm_int8_has_fp16_weight: false
 
 # =============================================================================
-# Training Configuration
+# TRAINING CONFIGURATION - Optimized for 100K Examples
 # =============================================================================
 training:
-  # Batch size per device
-  batch_size: 4
+  # ──────────────────────────────────────────────────────────────────────────
+  # Batch Size & Gradient Accumulation
+  # Effective batch = batch_size * gradient_accumulation * num_gpus
+  # Target: 256-512 for stable training
+  # ──────────────────────────────────────────────────────────────────────────
   
-  # Gradient accumulation steps
-  gradient_accumulation: 4
+  # Batch size per device (reduce if OOM)
+  per_device_train_batch_size: 4
   
-  # Learning rate
+  # Batch size for evaluation
+  per_device_eval_batch_size: 4
+  
+  # Gradient accumulation (effective batch = 4 * 4 = 16)
+  gradient_accumulation_steps: 4
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Learning Rate & Optimization
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Peak learning rate
   learning_rate: 2.0e-4
   
-  # Number of epochs
-  epochs: 3
-  
-  # Maximum sequence length
-  max_seq_length: 2048
-  
-  # Warmup ratio
-  warmup_ratio: 0.03
-  
   # Learning rate scheduler
-  lr_scheduler: "cosine"
+  lr_scheduler_type: "cosine"  # Options: linear, cosine, cosine_with_restarts
   
-  # Weight decay
+  # Warmup ratio (first 5% of steps)
+  warmup_ratio: 0.05
+  
+  # Weight decay (L2 regularization)
   weight_decay: 0.01
   
-  # Gradient clipping
+  # Adam epsilon
+  adam_epsilon: 1.0e-8
+  
+  # Adam beta1
+  adam_beta1: 0.9
+  
+  # Adam beta2
+  adam_beta2: 0.999
+  
+  # Gradient clipping (prevent exploding gradients)
   max_grad_norm: 1.0
   
-  # Logging steps
-  logging_steps: 10
+  # ──────────────────────────────────────────────────────────────────────────
+  # Training Loop
+  # ──────────────────────────────────────────────────────────────────────────
   
-  # Save steps
-  save_steps: 500
+  # Number of epochs (3 for 100K examples)
+  num_train_epochs: 3
   
-  # Evaluation steps
-  eval_steps: 500
+  # Max steps (-1 = use epochs)
+  max_steps: -1
   
-  # Save total limit
-  save_total_limit: 3
-
-# =============================================================================
-# Optimization Configuration
-# =============================================================================
-optimization:
-  # Optimizer type
-  optimizer: "adamw_torch"
+  # Steps per epoch (-1 = auto)
+  steps_per_epoch: -1
   
-  # Enable gradient checkpointing
-  gradient_checkpointing: true
+  # ──────────────────────────────────────────────────────────────────────────
+  # Precision
+  # ──────────────────────────────────────────────────────────────────────────
   
-  # Enable mixed precision
+  # FP16 mixed precision
   fp16: true
   
-  # BF16 (if supported)
+  # BF16 (if A100/H100 GPU)
   bf16: false
   
-  # Number of workers for data loading
-  num_workers: 4
+  # Full FP36 precision
+  full_fp32: false
   
-  # Pin memory for data loading
-  pin_memory: true
+  # ──────────────────────────────────────────────────────────────────────────
+  # Logging & Saving
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Log every N steps
+  logging_steps: 10
+  
+  # Evaluate every N steps
+  eval_steps: 100
+  
+  # Save every N steps
+  save_steps: 200
+  
+  # Save strategy
+  save_strategy: "steps"  # Options: "no", "epoch", "steps"
+  
+  # Evaluation strategy
+  evaluation_strategy: "steps"  # Options: "no", "epoch", "steps"
+  
+  # Save total limit (keep last N checkpoints)
+  save_total_limit: 3
+  
+  # Load best model at end
+  load_best_model_at_end: true
+  
+  # Metric for best model
+  metric_for_best_model: "eval_loss"
+  
+  # Greater is better for metric
+  greater_is_better: false
+  
+  # Report to
+  report_to: ["tensorboard"]
 
 # =============================================================================
-# Hardware Configuration
+# DATASET CONFIGURATION - 29 Roles, 100K Examples
+# =============================================================================
+dataset:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Training Data Files
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Training data path
+  train_file: "datasets/jsonl/trainingdata.jsonl"
+  
+  # Validation data path
+  eval_file: "datasets/jsonl/eval.jsonl"
+  
+  # Test data path
+  test_file: "datasets/jsonl/test.jsonl"
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Data Processing
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Preprocessing num workers
+  preprocessing_num_workers: 4
+  
+  # Overwrite cached datasets
+  overwrite_cache: false
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # ChatML Format Template
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Use ChatML format (recommended for instruction tuning)
+  use_chatml_format: true
+  
+  # ChatML tokens
+  chatml_tokens:
+    system_start: "<|system|>\n"
+    user_start: "<|user|>\n"
+    assistant_start: "<|assistant|>\n"
+    end: "<|end|>\n"
+  
+  # System prompt for Balygh
+  system_prompt: |
+    أنت بليغ، مساعد ذكي متخصص في اللغة العربية والعلوم الإسلامية.
+    تجيب بدقة وأمانة مع ذكر المصادر عند الحاجة.
+    
+    You are Balygh, an AI assistant specialized in Arabic language and Islamic sciences.
+    You respond accurately with citations when needed.
+
+# =============================================================================
+# ROLE-BALANCED TRAINING CONFIGURATION
+# =============================================================================
+role_balancing:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Enable role-balanced sampling
+  # Ensures all 29 roles are represented in each batch
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  enabled: true
+  
+  # Role distribution from schema.py DatasetConfig
+  # These should match the target distribution
+  role_weights:
+    # High Priority (47%)
+    rag_assistant: 0.20
+    tutor: 0.15
+    fatwa_assistant_safe: 0.12
+    
+    # Medium Priority (33%)
+    edtech_tutor: 0.10
+    proofreader: 0.08
+    muhaddith: 0.06
+    mufassir: 0.05
+    dialect_handling_egy: 0.05
+    faqih: 0.04
+    
+    # Low Priority (20%)
+    summarizer_ar: 0.04
+    legal_arabic_drafting: 0.03
+    translator_ar: 0.03
+    tool_caller_ar: 0.03
+    dataengineer_ar: 0.03
+    poet: 0.02
+    muhhaqiq: 0.02
+    aqeedah_specialist: 0.02
+    historian: 0.02
+    adab_specialist: 0.02
+    sufi: 0.01
+    logician: 0.01
+    physician: 0.01
+    genealogist: 0.01
+    geographer: 0.01
+    quran_reciter: 0.01
+    assistant_general: 0.01
+  
+  # Stratified sampling
+  stratified_sampling: true
+  
+  # Minimum examples per role per epoch
+  min_examples_per_role: 100
+
+# =============================================================================
+# HARDWARE CONFIGURATION
 # =============================================================================
 hardware:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Single GPU Configuration (24GB VRAM recommended)
+  # ──────────────────────────────────────────────────────────────────────────
+  
   # Device
   device: "cuda"
   
   # Number of GPUs
   num_gpus: 1
   
-  # GPU memory allocation
+  # GPU memory fraction
   gpu_memory_fraction: 0.9
   
-  # CPU offload for optimizer
+  # ──────────────────────────────────────────────────────────────────────────
+  # CPU Offload (for limited VRAM)
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Offload optimizer to CPU
   offload_optimizer: false
   
-  # CPU offload for parameters
+  # Offload parameters to CPU
   offload_params: false
+  
+  # Offload optimizer buffer
+  offload_optimizer_buffer: "cpu"
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Multi-GPU Configuration (DeepSpeed)
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Enable DeepSpeed
+  deepspeed: false
+  
+  # DeepSpeed config file
+  deepspeed_config: "configs/deepspeed_zero3.json"
+  
+  # Gradient checkpointing
+  gradient_checkpointing: true
 
 # =============================================================================
-# Output Configuration
+# OUTPUT CONFIGURATION
 # =============================================================================
 output:
-  # Output directory
-  output_dir: "models/arabic-linguist-v1"
+  # ──────────────────────────────────────────────────────────────────────────
+  # Output Directories
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Main output directory
+  output_dir: "models/balygh-v2"
   
   # Overwrite output directory
   overwrite_output_dir: true
+  
+  # Hub output directory
+  hub_output_dir: "models/balygh-v2-hub"
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Saving
+  # ──────────────────────────────────────────────────────────────────────────
   
   # Save model weights
   save_model: true
@@ -162,16 +385,36 @@ output:
   # Save tokenizer
   save_tokenizer: true
   
-  # Push to hub (HuggingFace)
+  # Save training arguments
+  save_training_args: true
+  
+  # Save adapter config
+  save_adapter_config: true
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Hugging Face Hub
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Push to hub
   push_to_hub: false
   
   # Hub model ID
-  hub_model_id: null
+  hub_model_id: "balygh-v2-7b"
+  
+  # Hub private
+  hub_private: false
+  
+  # Hub token (set via environment variable HF_TOKEN)
+  hub_token: null
 
 # =============================================================================
-# Logging Configuration
+# LOGGING CONFIGURATION
 # =============================================================================
 logging:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Log Levels
+  # ──────────────────────────────────────────────────────────────────────────
+  
   # Log level
   level: "INFO"
   
@@ -179,16 +422,153 @@ logging:
   log_to_file: true
   
   # Log file path
-  log_file: "training.log"
+  log_file: "logs/balygh_training.log"
   
-  # Tensorboard logging
+  # ──────────────────────────────────────────────────────────────────────────
+  # Experiment Tracking
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # TensorBoard logging
   tensorboard: true
   
-  # Tensorboard directory
-  tensorboard_dir: "runs/arabic-llm"
+  # TensorBoard directory
+  tensorboard_dir: "runs/balygh-v2"
   
-  # WandB logging
+  # Weights & Biases
   wandb: false
   
   # WandB project
-  wandb_project: "arabic-llm-finetuning"
+  wandb_project: "balygh-arabic-llm"
+  
+  # WandB entity
+  wandb_entity: null
+  
+  # WandB tags
+  wandb_tags:
+    - arabic
+    - llm
+    - qlora
+    - balygh
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Logging Details
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Log loss
+  log_loss: true
+  
+  # Log learning rate
+  log_lr: true
+  
+  # Log gradient norm
+  log_grad_norm: true
+  
+  # Log memory usage
+  log_memory: true
+
+# =============================================================================
+# EVALUATION CONFIGURATION
+# =============================================================================
+evaluation:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Evaluation Dataset
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Eval dataset size
+  eval_size: 1000
+  
+  # Eval batch size
+  eval_batch_size: 4
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Metrics
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Metrics to compute
+  metrics:
+    - "loss"
+    - "perplexity"
+    - "accuracy"
+  
+  # OALL benchmarks
+  oall_benchmarks:
+    - "arabic_mmlu"
+    - "arabic_qa"
+    - "arabic_summarization"
+  
+  # Custom linguistics tests
+  linguistics_tests:
+    - "i3rab"
+    - "balagha"
+    - "poetry_criticism"
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Generation Parameters for Evaluation
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Max new tokens for generation
+  max_new_tokens: 512
+  
+  # Temperature
+  temperature: 0.7
+  
+  # Top-p sampling
+  top_p: 0.9
+  
+  # Top-k sampling
+  top_k: 50
+  
+  # Repetition penalty
+  repetition_penalty: 1.1
+  
+  # Do sample
+  do_sample: true
+
+# =============================================================================
+# PERFORMANCE TUNING
+# =============================================================================
+performance:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Speed Optimizations
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Enable torch compile (PyTorch 2.0+)
+  torch_compile: false
+  
+  # Enable xformers
+  use_xformers: true
+  
+  # Enable cudnn benchmark
+  cudnn_benchmark: false
+  
+  # Enable TF32 (Ampere GPUs)
+  tf32: true
+  
+  # ──────────────────────────────────────────────────────────────────────────
+  # Memory Optimizations
+  # ──────────────────────────────────────────────────────────────────────────
+  
+  # Enable gradient scaling
+  gradient_scaling: true
+  
+  # Activation checkpointing
+  activation_checkpointing: true
+  
+  # Activation offload
+  activation_offload: false
+
+# =============================================================================
+# EARLY STOPPING
+# =============================================================================
+early_stopping:
+  # Enable early stopping
+  enabled: true
+  
+  # Patience (number of eval steps with no improvement)
+  patience: 5
+  
+  # Minimum delta
+  min_delta: 0.001
+  
+  # Restore best weights
+  restore_best_weights: true

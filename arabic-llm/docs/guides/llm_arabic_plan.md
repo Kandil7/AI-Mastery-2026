@@ -8495,3 +8495,3499 @@ if __name__ == "__main__":
 - تشغل Unsloth/Qwen2.5 عليها لمرحلة SFT الخاصة بالفقه/اللغة.
 
 
+Autoresearch مناسب لك جدًا في بليغ، لأنه بالضبط “agent يشغّل تجارب fine‑tuning نيابةً عنك وأنت نايم”. [reddit](https://www.reddit.com/r/LocalLLaMA/comments/1rowp28/karpathy_autoresearch/)
+
+### الفكرة باختصار
+
+- الريبو فيه فعليًا 3 ملفات فقط: [datasciencedojo](https://datasciencedojo.com/blog/karpathy-autoresearch-explained/)
+  - `train.py`: كود التدريب، هو الملف الوحيد اللي الـagent يحق له يغيّره.  
+  - `prepare.py`: كود الـevaluation (metric واحدة واضحة)، ممنوع الـagent يلمسه.  
+  - `program.md`: “عقل الباحث” — فيه الاستراتيجية اللي تقول للـagent:
+    - جرّب تغييرات معينة (lr, batch size, schedule, layers…).
+    - شغّل تدريب ٥ دقائق.
+    - قيّم بالـmetric (مثلاً val loss أو F1).
+    - لو تحسّن → `git commit`. لو ساء → `git reset` وترجع. [news.aakashg](https://www.news.aakashg.com/p/autoresearch-guide-for-pms)
+
+اللي يهمك إنك:
+- تغيّر `train.py` و`prepare.py` بحيث يشغّلوا **Qwen/Balygh على داتا عربية** بدل nanochat.
+- تكتب `program.md` يقول للـagent:
+  - ركّز على تحسين loss على `balygh_sft_refined.jsonl`.
+  - جرّب تغييرات على:
+    - QLoRA hyperparams (r, lr, epochs, max_seq_length).
+    - خلط real vs synthetic.
+  - استخدم eval script خاص بالفقه/اللغة اللي ناوي تبنيه (زي اللي اتكلمنا عنه).
+
+لو حابب، أقدر في الرسالة الجاية أكتب لك skeleton جاهز لـ:
+- `prepare.py` يقيس Arabic eval (فقه + نحو + scraping).
+- `program.md` مخصص لمشروع بليغ يطبّق “Karpathy Loop” على إعدادات الـfine‑tuning العربي.
+
+أقسم الإجابة لأجزاء صغيرة وواضحة.
+
+***
+
+## 1) ازاي تستخدم autoresearch لتحسين LLM عربي
+
+الفكرة: تخلي agent يجرّب **تغييرات مدروسة** على سكربت التدريب (Qwen2.5 + QLoRA) ويقيس النتيجة تلقائيًا. [reddit](https://www.reddit.com/r/LocalLLaMA/comments/1rowp28/karpathy_autoresearch/)
+
+الـloop:
+
+1. أنت تكتب:
+   - `train.py` → يشغّل fine‑tuning على بليغ (Qwen2.5 + داتا عربية).
+   - `prepare.py` → يرجّع رقم واحد (metric)، مثل:
+     - متوسط ROUGE/accuracy على eval set فقهي/لغوي.
+   - `program.md` → “خطة التجارب”:
+     - جرّب lr مختلفة، r مختلفة، mix داتا مختلفة… وما إلى ذلك.
+
+2. autoresearch agent يعمل:
+   - يعدّل `train.py` (أو config) تعديلًا صغيرًا.
+   - يشغّل `python train.py` (فترة قصيرة، مثلاً 1–2 ساعة أو epochs قليلة).
+   - يشغّل `python prepare.py` → يأخذ metric.
+   - لو الـmetric تحسّن → يحتفظ بالتغيير (git commit).
+   - لو ساء → يرجع للنسخة السابقة (git reset). [news.aakashg](https://www.news.aakashg.com/p/autoresearch-guide-for-pms)
+
+أنت بالتالي تكتب “العقل البحثي” مرة واحدة، وتسيبه يستكشف space الhyperparams والخلطات لوحده.
+
+***
+
+## 2) مثال program.md مكيّف لـ Qwen2.5 عربي
+
+ده skeleton تقدر تبدأ بيه (مختصر):
+
+```markdown
+# AutoResearch Program for Balygh (Arabic Qwen2.5)
+
+## Goal
+
+Optimize fine-tuning of **Qwen2.5-7B-Instruct** on the **Balygh Arabic SFT dataset**
+(`data/jsonl/balygh_sft_refined.jsonl`) for **Arabic fiqh + linguistics**.
+
+The objective metric is `balygh_score` returned by `prepare.py`:
+
+- `balygh_score` ∈ [0, 1]
+- higher is better
+- combines:
+  - JSON accuracy on scraping eval
+  - F1 on fiqh QA eval
+  - F1/ROUGE on nahw/grammar eval
+
+## Files
+
+- `train.py` — defines `train(config)` using QLoRA + Unsloth + Qwen2.5.
+- `prepare.py` — loads the last checkpoint and computes `balygh_score`.
+- `config.json` — current hyperparameters.
+
+The agent **MAY** edit: `config.json`, `train.py` (only hyperparams), comments in this file.  
+The agent **MUST NOT** edit: `prepare.py`, eval data, model weights.
+
+## Search Space
+
+The agent should explore combinations of:
+
+- `learning_rate`: [5e-5, 1e-4, 2e-4]
+- `lora_r`: [32, 64]
+- `lora_alpha`: always `2 * lora_r`
+- `num_train_epochs`: [2, 3]
+- `max_seq_length`: [2048, 3072, 4096]
+- `per_device_train_batch_size`: [2, 4]
+- `gradient_accumulation_steps`: adjust to keep effective batch ≈ 16
+- `warmup_ratio`: [0.03, 0.05]
+- `weight_decay`: [0.0, 0.01]
+- `packing`: [true, false]
+
+The agent should **only change 1–2 parameters per iteration**.
+
+## Evaluation Budget
+
+- Each `train.py` run must not exceed **90 minutes** on a single GPU.
+  - Use fewer epochs and/or a subset of data if needed.
+- For each candidate config:
+  1. Run `python train.py --config config.json --fast` (e.g. 0.5–1 epoch).
+  2. Run `python prepare.py` → prints `balygh_score=<value>`.
+  3. If `balygh_score` improved over best so far by at least `0.01`:
+     - keep changes (git commit with message: `improve: score X -> Y`).
+  4. Otherwise:
+     - revert changes to `config.json` and `train.py` (git reset).
+
+## Constraints
+
+- Do **not** modify model base (stay on Qwen2.5-7B-Instruct).
+- Keep LoRA-only training (no full finetune).
+- Do not increase VRAM usage beyond current config.
+- Do not change eval data or metric definitions.
+- Prefer **simpler** configs when scores are tied.
+
+## Strategy Hints
+
+1. Start from a known good baseline:
+   - `lr=2e-4, r=64, seq=4096, epochs=3, packing=true`.
+2. First, tune `learning_rate` and `lora_r`.
+3. Then, tune `max_seq_length` if VRAM/time allows.
+4. Finally, fine-tune regularization (weight_decay, warmup_ratio).
+
+## Stopping Criteria
+
+Stop when:
+- No improvement ≥ 0.01 for 10 consecutive experiments, or
+- Maximum of 50 experiments is reached.
+
+```
+
+تعدّل الأرقام (وقت، space) حسب الـGPU والوقت اللي عندك. [datasciencedojo](https://datasciencedojo.com/blog/karpathy-autoresearch-explained/)
+
+***
+
+## 3) دمج autoresearch مع LangGraph Agents
+
+الفكرة: تخلي autoresearch يحسّن “نيوكلياس” الـfinetuning، وLangGraph يدير الـagents في الـproduction.
+
+طريقتان:
+
+1. **LangGraph كـ外 loop فوق autoresearch**:
+   - Agent في LangGraph:
+     - يقرأ نتائج autoresearch (scores + configs).
+     - يقرّر:
+       - أي checkpoint deploy على vLLM.
+       - إمتى يشغّل دورة autoresearch جديدة.
+   - Nodes:
+     - `EvalNode` → يشغّل `prepare.py` + جمع logs.
+     - `DecisionNode` → إذا score تحسّن كثير → trigger “Deploy”.
+
+2. **autoresearch يحسّن agent behaviors**:
+   - تقدّم لـautoresearch سكربت تدريب agent policy (prompt templates + tool‑calling examples)، و`prepare.py` يقيس:
+     - success rate لAgent LangGraph على tasks (scraping, RAG…).
+   - autoresearch يغيّر:
+     - system prompts.
+     - routing logic (thresholds).
+     - templates الأدوات (tool instructions). [aclanthology](https://aclanthology.org/2025.arabicnlp-main.28.pdf)
+
+في البداية ركّز على الخيار (1): خليه optimizer للـmodel فقط، وسيب LangGraph مسؤول عن orchestration.
+
+***
+
+## 4) أمثلة نجاح autoresearch خارج ML
+
+من المقالات حول autoresearch pattern: [datacamp](https://www.datacamp.com/tutorial/guide-to-autoresearch)
+
+- **Marketing experiments**:
+  - autoresearch يشغّل A/B tests على landing pages:
+    - يعدّل copy / CTA / layout في repo.
+    - يشغّل sim أو يأخذ بيانات من analytics API.
+    - يقارن conversion metrics ويثبت النسخة الأحسن تلقائيًا.
+- **Product analytics**:
+  - يشغّل queries مختلفة على warehouse (SQL) للعثور على KPIs مفيدة، ويحتفظ بالـdashboards اللي فيها insights حقيقية.
+- **Code optimization**:
+  - تشغيل تجارب على خوارزميات (مثلاً optimizer لخط أنابيب ETL):
+    - يغير structures بسيطة أو caching.
+    - يقيس runtime عبر tests.
+- **Documentation generation**:
+  - يبني ويحسّن README, API docs, tutorials عبر LLM، ويقيس readability score أو feedback من مستخدمين داخليين.
+
+النقطة: pattern عام “agent يغيّر كود/كونفيج + يقيس + يرجّع/يثبّت”، مش قاصر على ML. [sidsaladi.substack](https://sidsaladi.substack.com/p/autoresearch-101-builders-playbook)
+
+***
+
+## 5) Requirements وsetup لتشغيل autoresearch محليًا
+
+من الشروحات الحالية: [openrepoguide](https://openrepoguide.com)
+
+**1) متطلبات النظام:**
+- Python 3.10+
+- Git
+- GPU مع CUDA (لو هتعمل fine‑tuning)، أو CPU لتجارب خفيفة.
+- بيئة virtualenv/conda نظيفة.
+
+**2) تثبيت autoresearch (لو هتاخد النمط بتاع Karpathy حرفيًا):**
+
+الريبو الأصلي لسه بسيط جدًا؛ الفكرة الأساسية:
+
+```bash
+git clone https://github.com/karpathy/autoresearch.git
+cd autoresearch
+
+# أنشئ بيئة:
+python -m venv .venv
+source .venv/bin/activate  # أو .venv\Scripts\activate على ويندوز
+
+# ثبّت المتطلبات العامة
+pip install -r requirements.txt   # لو موجود
+# غالبًا تحتاج:
+# pip install openai gitpython tenacity pyyaml
+```
+
+**3) إعداد مشروعك كبروجيكت autoresearch:**
+
+إما:
+- تعدّل الريبو الأصلي مباشرة على مشروعك، أو
+- تعمل repo جديد وتنسخ pattern:
+
+هيكل مقترح:
+
+```text
+balygh-autoresearch/
+├── train.py          # يستدعي unsloth + Qwen2.5 + بياناتك
+├── prepare.py        # يحمل أحدث checkpoint ويحسب balygh_score
+├── program.md        # خطة البحث (اللي فوق)
+├── config.json       # hyperparams الحالية
+├── data/
+│   ├── train/
+│   ├── eval/
+└── models/
+```
+
+**4) تشغيل autoresearch loop (من سكربت بسيط):**
+
+لو استخدمت سكربت autotuner صغير (مش Karpathy الرسمي):
+
+```python
+# simple_autoresearch_loop.py
+import subprocess, json, copy
+
+best_score = -1.0
+best_config = json.load(open("config.json", encoding="utf-8"))
+
+def run(cmd):
+    return subprocess.run(cmd, shell=True, check=True)
+
+for i in range(30):  # 30 تجربة مثلًا
+    print(f"\n=== Experiment {i+1} ===")
+
+    # عدّل config.json (مثلاً غيّر lr أو r) — ممكن تستخدم LLM هنا لاحقًا
+    cfg = copy.deepcopy(best_config)
+    cfg["learning_rate"] = 2e-4 if i % 2 == 0 else 1e-4
+    json.dump(cfg, open("config.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+    # train fast
+    run("python train.py --config config.json --fast")
+
+    # eval
+    out = subprocess.check_output("python prepare.py", shell=True, text=True)
+    # افترض prepare.py يطبع سطر فيه: balygh_score=0.73
+    for line in out.splitlines():
+        if "balygh_score=" in line:
+            score = float(line.split("=",1) [reddit](https://www.reddit.com/r/LocalLLaMA/comments/1rowp28/karpathy_autoresearch/))
+            break
+
+    print(f"Score = {score:.4f}")
+    if score > best_score:
+        print("→ New best, keeping config.")
+        best_score = score
+        best_config = cfg
+        # هنا ممكن تعمل git commit
+    else:
+        print("→ Worse, reverting to previous config.")
+        json.dump(best_config, open("config.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        # ترجع للـcheckpoint السابق لو كنت بتحفظه
+```
+
+بعد ما تظبط ده يدويًا، تقدر تقرّب من نمط Karpathy الكامل (LLM يساعد في اقتراح التغييرات بدل ما أنت تغيّرها يدويًا).
+
+***
+
+لو حابب، أقدر أساعدك تحديد **balhygh_score** بدقة (مثلاً: 0.4 فقه + 0.3 نحو + 0.3 scraping) وأكتب `prepare.py` يرجّع القيمة دي من eval scripts اللي عندك.
+أديك تعريف واضح لـ `balygh_score` + قالب `prepare.py` كامل.
+
+***
+
+## 1) تعريف balygh_score
+
+نركّبه من ثلاث مكونات رئيسية:
+
+- **فقه وحديث** (40٪):
+  - `fiqh_f1`  (أو correctness) من eval أسئلة الفقه.
+  - `hadith_f1` من eval أسئلة الحديث.
+  - ندمجهم: `fiqh_hadith = 0.6*fiqh_f1 + 0.4*hadith_f1`.
+
+- **لغة عربية** (30٪):
+  - `nahw_score` (مثلاً متوسط ROUGE‑L أو exact match لمفاتيح الإعراب).
+  - `balagha_score` (تقييم LLM‑as‑judge أو ROUGE).
+  - ندمجهم: `lang = 0.7*nahw_score + 0.3*balagha_score`.
+
+- **Scraping / Extraction** (30٪):
+  - `json_acc`: نسبة JSON valid + الحقول الأساسية موجودة.
+  - `field_f1`: متوسط F1 للحقول (title, question, answer, …).
+  - `scraping = 0.4*json_acc + 0.6*field_f1`.
+
+ثم:
+
+\[
+balygh\_score = 0.4 * fiqh\_hadith + 0.3 * lang + 0.3 * scraping
+\]
+
+كل القيم بين 0 و1.
+
+***
+
+## 2) قالب `prepare.py` كامل
+
+يفترض عندك 3 سكربتات تقييم منفصلة (تقدر تكمّلها لاحقًا):
+
+- `eval_fiqh_hadith()` → يرجّع dict بالـmetrics.
+- `eval_language()` → يرجّع dict.
+- `eval_scraping()` → يرجّع dict.
+
+لو لسه مش عامِلهم، خلّيهم placeholders ترجع قيم تجريبية مؤقتًا، وبعدين تبدّل الجسم بتاعهم.
+
+```python
+# prepare.py
+"""
+حساب balygh_score لأحدث checkpoint.
+
+السكربت:
+- يحمل الموديل من مجلد output (مثلاً models/balygh-latest).
+- يشغّل 3 أنواع تقييم: فقه/حديث، لغة، Scraping.
+- يحسب balygh_score ∈ [0,1].
+- يطبع النتائج في stdout عشان autoresearch يقرأها.
+
+تشغيل:
+    python prepare.py
+"""
+
+import json
+import os
+from dataclasses import dataclass, asdict
+from pathlib import Path
+from typing import Dict
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# عدّل المسار حسب train.py
+MODEL_DIR = os.getenv("BALYGH_MODEL_DIR", "models/balygh-latest")
+DEVICE    = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+@dataclass
+class EvalSummary:
+    fiqh_f1: float
+    hadith_f1: float
+    nahw_score: float
+    balagha_score: float
+    json_acc: float
+    field_f1: float
+    fiqh_hadith: float
+    lang: float
+    scraping: float
+    balygh_score: float
+
+
+# ─────────────────────────────────────
+# تحميل الموديل مرة واحدة
+# ─────────────────────────────────────
+
+def load_model():
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32,
+        device_map="auto" if DEVICE == "cuda" else None,
+    )
+    model.eval()
+    return model, tokenizer
+
+
+# ─────────────────────────────────────
+# دوال التقييم (مكانك تكمّل التنفيذ لاحقًا)
+# ─────────────────────────────────────
+
+def eval_fiqh_hadith(model, tokenizer) -> Dict[str, float]:
+    """
+    يشغّل eval على بنك الأسئلة الفقهي/الحديثي.
+    TODO: استبدل الـdummy implementation بالاستدعاء الفعلي لسكريبت التقييم.
+    """
+    # PLACEHOLDER: ضع هنا استدعاء eval_fiqh.py مثلاً
+    # مثال متوقَّع للرجوع:
+    # return {"fiqh_f1": 0.72, "hadith_f1": 0.68}
+    return {"fiqh_f1": 0.70, "hadith_f1": 0.65}
+
+
+def eval_language(model, tokenizer) -> Dict[str, float]:
+    """
+    يشغّل eval على بنك أسئلة النحو والبلاغة.
+    """
+    # PLACEHOLDER: استبدلها لاحقًا بـeval_nahw_balagha.py
+    return {"nahw_score": 0.75, "balagha_score": 0.70}
+
+
+def eval_scraping(model, tokenizer) -> Dict[str, float]:
+    """
+    يشغّل eval على صفحات HTML → JSON.
+    """
+    # PLACEHOLDER: استبدلها بـeval_scraping.py
+    return {"json_acc": 0.80, "field_f1": 0.78}
+
+
+# ─────────────────────────────────────
+# الحساب الرئيسي
+# ─────────────────────────────────────
+
+def compute_balygh_score() -> EvalSummary:
+    model, tokenizer = load_model()
+
+    fiqh_res   = eval_fiqh_hadith(model, tokenizer)
+    lang_res   = eval_language(model, tokenizer)
+    scrap_res  = eval_scraping(model, tokenizer)
+
+    fiqh_f1    = fiqh_res["fiqh_f1"]
+    hadith_f1  = fiqh_res["hadith_f1"]
+    nahw_score = lang_res["nahw_score"]
+    balagha_score = lang_res["balagha_score"]
+    json_acc   = scrap_res["json_acc"]
+    field_f1   = scrap_res["field_f1"]
+
+    # تركيبات فرعية
+    fiqh_hadith = 0.6 * fiqh_f1 + 0.4 * hadith_f1
+    lang        = 0.7 * nahw_score + 0.3 * balagha_score
+    scraping    = 0.4 * json_acc + 0.6 * field_f1
+
+    # balygh_score النهائي
+    balygh_score = 0.4 * fiqh_hadith + 0.3 * lang + 0.3 * scraping
+
+    return EvalSummary(
+        fiqh_f1=fiqh_f1,
+        hadith_f1=hadith_f1,
+        nahw_score=nahw_score,
+        balagha_score=balagha_score,
+        json_acc=json_acc,
+        field_f1=field_f1,
+        fiqh_hadith=fiqh_hadith,
+        lang=lang,
+        scraping=scraping,
+        balygh_score=balygh_score,
+    )
+
+
+if __name__ == "__main__":
+    summary = compute_balygh_score()
+    data = asdict(summary)
+
+    # اطبع JSON منسق ليسهل التخزين
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+
+    # اطبع سطر واحد لمُلتقِط autoresearch
+    print(f"balygh_score={summary.balygh_score:.4f}")
+```
+
+- autoresearch (أو الـloop اللي كتبناه قبل) يقرأ الـstdout:
+  - يلتقط السطر `balygh_score=0.7321`.
+  - يستخدمه للمقارنة بين التجارب.
+
+***
+
+أهم حاجات إضافية هتساعدك ترفع مستوى مشروع بليغ فعلًا:
+
+***
+
+## 1) Mini‑Balygh للـEdge والتطبيقات الخفيفة
+
+- بعد ما تثبّت Qwen2.5‑7B، اعمل **distillation** لـ3B أو حتى 1.8B:
+  - أسرع بكتير لـ:
+    - موبايل (Zadi app).
+    - سيرفرات رخيصة.
+  - تحافظ فيه بس على الـroles الأساسية: `tutor`, `fatwa_assistant_safe`, `rag_assistant`, `scraper`.
+- ده يفتح لك:
+  - offline mode.
+  - on‑premise installations لعملاء حريصين على الخصوصية.
+
+***
+
+## 2) أدوات مساعدة للمراجعة البشرية (Human‑in‑the‑Loop)
+
+- Dashboard بسيطة (Streamlit/FastAPI) تخلّي المراجعة سهلة:
+  - تعرض:
+    - السؤال.
+    - جواب بليغ.
+    - الجواب المرجعي (لو موجود).
+    - أزرار: 👍/👎 + تعديل النص.
+  - كل مراجعة سلبية + تصحيح تتحوّل تلقائيًا:
+    - SFT example جديد.
+    - أو DPO pair (chosen/rejected).
+- ده مهم جدًا عشان:
+  - تضبط الفقه والحديث.
+  - تبني data flywheel حقيقي مع مستخدمين حقيقيين.
+
+***
+
+## 3) توحيد الـtooling في repo واحد منظم
+
+بدل ما السكربتات تبقى متفرقة، هيكل واحد:
+
+```text
+balygh-llm/
+├── data/
+│   ├── raw/           # كتب ومصادر خام
+│   ├── cleaned/       # بعد الـ7 stages
+│   ├── sft/           # JSONL للتدريب
+│   ├── eval/          # eval_sets (fiqh, nahw, scraping)
+├── src/
+│   ├── cleaning/      # pipeline
+│   ├── scraping/      # agents + models
+│   ├── rag/           # ingest + retrieve + answer
+│   ├── training/      # train.py, configs
+│   └── eval/          # prepare.py + eval scripts
+├── autoresearch/
+│   ├── train.py
+│   ├── prepare.py
+│   └── program.md
+└── docs/
+```
+
+- ده يسهل عليك:
+  - الرجوع لإصدار قديم.
+  - نشر مفتوح المصدر.
+  - جذب مساهمين أو شركاء.
+
+***
+
+## 4) شراكات صغيرة مع باحثين أو طلاب شريعة/لغة
+
+- حتى 2–3 ناس تثق فيهم يراجعوا:
+  - بنك الأسئلة الفقهي.
+  - إجابات بليغ في مرحلة مبكرة.
+- دي هتديك:
+  - ثقة علمية أعلى.
+  - feedback نوعي غير اللي الموديل يقدر يولّده أو تلاحظه لوحدك.
+- ممكن تعرض عليهم:
+  - access مبكر لأدوات بليغ.
+  - ذكر أسمائهم (أو هويات عامة) في الـmodel card كـ“reviewers”.
+
+***
+
+## 5) خطة نشر تدريجية (Soft Launch → Beta → Public)
+
+- **مرحلة 1 – Private alpha:**
+  - تستخدمه أنت وبعض الأصدقاء/المقرّبين بس.
+  - تجمع أسوأ الردود وتصلحها.
+- **مرحلة 2 – Closed beta:**
+  - تضيف 20–50 مستخدم (طلاب علم/مطورين).
+  - تفتح لهم واجهة ويب بسيطة + feedback.
+- **مرحلة 3 – Public API:**
+  - محدود rate.
+  - موثّق كويس.
+  - مع تحذيرات واضحة واستخدام بحثي/تعليمي.
+
+ده بيخليك تتحكم في السمعة والجودة قبل الانتشار.
+
+***
+
+لو حابب، أقدر أساعدك بعد كده في نقطة واحدة محددة من دول (مثلاً: design لـStreamlit dashboard للمراجعة البشرية، أو خطة soft‑launch خطوة بخطوة).
+
+فيه كذا طبقة tools / مشاريع تقدر تركّبها فوق شغلك الحالي وتوفّر عليك وقت كبير في **جمع/تجهيز الداتا وبناء بليغ**:
+
+***
+
+## 1) أدوات متخصصة لجمع وتنظيف الداتا
+
+### NeMo Curator (من NVIDIA)
+- Framework جاهز لـ:
+  - download, cleaning, language ID, quality filtering, privacy filtering, dedup (MinHash GPU)، تصنيف domain/toxicity. [developer.nvidia](https://developer.nvidia.com/blog/scale-and-curate-high-quality-datasets-for-llm-training-with-nemo-curator/)
+- ينفعك في:
+  - تعميم pipeline التنظيف بدل سكربتات ad‑hoc.
+  - تشغيل dedup على كوربسات كبيرة (لو وسّعت بعد شوية عن الكتب الحالية).
+
+### DataFlow (2025) — LLM‑driven data prep
+- Framework جديد بيعمل للي إحنا بنحاول تبنيه يدويًا:
+  - “operators” جاهزة لـ:
+    - model‑in‑the‑loop generation.
+    - refinement / filtering.
+    - workflows قابلة للإعادة. [arxiv](https://arxiv.org/html/2512.16676v1)
+- الفكرة: تبني pipeline زي:
+  - `load_books → clean → segment → generate_SFT_with_Qwen → verify_with_Qwen_or_DeepSeek → dedup`.
+- ميزة: مبني أصلا على Qwen2.5؛ يعني aligned مع اختياراتك. [arxiv](https://arxiv.org/html/2512.16676v1)
+
+لو ما تحبش complexity بتاع NeMo/DataFlow، تقدر على الأقل تستلهم منهم:
+- أنواع الفلاتر.
+- ترتيب مراحل الـpipeline. [thealliance](https://thealliance.ai/blog/mastering-data-cleaning-for-fine-tuning-llms-and-r)
+
+***
+
+## 2) Frameworks للـRAG والبناء فوق الموديل
+
+### LangChain / LlamaIndex
+- أفضل لاستخدام:
+  - RAG على مكتبة كتبك (ingest + chunk + embed + retrieve).
+  - توصيل Balygh كـLLM backend. [skillcrush](https://skillcrush.com/blog/best-llm-frameworks/)
+- هيساعدك في:
+  - تجريب سریع لعدة استراتيجيات chunking/retrieval.
+  - بناء API أو chatbot RAG بسرعة بدون إعادة اختراع كل شيء.
+
+### LangGraph (اللي بدأت تستخدمه)
+- ممتاز لتعريف:
+  - Agents للـscraping.
+  - RAG‑assistant, Fiqh‑assistant, Scraper‑assistant.
+- تقدر تدمج autoresearch هنا كـ“node تحسين model/config” زي ما وضحنا قبل.
+
+***
+
+## 3) Frameworks للتجارب والتقييم
+
+### Deepchecks for LLM Evaluation
+- مش عربي‑specific، لكن:
+  - بيقدم framework لـ:
+    - test suites.
+    - regression tests بين إصدارات الموديل.
+    - ربط metrics مختلفة بمكان واحد. [deepchecks](https://deepchecks.com/llm-evaluation/framework/)
+- ينفعك في:
+  - تثبيت الـeval battery (فقه/نحو/scraping) داخل framework متماسك بدل سكربتات منفصلة.
+
+### Arabic LLM Survey / Benchmarks
+- ورقة “Evaluating Arabic LLMs: A Survey” تلخّص:
+  - المعايير الشائعة للموديلات العربية.
+  - الـbenchmarks اللي الناس ترجع لها (ArabicMMLU, BALSAM, AraGen…). [arxiv](https://arxiv.org/html/2510.13430v2)
+- دي تساعدك تختار إيه تضيفه لمرحلة التقييم خارج بياناتك الخاصة.
+
+***
+
+## 4) مصادر داتا عربية جاهزة تكمل كوربسك
+
+من مراجعات Arabic datasets وArabicWeb24: [youtube](https://www.youtube.com/watch?v=_C3f1-QvFFQ)
+
+- **OpenITI Corpus / Abu El‑Khair / OSIAN**:
+  - كوربسات عربية كبيرة (تراث + حديث) استخدموها لبناء AraBERT, CAMeLBERT, JABER.
+- **ArabicWeb24**:
+  - مشروع حديث لبناء web corpus عربي نظيف؛ paper فيها بالضبط خطوات cleaning/dedup اللي تبني عليها. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- **Pangeanic Arabic datasets**:
+  - مجموعة corpora (أخبار، محادثات، تقنية…) جاهزة للاستخدام التجاري مع اتفاقية واضحة. [pangeanic](https://pangeanic.com/arabic-datasets-for-ai-training)
+
+مش لازم تأخذ كل حاجة، لكن:
+- ممكن تسحب subsets صغيرة عالية الجودة (مثلاً أخبار/تعليم) وتولّد منها أمثلة تعليمية أو RAG عامة تدعم الفقه/اللغة.
+
+***
+
+## 5) Guides عملية عن data‑centric LLM training
+
+فيه مقالات/أدلة حديثة مركزة على **data‑centric** مش model‑centric: [techunpacked.substack](https://techunpacked.substack.com/p/10-data-collection-and-curation-for)
+
+- تديك:
+  - قوائم جاهزة بخطوات:
+    - collection → cleaning → dedup → structuring → governance.
+  - أمثلة tools:
+    - dedup (MosaicML, HF tools).
+    - PII redaction.
+    - noise / outlier detection.
+  - مقارنة workflows بين:
+    - data لــfine‑tuning vs data لـRAG. [thealliance](https://thealliance.ai/blog/mastering-data-cleaning-for-fine-tuning-llms-and-r)
+
+تقدر تستخدمها كـchecklist جنبية وأنت بتراجع pipeline بليغ.
+
+***
+
+لو حابب، أقدر أختار framework واحد بس (مثلاً DataFlow أو NeMo Curator) وأكتب لك “mini‑plan” إزاي تدخّله تدريجًا في مشروعك بدل ما تكتب كل حاجة بإيدك.
+
+ألخّص لك خبرة المشاريع العربية الكبيرة في نقاط واضحة: أخطاء شائعة + أفضل ممارسات + حلول عملية.
+
+***
+
+## 1) أخطاء شائعة في بيانات الـLLM العربي
+
+### أ) خلط محتوى ضعيف بجودة عالية بدون فلترة
+- كثير من المشاريع اعتمدت على web crawl عربي خام (غث وسمين معًا). [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- النتيجة:
+  - نموذج يهذّي بقوائم، spam، تعبيرات عامية عشوائية.
+  - تلوّث فقهي/ديني بمحتوى غير موثوق.
+
+**الحل:**
+- طبّق pipeline شبيهة بـArabicWeb24:
+  - language filter (fastText ≥ 0.65 للعربية). [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+  - Gopher/FineWeb quality filters لإزالة:
+    - الصفحات القصيرة جدًا.
+    - القوائم، navigation bars، boilerplate.
+    - الصفحات المليانة رموز أو bullet‑spam. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+
+### ب) إهمال الـdedup (تكرار الكتب والفتاوى)
+- الورقة الخاصة بـArabicWeb24 تبيّن إن dedup (document + sentence) قلّل الحفظ والهلوسة وحسّن الجودة مع كمية بيانات أصغر. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- كثير من ALLMs العربية الأولى نسيت dedup أو اشتغلت فقط على مستوى بسيط.
+
+**الحل:**
+- Document‑level MinHash (threshold ~0.75–0.8). [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- Sentence‑level dedup للأسانيد والمقدمات المتكررة.
+- Dedup per‑domain (فقه، حديث، لغة) عشان ما تضربش تنوّع كل مجال.
+
+### ج) الاعتماد على tokenizer سيئ للعربية بدون قياس
+- دراسات Tahakom وTokenMain بيّنوا إن تحسين vocabulary من 32k → 128k قلّل fertility (tokens/char) لكن لم يحسّن دائمًا الأداء؛ يعني “كبر الـvocab مش دائمًا حل”. [themoonlight](https://www.themoonlight.io/en/review/tahakom-llm-guidelines-and-receipts-from-pre-training-data-to-an-arabic-llm)
+- مشكلة حقيقية: over‑segmentation للعربية (كل كلمة تتكسر لـ6–8 tokens). [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+**الحل:**
+- اعمل **tokenization audit** قبل أي تدريب:
+  - جرّب corpus صغير، واحسب:
+    - متوسط حروف/Token (هدف ≥ 2.5 للعربية).
+  - اختبر كلمات حرجة (بالتشكيل، أرقام عربية، كلمات فقهية).
+- إن احتجت، استخدم:
+  - Arabic‑aware tokenizer أو vocabulary مضبوطة (كما فعلت بعض نماذج Tahakom).
+- لكن تجنّب اللعب في الـvocab بعد الـpretraining إلا لو ناوي تدريب طويل وجدي؛ وإلا هتدفع “ضريبة tokenization” اللي شرحها تقرير HF الأخير. [arxiv](https://arxiv.org/pdf/2510.13481.pdf)
+
+### د) إهمال اللهجات أو خلطها بلا سياسة
+- المسح الشامل لـALLMs العربية يذكر أن معظم النماذج:
+  - يا إمّا MSA فقط فبتخفق في الدارجة.
+  - يا إمّا مخلطة بطريقة غير متحكم فيها، فتتعلم patterns مش حاببها. [arxiv](https://arxiv.org/html/2506.01340v1)
+
+**الحل:**
+- حط سياسة واضحة:
+  - بليغ أساسه فصحى → 80–90% MSA، 10–20% لهجة (مصري) في role مستقل (dialect_handling_egy).
+- اعمل tagging/detection:
+  - `dialect` field في الداتا (MSA/EGY/GLF…).
+  - استخدمه في التدريب (skills/roles) وفي الـeval.
+
+### هـ) عدم عزل الداتا الدينية الحساسة وعدم إضافة safety layer
+- تقارير safety بالعربي تشير إن كثير من النماذج:
+  - تجاوب فتاوى حساسة بثقة زائدة.
+  - تخترع أحاديث ومراجع غير صحيحة. [arxiv](https://arxiv.org/html/2506.01340v2)
+
+**الحل:**
+- دور `fatwa_assistant_safe` منفصل:
+  - كل إجابة فيها:
+    - عرض أقوال/أدلة بدون جزم زائد.
+    - disclaimer إلزامي.
+- تدريب DPO على:
+  - تفضيل إجابات فيها تنبيه وإحالة لدار الإفتاء على الإجابات “الجازمة” بلا دليل.
+- فصل eval واضح لمسائل حساسة (طلاق، حدود، تكفير) → يجب أن يرفض أو يحيل.
+
+***
+
+## 2) أفضل ممارسات في بناء بيانات LLM عربي
+
+### أ) Data‑centric approach (زي ArabicWeb24 وTahakom)
+
+من ArabicWeb24 + Tahakom guidelines: [themoonlight](https://www.themoonlight.io/en/review/tahakom-llm-guidelines-and-receipts-from-pre-training-data-to-an-arabic-llm)
+
+1. **ابدأ من data pipeline قبل الموديل**:
+   - حدد بالظبط:
+     - مصادر.
+     - فلاتر.
+     - dedup.
+     - quality scoring.
+   - اختبر أثر كل فلتر عبر ablation (موديل صغير) بدل ما تفترض.
+
+2. **mix مصادر متعددة لكن بموازين واضحة**:
+   - Web عام (أخبار، منتديات مصفّاة).
+   - كتب تراثية وعلمية.
+   - Corpora مهيكلة (Hadith, Tafseer).
+   - Instruction datasets (InstAr/GemmAr‑style). [arxiv](https://arxiv.org/html/2407.02147v1)
+
+3. **استفد من synthetic data بحذر**:
+   - ورقة fine‑tuning Arabic conversational models أظهرت إن داتا اصطناعية عالية الجودة من LLMات كبيرة تحسّن Arabic dialogue بشكل ملحوظ حتى مع قليل real data. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+   - لكن:
+     - لازم quality filter (LLM‑as‑judge أو rules).
+     - لازم تبقى أقلية في المجالات الحساسة (فقه/عقيدة).
+
+### ب) Data governance / lineage
+
+- من تجارب Tahakom وArabicWeb24: tracking لكل document:
+  - source, date, license, transformations. [themoonlight](https://www.themoonlight.io/en/review/tahakom-llm-guidelines-and-receipts-from-pre-training-data-to-an-arabic-llm)
+- في بليغ:
+  - خلي كل training example عنده `lineage` (source_type, source_url/bookid, cleaning_version, generator_model…).
+
+***
+
+## 3) أفضل ممارسات في تصميم وتدريب نموذج عربي
+
+### أ) اختيار base model
+
+من survey ALLMs + تقارير السوق: [dl.acm](https://dl.acm.org/doi/10.1145/3737453)
+
+- Qwen2.5‑7B/14B: أداء قوي جدًا عام، عربيته جيدة بفضل corpus متعدد.
+- AceGPT, ALLaM, Fanar: عربية جيدة لكن غالبًا مغلقة أو رخصها أقل مرونة.
+- التوصية:
+  - لنموذج عام/علمي: Qwen2.5‑7B‑Instruct + QLoRA (زي ما أنت عامل).
+  - لموديل صغير للـedge: distill لــ3B/1.8B من teacher عربي قوي.
+
+### ب) Fine‑tuning recipe
+
+مدعوم بتجارب حديثة لـfine‑tuning LLMs في 2025–2026: [philschmid](https://www.philschmid.de/fine-tune-llms-in-2025)
+
+- QLoRA + RSLoRA (Unsloth):
+  - r=64، lora_alpha=128، dropout=0–0.05.
+  - lr=1e‑4–2e‑4، epochs=2–3.
+  - packing=True، max_seq_len=2k–4k.
+- Regularization ضد overfitting على داتا عربية صغيرة:
+  - مزج مهام متعددة (فقه + لغة + RAG) في نفس run.
+  - مزج real + synthetic بنسبة مدروسة.
+  - early stopping على balygh_score.
+
+### ج) Multi‑turn وalignment
+
+- ورقة multi‑turn Arabic dialogue fine‑tuning تبيّن أن:
+  - تحويل أمثلة single‑turn لمحادثات multi‑turn synthetic يحسّن بشكل واضح جودة الحوار. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+- لبليغ:
+  - بنِ multi‑turn sets للـtutor والفتوى (سؤال → توضيح → سؤال متابعة…).
+  - بعد SFT، أضف DPO على:
+    - style (هدوء، شرح تدريجي).
+    - safety (disclaimers، عدم التجرؤ).
+
+***
+
+## 4) أخطاء شائعة في RAG العربي وحلولها
+
+من Arabic RAG papers وArabicWeb24: [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+
+### أ) chunking أعمى
+
+- تقسيم بــN tokens بدون اعتبار لطبيعة النص:
+  - يفصل السؤال عن الجواب في الفتاوى.
+  - يفصل الإسناد عن المتن في الحديث.
+
+**الحل:**
+- domain‑aware chunking:
+  - فتوى: سؤال+جواب chunk واحد.
+  - حديث: إسناد+متن chunk واحد.
+  - كتب: باب/فصل كوحدة chunk.
+
+### ب) retriever أحادي (dense فقط)
+
+- dense embeddings بس على نصوص متقاربة لغويًا (فقه/حديث) → استرجاع خاطئ. [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+- الحل:
+  - Hybrid retrieval:
+    - BM25 (lexical) + dense (semantic) + cross‑encoder reranker.
+
+### ج) عدم فحص faithfulness
+
+- كثير من المشاريع تقيّم RAG فقط على accuracy العام بدون verifying إن كل جملة مدعومة بالسياق. [arxiv](https://arxiv.org/html/2510.13430v2)
+
+**الحل:**
+- metrics مثل:
+  - faithfulness, context_precision, answer_relevance (RAGAS‑style).
+- واستخدام LLM‑as‑judge لوسم الجمل غير المدعومة.
+
+***
+
+## 5) نقاط تصميمية مهمّة لبناء LLM عربي ناجح
+
+ملخّص ما تتفق عليه survey ALLMs والأعمال الحديثة: [arxiv](https://arxiv.org/abs/2506.01340)
+
+1. **وضوح هدف النموذج**:
+   - هل هو:
+     - general chat؟
+     - tutor لغوي؟
+     - مساعد فقهي/إسلامي؟
+     - RAG فقط؟
+   - بليغ عندك موجه بوضوح (فقه + لغة + RAG) وهذا شيء ممتاز؛ حافظ على وضوح ده في كل مرحلة.
+
+2. **تخصيص أدوار (personas) بدل موديل واحد لكل شيء**:
+   - roles منفصلة + system prompts واضحة:
+     - tutor, fatwa_assistant_safe, rag_assistant, scraper.
+   - حتى لو نفس الـweights، separation في الـinference يرفع الجودة.
+
+3. **استثمار في eval قوي أكثر من زيادة حجم الداتا**:
+   - معظم المشاريع العربية اشتغلت “data‑volume first”، لكن papers الحديثة توصي:
+     - eval battery قوية (IslamicMMLU, ArabicMMLU, BALSAM + internal sets).
+     - data ablations لتعرف أي جزء فعلاً بيفرق. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0332419)
+
+4. **Transparency & openness**:
+   - survey ALLMs ينقد كثير من النماذج العربية المغلقة أو غير الموثّقة. [themoonlight](https://www.themoonlight.io/en/review/a-survey-of-large-language-models-for-arabic-language-and-its-dialects)
+   - بليغ عندك فرصة يكون:
+     - open weights + open data recipe.
+     - model card صريح عن القيود والتحيزات.
+
+5. **Culture‑aware safety**:
+   - paper عن safety بالعربي تشير لـdistinct failure modes (فتاوى، محتوى طائفي، gender، إلخ). [mbzuai.ac](https://mbzuai.ac.ae/news/testing-llms-safety-in-arabic-from-two-perspectives-naacl/)
+   - لذلك:
+     - safety classifier عربي أمام الموديل.
+     - DPO مخصص على تفضيلات مجتمعية/شرعية عندك.
+
+***
+
+لو حابب، أقدر في الرسالة الجاية أطلع لك **checklist تنفيذية قصيرة** (10–15 بند) تمشي عليها من دلوقتي لحد أول إصدار رسمي من بليغ (v1)، مؤسَّسة على كل الممارسات دي.
+
+أجاوبك نقطة نقطة، مختصرًا لكن مركز.
+
+***
+
+## 1) كيفية تحسين tokenizer للعربية في LLMs
+
+من خبرة ArabicWeb24 + أعمال حديثة عن tokenization: [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+**مشاكل شائعة:**
+- تقطيع الكلمة العربية لعدد كبير من الtokens (fertility عالي).
+- عدم احترام الجذر/الوزن (morphological incoherence).
+- اختلافات إملائية وتشكيل تعامل كـسلاسل جديدة تمامًا.
+
+**أفضل ممارسات عملية:**
+- قبل أي تعديل:
+  - اعمل audit على tokenizer الحالي:
+    - احسب متوسط عدد الtokens لكل حرف/كلمة على corpus عربي صغير.
+    - استهدف تقريبًا: 1.5–3 tokens للكلمة المتوسطة؛ لو 5–8 يبقى سيئ. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+- لو هتدرّب tokenizer عربي من الصفر:
+  - درّبه على corpus عربي نظيف ومتنوّع (MSA + لهجات حسب هدفك).
+  - استخدم unigram/BPE لكن:
+    - امنع الـsplits داخل الجذر/الوزن قدر الإمكان (قواعد بسيطة؛ مثلاً لا تقسّم قبل/بعد ال التعريف، الضمائر المتصلة…).
+- لو هتستخدم model جاهز (Qwen، LLaMA…):
+  - تجنّب “توسيع” الـvocab عشوائيًا؛ paper HF توضّح إن إضافة vocab بعد pre‑training غالبًا تخلق tokens غير مدرَّبة جيدًا وتقلل الأداء. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+  - الأفضل:
+    - إما تقبل tokenizer كما هو وتستثمر أكثر في الـdata والتدريب.
+    - أو pre‑train/further‑pretrain model من البداية بـtokenizer عربي مخصص، لو عندك ميزانية pre‑training.
+
+***
+
+## 2) مقارنة AceGPT و ALLaM على benchmarks عربية
+
+من ورقة AceGPT والـreports عن ALLMs والـArabic LLM Leaderboard: [tii](https://www.tii.ae/insights/introducing-open-arabic-llm-leaderboard-empowering-arabic-language-modeling-community)
+
+**AceGPT:**
+- أحسن أداء بين النماذج المفتوحة في:
+  - Arabic Vicuna‑80 (chat).
+  - Arabic AlpacaEval (instruction following).
+  - Arabic MMLU وEXAMs وACVA (معرفة واختبارات مدرسية). [aclanthology](https://aclanthology.org/2024.naacl-long.450.pdf)
+- نسخة 13B‑base:
+  - أعلى نتيجة على Arabic MMLU (حوالي 37٪ few‑shot) بين النماذج العربية المفتوحة وقت نشر الورقة. [aclanthology](https://aclanthology.org/2024.naacl-long.450.pdf)
+
+**ALLaM (وكذلك نماذج خليجية حديثة):**
+- حسب survey ALLMs والمراجعات:
+  - تركيز أقوى على:
+    - اللهجات (خليجي/عاميات).
+    - alignment ثقافي عربي (سلامة، قيم محلية).
+  - تستخدم RLHF/RAHF عربي لرفع quality في المحادثة العامة. [arxiv](https://arxiv.org/html/2506.01340v1)
+- تقارير الشركات والbenchmarks المستقلة (aiXplain, Arabic LLM Benchmark) تشير إلى:
+  - AceGPT يتفوّق غالبًا في مهام الامتحانات والمعرفة.
+  - ALLaM وأقاربها يتفوّقون أحيانًا في الحوار اليومي واللهجات، ولكن الأرقام التفصيلية غالبًا غير معلنة بالكامل أو تحت رخص مغلقة. [linkedin](https://www.linkedin.com/posts/ammroragaban_arabic-llm-benchmark-report-april-2025-activity-7318782427483525120-aveK)
+
+**خلاصة عملية ليك:**
+- لو هدفك **فقه/لغة فصحى + امتحانات** → منهج AceGPT في pre‑training + instruction + benchmarks قريب من اللي محتاجه.
+- لو هدفك **لهجات ومحادثة عامة** → منهج ALLaM / Fanar في التعامل مع الدارجة مفيد كمرجع لطريقة خلط الداتا وتدريب RLHF. [cacm.acm](https://cacm.acm.org/arab-world-regional-special-section/the-landscape-of-arabic-large-language-models/)
+
+***
+
+## 3) أفضل datasets لـ pre‑training LLM عربي
+
+من ArabicWeb24 + FineWeb‑Arabic + surveys: [huggingface](https://huggingface.co/omarkamali)
+
+**Core web datasets:**
+- **ArabicWeb24**:
+  - 28–39B tokens من الويب العربي فقط، بجودة أعلى من 101B Arabic Words baseline بفضل:
+    - Gopher + FineWeb filters (جودة وspam).
+    - language ID صارم.
+    - MinHash dedup document‑level + sentence dedup. [linkedin](https://www.linkedin.com/posts/2a2i_arabicweb24-creating-a-high-quality-arabic-activity-7227327248515694592-xbcK)
+- **FineWeb‑Arabic** (من نفس المؤلف اللي كتب مقال tokenization):
+  - subset عربي من FineWeb، مصفى لجودة النص العربي ومتوافق مع أدوات datatrove. [huggingface](https://huggingface.co/omarkamali)
+
+**Corpora منظمة:**
+- 101B Arabic Words Dataset (اللي استُخدم في عدة نماذج سابقة) — مفيد لكن ArabicWeb24 أثبتت أنها أعلى جودة. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- OpenITI / OSIAN / corpora تراثية للأدب والتفسير والفقه. [arxiv](https://arxiv.org/html/2506.01340v1)
+- Corpora متخصصة:
+  - Hadith DBs (نص + سند + حكم).
+  - Tafseer corpora.
+  - Arabic news, parliamentary proceedings، إلخ.
+
+**أفضل مزيج عملي لـpre‑training أو further‑pretraining:**
+- Web نظيف (ArabicWeb24 أو FineWeb‑Arabic) كأساس عام. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- + تراث/علم (OpenITI + فقه/حديث).
+- + بيانات تعليمية/امتحانات (EXAMs، ArabicMMLU‑like) لو هتركّز على reasoning/اختبارات.
+
+***
+
+## 4) حلول مشاكل اللهجات في تدريب ALLMs
+
+من surveys ALLMs والمناقشات حول Darija/Amazigh/tokenization: [cacm.acm](https://cacm.acm.org/arab-world-regional-special-section/the-landscape-of-arabic-large-language-models/)
+
+**مشاكل أساسية:**
+- اختلاف كبير بين MSA واللهجات (صرف، مفردات، كتابة حتى بحروف لاتينية – Arabizi).
+- لهجة واحدة تهيمن (غالبًا مصرية أو خليجية) مما يظلم الباقي.
+- الخلط غير المضبوط يخلي الموديل يتصرف بلهجة في سياقات فصحى.
+
+**استراتيجيات عملية:**
+
+1. **Tagging وseparate roles**
+   - أضف حقل `dialect` في الداتا: `MSA`, `EGY`, `LEV`, `GLF`, `DARJA`…
+   - درّب roles مختلفة:
+     - `tutor_msa`
+     - `dialect_converter_egy` (عامية مصرية ↔ فصحى)
+   - في inference، اختر role/ system prompt مناسب بدل ترك الموديل يخلط بحرّية.
+
+2. **Dataset balancing**
+   - نسبة MSA عالية (خاصة في Balygh)؛ dialect data:
+     - تركيز على mapping (darija → MSA) أكثر من انتاج نص دارج جديد.
+   - اختر مصادر لهجات عالية الجودة (subtitles، محادثات حقيقية) بدل social‑media noisy فقط. [arxiv](https://arxiv.org/html/2506.01340v1)
+
+3. **Arabizi handling**
+   - ورقة tokenization تشير أن Arabizi / mixed‑script languages تتعذّب مع tokenizers الحالية. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+   - عمليًا:
+     - إمّا تمنعه صراحة (detect → prompt: “اكتب بالعربية الفصحى/الحروف العربية من فضلك”).
+     - أو تبني normalizer يحوّل Arabizi الأساسي لفصحى قبل الـLLM (مش trivial لكن ممكن لــEGY).
+
+4. **Dialect‑aware eval**
+   - لو هتدعم لهجات، لازم:
+     - eval sets منفصلة لكل لهجة.
+     - tasks: translation إلى مStandard Arabic، intent classification، QA في لهجة معينة. [cacm.acm](https://cacm.acm.org/arab-world-regional-special-section/the-landscape-of-arabic-large-language-models/)
+
+***
+
+## 5) تأثير حجم الـvocabulary على دقة النماذج العربية
+
+من Tahakom guidelines + tokenization article: [arxiv](https://arxiv.org/pdf/2510.13481.pdf)
+
+**ملاحظات من المشاريع:**
+- زيادة الـvocab للعربية (مثلاً من 32k → 128k tokens):
+  - تقلل عدد tokens للنص (fertility أقل).
+  - لكن:
+    - لا تضمن تحسّن الأداء، خصوصًا لو الtraining budget ثابت.
+    - قد تخلق الكثير من tokens قليلة التكرار (under‑trained) → embeddings ضعيفة. [arxiv](https://arxiv.org/pdf/2510.13481.pdf)
+
+**Trade‑offs مهمة:**
+
+- **Vocab صغير نسبيًا (32–50k، مشترَك)**:
+  - + استفادة من knowledge متعدد اللغات (لو multilingual).
+  - − Arabic words تنقسم لقطع كثيرة، model capacity يُستهلك لإعادة تركيبها (tax on middle layers). [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+- **Vocab عربي مخصّص وكبير (80–200k)**:
+  - + tokens أقرب للكلمات/الجذور → sequences أقصر.
+  - − تحتاج pre‑training كافي جدًا على هذا الـvocab؛ وإلا كثير من tokens تكون under‑trained.
+  - − تفقد cross‑lingual alignment مع بقية اللغات في الموديل، كما يشير المقال “Tokenization is Killing our Multilingual LLM Dream”. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+**أفضل ممارسة عملية الآن:**
+- لو تبني **موديل عربي بحت** من البداية وبمعاك pre‑training budget:
+  - استخدم vocab عربي مخصص متوسط الحجم (مثلاً 64–80k) مدرَّب على corpus عربي فقط، مع حرص على أن:
+    - fertility في حدود معقولة.
+    - لا تفرط في تمثيل كلمات stop أو حروف منفصلة.
+- لو تبني فوق **موديل عام مثل Qwen/LLaMA**:
+  - تجنّب تغيير الـvocab.
+  - ركّز على:
+    - cleaning وcuration.
+    - instruction tuning وRAG.
+    - يمكن تحسين التعامل مع العربية عبر normalizers/segmenters قبل الـLLM، بدل العبث بالtokenizer نفسه. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+
+***
+
+لو حابب، أقدر أساعدك تبني **tokenization audit script** صغير:
+- يقيس fertility، يغطي أمثلة فقهية ولغوية ولهجية.
+- يقارن مثلاً بين tokenizer Qwen، LLaMA، وArabic‑specific tokenizer، عشان تشوف بالأرقام قبل ما تقرر تغيّر حاجة.
+
+أجاوبك على الخمسة نقاط بسرعة لكن بتركيز.
+
+***
+
+## 1) كود لتدريب tokenizer عربي بـSentencePiece
+
+أفضل خيار حاليًا للعربية: **SentencePiece + Unigram** مع pipeline تطبيع بسيطة. [arxiv](https://arxiv.org/html/2512.18399v1)
+
+```python
+# train_arabic_sentencepiece.py
+import sentencepiece as spm
+from pathlib import Path
+
+# 1) جهّز corpus عربي كبير (نص عادي، سطر/فقرة في كل سطر)
+CORPUS = "data/arabic_corpus.txt"      # دمج كتبك + ArabicWeb24 subset مثلاً
+MODEL_PREFIX = "balygh_ar_sp"
+VOCAB_SIZE = 64000                     # عدّل حسب هدفك
+
+# 2) اختياري: ملف normalization بسيط (NFKC + إزالة tatweel...)
+# تقدر تبدأ بدونها لو لسه
+
+Path("models").mkdir(exist_ok=True)
+
+spm.SentencePieceTrainer.train(
+    input=CORPUS,
+    model_prefix=f"models/{MODEL_PREFIX}",
+    vocab_size=VOCAB_SIZE,
+    model_type="unigram",          # أو "bpe" لو حابب تقارن
+    character_coverage=0.9995,     # للعربية كفاية <1
+    normalization_rule_name="nfkc",# تطبيع Unicode أساسي
+    input_sentence_size=10_000_000,# sampling لو corpus ضخم
+    shuffle_input_sentence=True,
+    num_threads=8,
+    byte_fallback=True             # للتعامل مع رموز نادرة
+)
+
+# استخدام النموذج
+sp = spm.SentencePieceProcessor()
+sp.load(f"models/{MODEL_PREFIX}.model")
+
+text = "هذا مثال على نص عربي لاختبار المُقطِّع."
+pieces = sp.encode_as_pieces(text)
+ids = sp.encode_as_ids(text)
+print(text)
+print(pieces)
+print(ids)
+```
+
+بعد التدريب:
+- اعمل audit بسيط:
+  - احسب متوسط tokens/word على عينة نصوص فقه/لغة.
+  - جرّب كلمات بتشكيل ولهجات وتشوف التقسيم.
+
+***
+
+## 2) أفضل أدوات لمعالجة اللهجات العربية في LLMs
+
+ما فيش “silver bullet”، لكن في building blocks مفيدة: [emergentmind](https://www.emergentmind.com/topics/aratoken)
+
+- **AraNizer**:
+  - Toolkit للعربية مبني حول SentencePiece، فيه tokenizers مختلفة ودعم تحليل بسيط. [github](https://github.com/riotu-lab/aranizer)
+- **Classifiers لـdialect detection**:
+  - نماذج جاهزة (مثل CAMeL tools أو Jais/AceGPT dialect classifiers في الأبحاث) تستخدم كـfilter/tagger قبل الـLLM. [arxiv](https://arxiv.org/html/2506.01340v1)
+- **Pipelines عملية:**
+  - Normalizer بسيط:
+    - توحيد ي/ى، حذف تطويل، توحيد همزات، إلخ.
+  - Dialect tagger:
+    - يميّز MSA vs EGY vs GLF إلخ.
+  - Role‑aware prompting:
+    - role `dialect_converter_egy` لتحويل عامية → فصحى.
+- للـArabizi:
+  - معظم الأعمال توصي إمّا:
+    - منعه (الرد بطلب الكتابة بالعربية). [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+    - أو استخدام converter خارجي (مخصص للمصري/الخليجي) قبل الـLLM، لكنها حلول custom وليست جاهزة بالكامل.
+
+***
+
+## 3) مقارنة Jais مع AceGPT على OALL leaderboard
+
+من ورقة AceGPT + Open Arabic LLM Leaderboard v2: [aclanthology](https://aclanthology.org/2024.naacl-long.450.pdf)
+
+- على Arabic Vicuna‑80 وArabic AlpacaEval (chat/instruction):
+  - **AceGPT‑7B‑chat** يتفوّق بوضوح على **Jais‑13B‑chat** في متوسط “نسبة الأداء إلى GPT‑3.5 Turbo” (حوالي +8 نقاط نسبية). [aclanthology](https://aclanthology.org/2024.naacl-long.450.pdf)
+  - **AceGPT‑13B‑chat** يتفوق حتى على **Jais‑30B‑chat** في تقييم بشر/GPT‑4 على الجودة العربية. [aclanthology](https://aclanthology.org/2024.naacl-long.450.pdf)
+- على OALL v1/v2:
+  - تقارير HF توضح أن عائلة AceGPT عمومًا تتفوق على Jais في متوسط الدرجة عبر مهام leaderboard، مع أن Jais‑30B يظل قويًا في EXAMs‑like knowledge benchmarks. [huggingface](https://huggingface.co/blog/leaderboard-arabic)
+- عمليًا:
+  - AceGPT ⟶ أفضل **general Arabic chat + instruction** بأحجام أصغر.
+  - Jais ⟶ قوي في **معرفة أكاديمية/امتحانات** خاصة في النسخة 30B. [github](https://github.com/huggingface/blog/blob/main/leaderboard-arabic-v2.md?plain=1)
+
+***
+
+## 4) كيفية استخدام ArabicWeb24 في pre‑training
+
+ArabicWeb24 مصمم بالضبط للاستخدام ده. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+
+- محتوى:
+  - V1 ≈ 28B tokens، V5 ≈ 39B tokens من web عربي عالي الجودة، بعد:
+    - Gopher + URL quality filters.
+    - language ID عربي صارم.
+    - Trafilatura لاقتطاع النص من HTML.
+    - MinHash dedup لكل جزء (≥75٪ تشابه) + sentence‑dedup global. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- الاستخدام العملي:
+  - لو هتعمل further‑pretraining على موديل موجود (مثلاً Qwen):
+    - استخدم ArabicWeb24 كـextra corpus:
+      - mix مع نصوص base model أو تعمل مرحلة خاصة بالعربية.
+    - recipe:
+      - batch size متوسط، lr صغير (1e‑5–5e‑5)، 50–100B tokens من ArabicWeb24.
+  - لو هتبني موديل عربي من الصفر:
+    - ArabicWeb24 يكون العمود الفقري مع corpora تراثية/علمية إضافية. [arxiv](https://arxiv.org/abs/2512.18834)
+- code:
+  - المدونة توفر كود datatrove لتطبيق نفس cleaning/dedup pipelines على data إضافية، تقدر تستخدمه لكتبك وقواعد بياناتك. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+
+***
+
+## 5) تأثير BPE مقابل Unigram على أداء العربية
+
+من دراسة tokenization للعربية + مقالات عامة عن BPE/Unigram: [mbrenndoerfer](https://mbrenndoerfer.com/writing/sentencepiece-subword-tokenization-bpe-unigram)
+
+- دراسة 2025 على tokenization عربي:
+  - درّبت 3 tokenizers (BPE, WordPiece, SentencePiece‑Unigram) على corpora عربية مع pipeline تطبيع.
+  - النتيجة:
+    - **SentencePiece Unigram** حقق:
+      - أقل fertility (≈1.20 مقابل ≈1.24 لـBPE/WordPiece).
+      - أعلى compression ratio، وبالتالي سلاسل أقصر بنفس النص. [arxiv](https://arxiv.org/html/2512.18399v1)
+    - مع نفس إعدادات الـLLM، models المبنية على Unigram أدت أفضل قليلًا في مهام Arabic downstream (classification/QA) بفضل segmentation الأنسب للمورفولوجيا العربية. [emergentmind](https://www.emergentmind.com/topics/aratoken)
+- تفسير:
+  - BPE greedy، يدمج أزواج frequent بدون النظر لسياق الكلمة بالكامل.
+  - Unigram probabilistic:
+    - يبدأ بvocab كبير ويزيل المركبات الأقل احتمالًا.
+    - يقيّم segmentation كامل للجملة ويختار الأكثر احتمالًا، وهذا يناسب العربية ذات الصيغ المتعددة. [linkedin](https://www.linkedin.com/posts/arun-srinivasan-33b974223_tokenization-strategies-vary-significantly-activity-7421461403145756672-o0YW)
+
+**عمليًا لك في بليغ:**
+- لو هتبني tokenizer عربي من الصفر:
+  - استخدم **SentencePiece Unigram** (زي الكود أعلاه).
+- لو هتجرب BPE مقابل Unigram:
+  - درّب الاثنين على نفس corpus بحجم vocab واحد (مثلاً 64k).
+  - قارن:
+    - fertility.
+    - طول sequences.
+    - أداء موديل صغير 300M–1B على مهام عربية بسيطة.
+  - غالبًا Unigram يكسب بفارق صغير لكن ثابت، بشرط وجود pipeline تطبيع كويسة. [arxiv](https://arxiv.org/html/2512.18399v1)
+
+***
+
+لو حابب، أقدر أكتب لك سكربت Python صغير يعمل **tokenization audit**:
+- يقيس fertility وsegmentations لثلاثة tokenizers (Qwen الأصلي، BPE عربي، Unigram عربي) على عيّنة من كتبك الفقهية واللغوية، عشان تشوف الفرق رقميًا قبل ما تقرر تعتمد tokenizer جديد.
+
+أجاوبك نقطة نقطة وبشكل عملي.
+
+***
+
+## 1) أمثلة datasets لتدريب tokenizer عربي
+
+أفضل شيء: corpus متنوّع يغطي فصحى + شوية لهجات، من مصادر نظيفة: [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+
+- ArabicWeb24 (أو subset منه):
+  - Web عربي متنوع مع cleaning وdedup جاهز؛ ممتاز لتغطية vocab معاصر. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- OpenITI / OSIAN:
+  - نصوص تراثية (فقه، حديث، تفسير، أدب)، مهمة للـroots والكلمات الكلاسيكية. [arxiv](https://arxiv.org/html/2506.01340v1)
+- صحافة عربية:
+  - مجموعات أخبار (Aljazeera, Alarabiya, BBC Arabic…) من corpora مرخّصة أو open.
+- كتب تعليمية:
+  - مناهج نحو/بلاغة/علوم بالعربية الحديثة (تزيد نسبة MSA “مرتبة”).
+- قدر بسيط من لهجات:
+  - subtitles (مسلسلات/برامج عربية) أو corpora دارجة (Darija/CAMeL)، لو حابب tokenizer يتعرّف على الدارجة لكن بدون تضخيمها.
+
+عمليًا:
+- جهّز ملف corpus واحد (مثلاً 10–50GB نص) بدمج هذه المصادر قبل تدريب tokenizer.
+
+***
+
+## 2) كيفية دمج tokenizer مخصص في Qwen2.5
+
+تغيير tokenizer لموديل كبير بعد pre‑training خطر، لكن تقدر تستخدمه في حالتين:
+
+### أ) further‑pretraining / full retrain (حل جذري)
+
+- تبني **نسخة جديدة من Qwen‑style** weights:
+  - تعرّف `AutoTokenizerFast` جديد من نموذج SentencePiece العربي:
+    ```python
+    from transformers import PreTrainedTokenizerFast
+
+    tokenizer = PreTrainedTokenizerFast(
+        tokenizer_file="models/balygh_ar_sp_tokenizer.json",  # من SentencePiece → HF
+        bos_token="<|im_start|>",
+        eos_token="<|im_end|>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+    )
+    tokenizer.push_to_hub("YourName/balygh-ar-tokenizer")
+    ```
+  - تعرّف config جديد لـQwen2.5 ولكن مع `vocab_size` الخاص بك، وتعمل pre‑training/further‑pretraining من scratch أو checkpoint مناسب.
+- ده يحتاج budget pre‑training ضخم؛ مش مناسب لو هتشتغل فقط fine‑tune.
+
+### ب) استخدام tokenizer مخصص فقط كـpre‑/post‑processor
+
+عمليًا للبليغ:
+
+- تترك Qwen2.5 بtokenizerه الطبيعي، لكن:
+  - تستخدم tokenizer العربي الجديد:
+    - في **تحليل corpus** (حساب frequencies، بناء lexicons).
+    - في أدوات خارجية (RAG chunking, morphological feats…).
+  - للـLLM نفسه:
+    - تكتب normalizer/segmenter بسيط قبل Qwen:
+      - يحوّل نص المستخدم لشكل يناسب tokenizer Qwen (normalize، توحيد الحروف، إلخ).
+- هذا يعطيك فوائد تنظيف/تحليل بدون كسر compatibility مع weights الأصلية.
+
+خلاصة: دمج tokenizer جديد “حقيقيًا” داخل Qwen2.5 يستلزم إعادة تدريب layer embedding على الأقل؛ لو مش ناوي pre‑training كبير، الأفضل تبقي على tokenizer الأصلي وتصلح الباقي في الpipeline. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+***
+
+## 3) أدوات تقييم أداء tokenizer عربي
+
+ثلاث مستويات تقييم: [arxiv](https://arxiv.org/html/2512.18399v1)
+
+1) **إحصائيات سطحية (fertility / length)**
+   - metrics:
+     - متوسط tokens/char.
+     - متوسط tokens/word.
+     - توزيع أطوال sequences لنفس النص عبر tokenizers مختلفة.
+   - تطبقها على:
+     - نصوص فقه، حديث، نحو، أخبار، لهجات.
+
+2) **تحليل لغوي / مورفولوجي**
+   - تقيس:
+     - هل الجذر محفوظ أم مكسّر؟
+     - عدد الsubwords داخل كلمة شائعة (مثلاً “المستقلين”).
+   - ممكن تستخدم أدوات مثل AraNizer لإعطاء segmentation مرجعي أو على الأقل مقارنة lexicon. [emergentmind](https://www.emergentmind.com/topics/aratoken)
+
+3) **تأثير downstream**
+   - Train small models (مثلاً 300M–1B) على نفس corpus مع:
+     - tokenizer A (BPE).
+     - tokenizer B (Unigram).
+   - قارن أداءهم على tasks عربية (classification/QA/simple LM perplexity). [linkedin](https://www.linkedin.com/posts/arun-srinivasan-33b974223_tokenization-strategies-vary-significantly-activity-7421461403145756672-o0YW)
+
+ما في أداة “واحدة” تلقائية، لكن تقدر تبني **tokenization audit script** يجمع هذه المقاييس ويخرج report لكل tokenizer.
+
+***
+
+## 4) تأثير حجم الـvocabulary على LLMs عربية
+
+من Tahakom guidelines، tokenization study، ومقال HF: [arxiv](https://arxiv.org/pdf/2510.13481.pdf)
+
+- **vocab صغير (32–50k، مش عربي مخصص):**
+  - + model أصغر، embeddings أقل.
+  - − العربية تنقسم لsubwords كثيرة؛ sequences أطول، cost أعلى.
+
+- **vocab عربي متوسط (64–80k):**
+  - توازن جيد:
+    - أقل fertility.
+    - ما يزال manageable في الparameters.
+  - في الدراسات الحديثة للعربي، 64k–80k أعطت أفضل trade‑off. [arxiv](https://arxiv.org/html/2512.18399v1)
+
+- **vocab ضخم (100–200k+):**
+  - + أقل fertility.
+  - − كثير tokens نادرة → embeddings ضعيفة.
+  - − memory أعلى، training أصعب.
+  - Tahakom paper تشير إلى أن توسيع vocab كثيرًا دون زيادة كبيرة في البيانات والتدريب لم يحسّن النتائج، وأحيانًا أضر. [arxiv](https://arxiv.org/pdf/2510.13481.pdf)
+
+**قاعدة عملية:**
+- لموديل عربي pure من الصفر: 64–80k غالبًا كافي.
+- لموديل multilingual: لا تحاول رفع vocab العربي وحده بعد fact؛ أحسن تركز على normalization والـdata بدلاً من العبث بالvocab. [huggingface](https://huggingface.co/blog/omarkamali/tokenization)
+
+***
+
+## 5) خطوات تحسين ArabicWeb24 لـfine‑tuning
+
+ArabicWeb24 ممتاز للـpre‑training، لكن للـfine‑tuning (خاصة بليغ) تحتاج **تحويله من raw web → tasks مفيدة**. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+
+### خطوات عملية:
+
+1) **Filter by domain**
+   - استخرج subset:
+     - مقالات علمية، تعليمية، دينية، لغوية.
+     - استبعد:
+       - content سطحي (clickbait، تعليقات، spam).
+   - استخدم:
+     - domain heuristics (URL / site list).
+     - quality score الموجود في ArabicWeb24 metadata. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+
+2) **تحويل paragraphs إلى tasks**
+   - QA / comprehension:
+     - استخدم LLM قوي لإنتاج:
+       - سؤال + إجابة من داخل الفقرة (InstAr/GemmAr‑style).
+   - Summarization / explanation:
+     - لفقرة/مقال يكتب ملخص، أو يشرح مفهوم.
+   - Classification:
+     - label فقرة بحسب الموضوع، الأسلوب، الرأي/الخبر.
+
+3) **التقاطع مع مشروع بليغ**
+   - اختر نصوص:
+     - فقهية/دينية معاصرة (مقالات موثوقة).
+     - مقالات تعليم لغة عربية.
+   - حوّلها لـSFT examples تناسب roles:
+     - `rag_assistant`, `tutor`, `scraper`.
+
+4) **استخدام ArabicWeb24 في RAG**
+   - بدلاً من تدريب الموديل يحفظ كل شيء:
+     - خزّن ArabicWeb24 (أو subset) في vector DB.
+     - استخدم Balygh كـRAG assistant فوقه:
+       - يجيب بالاعتماد على سياق retrieved، مع citations.
+
+5) **حماية من التحيز والسموم**
+   - رغم التنظيف، ArabicWeb24 يأتي من web عام.
+   - طبّق filters إضافية قبل استخدامه في tasks دينية:
+     - profanity/toxicity filters.
+     - استبعاد مواقع غير موثوقة دينيًا/علميًا قدر الإمكان. [arxiv](https://arxiv.org/abs/2512.18834)
+
+***
+
+لو تحب الرسالة الجاية تكون عملية، أقدر أكتب لك:
+
+- `tokenizer_audit.py` صغير:
+  - يقارن Qwen tokenizer مع tokenizer SentencePiece العربي اللي درّبناه، ويطلع تقرير fertility وطول sequences على عيّنة من كتب الفقه/النحو.
+
+  لأن سؤالك عام، أديك خلاصة عملية جدًا لـ**fine‑tuning LLM عربي** مبنية على أحدث شغل في المجال. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+***
+
+## 1) حدد هدف واضح (use case عربي)
+
+من الدراسات على ALLMs العربية: النموذج اللي “بيحاول يعمل كل حاجة” بيطلع متوسط في كل حاجة. [linkedin](https://www.linkedin.com/pulse/arabic-llms-2025-benchmark-business-applications-part-rabehi-phd-d91ff)
+
+اختر واحد أو اثنين من دول لكل run:
+
+- **محادثة عامة بالعربي** (chat / assistant).
+- **تعليم لغة عربية** (نحو، بلاغة، فهم مقروء).
+- **علوم إسلامية** (فقه، حديث، تفسير) مع safety.
+- **RAG / QA على مكتبتك**.
+- **Tool‑calling / scraping / structured JSON**. [arxiv](https://arxiv.org/pdf/2509.20957.pdf)
+
+بليغ عندك مركّز على: فقه + لغة + RAG → ممتاز، التزم بالـscope ده لكل مرحلة تدريب.
+
+***
+
+## 2) بناء الداتا: real + synthetic عربي
+
+الدراسات على multi‑turn Arabic chat أثبتت أن **داتا اصطناعية عالية الجودة** من LLM أكبر بتحسّن الأداء بوضوح حتى لو real data قليلة. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+
+عمليًا:
+
+- اجمع **demos حقيقية** (كتب، فتاوى، تمارين نحو، HTML + JSON…).
+- استخدم LLM قوي (Qwen كبير، DeepSeek، Jais…) لـ:
+  - توليد حوارات متعددة الأدوار بالعربية (multi‑turn).
+  - توليد سؤال/جواب، شرح قواعد، استخراج معلومات.
+- طبق cleaning خاص بالداتا الاصطناعية:
+  - speaker alternation صحيح.
+  - إزالة التكرار والـgoodbye loops.
+  - structure ثابت (role, instruction, input, output). [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+ثم:
+- حافظ على real data كعمود فقري، وsynthetic كمكمّل (مثلاً ≤ 40٪ من العدد، وأقل في الفقه الحساس).
+
+***
+
+## 3) Recipe تقني موصى به الآن لـLLMs عربية
+
+من أوراق fine‑tuning عربية + أدلة HF في 2025: [aclanthology](https://aclanthology.org/2025.arabicnlp-sharedtasks.110.pdf)
+
+**Model choice:**
+- Base multilingual/Arabic قوي (Qwen2.5, AceGPT, Jais, Fanar) حسب الرخصة. [siliconflow](https://www.siliconflow.com/articles/en/best-open-source-LLM-for-Arabic)
+
+**Parameter‑Efficient FT (مفضّل):**
+- QLoRA + RSLoRA أو Spectrum:
+  - `r = 32–64`, `lora_alpha = 2*r`.
+  - `learning_rate = 1e-4–2e-4`.
+  - `epochs = 2–3`.
+  - `max_seq_len = 2048–4096`.
+  - `packing = True` مع TRL `SFTTrainer`.
+- Spectrum أحيانًا يعطي +2–4 نقاط دقة مقابل QLoRA بس، لكن أبطأ قليلًا. [philschmid](https://www.philschmid.de/fine-tune-llms-in-2025)
+
+**Multi‑turn & chat formatting:**
+- مثّل البيانات في قالب حواري واحد متسق (ChatML / Llama template).
+- درّب على **completions فقط** (تجاهل prompt tokens في loss)، كما توصي أدلة HF. [philschmid](https://www.philschmid.de/fine-tune-llms-in-2025)
+
+***
+
+## 4) نقاط خاصة بالعربية: tokenization، لهجات، ثقافة
+
+### Tokenization
+- لا تغامر بتغيير vocab لموديل جاهز إلا لو عندك pre‑training budget؛ بدلًا من كده:
+  - طبّق normalization عربي (ي/ى، همزات، تطويل…) قبل الـLLM.
+  - راقب fertility؛ لو سيئ جدًا، فكّر في موديل base بtokenizer أفضل للعربي. [arxiv](https://arxiv.org/html/2512.18399v1)
+
+### لهجات
+- استخدم حقول `dialect` + roles:
+  - `dialect_converter_egy`, `chat_gulf`, `tutor_msa`. [aclanthology](https://aclanthology.org/2026.vardial-1.30.pdf)
+- درّب الموديل على:
+  - فهم اللهجة.
+  - لكنه يجاوب غالبًا بالفصحى في بليغ (إلا لو role مختلف).
+
+### ثقافة وسلامة
+- papers عن tool‑calling والسيفتي بالعربي توصي بـ:
+  - alignment ثقافي (قيم، حساسيات دينية).
+  - DPO على إجابات “متحفّظة ومستنِدة لمصادر” مقابل إجابات جريئة. [arxiv](https://arxiv.org/html/2603.16901v1)
+
+***
+
+## 5) Evaluation عربي جاد (مش بس loss)
+
+أفضل التجارب العربية ركزت كثيرًا على الـbenchmarks: [dl.acm](https://dl.acm.org/doi/10.1145/3737453)
+
+للـfine‑tuning:
+
+- Benchmarks عامة:
+  - Open Arabic LLM Leaderboard (ArabicMMLU, EXAMs, BALSAM…). [huggingface](https://huggingface.co/blog/leaderboard-arabic)
+- Benchmarks خاصة:
+  - multi‑turn Arabic dialogue benchmark من دراسة 2026. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+  - test sets للفقه/الحديث/النحو اللي تبنيها بنفسك.
+- Metrics:
+  - BLEU/ROUGE في الشرح/الملخصات.
+  - F1/accuracy في QA.
+  - faithfulness في RAG (هل الإجابة مدعومة بالنص؟). [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+
+دايمًا:
+- قارن نسخة fine‑tuned بالعربي مع base model على نفس Arabic benchmarks؛ لو ما فيش تحسن واضح، رجع للـdata قبل ما تغيّر الhyperparams.
+
+***
+
+## 6) Pipeline عملي مبسّط لـfine‑tuning LLM عربي (زي بليغ)
+
+بناءً على كل ما سبق: [aclanthology](https://aclanthology.org/2025.arabicnlp-sharedtasks.110.pdf)
+
+1. **Define roles & tasks** (فقه، نحو، RAG، scraping).
+2. **Build dataset**:
+   - real Arabic demos.
+   - synthetic multi‑turn + instructional data (LLM‑generated).
+   - tagging: `role, skills, dialect, source, quality_score`.
+3. **Format to chat template** (Qwen/ChatML).
+4. **Fine‑tune with QLoRA/Unsloth**:
+   - hyperparams في الرينج اللي فوق.
+5. **Evaluate على battery عربية** (benchmarks + internal).
+6. **Iterate data‑first**:
+   - حسّن داتا، فيلترة، balance roles.
+   - بعدين جرّب hyperparams وPEFT methods (QLoRA vs Spectrum).
+7. **Add DPO / preference tuning**:
+   - على safety والـstyle (فقه، تعليم، RAG).
+
+لو قلت لي بالضبط:
+- الموديل اللي عايز تبدأ منه (مثل Qwen2.5‑7B).
+- والـGPU المتاح لك (T4, 4090, A100…),
+
+أقدر أكتب لك config جاهز (YAML + `run_sft.py`) مخصوص لـبليغ بالعربي.
+
+أشهر الأخطاء اللي شفتها في شغل الـLLMs العربية (من الأوراق والـleaderboards) مع حلول مباشرة. [arxiv](https://arxiv.org/html/2506.01340v1)
+
+***
+
+## 1) داتا “عربية” مش نظيفة فعلًا
+
+**المشكلة:**
+- خلط عربي/إنجليزي/فرنسي/إيموجي/Spam في نفس الـdataset. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- نقل محتوى من مواقع ضعيفة أو غير موثوقة دينيًا أو علميًا.
+
+**النتيجة:**
+- model يتكلم بنص عربي غريب، أو يدخل كلمة أجنبية كل سطر.
+- فقه/علوم معتمدة على مصادر ضعيفة.
+
+**الحل:**
+- language ID + quality filters زي ArabicWeb24:
+  - fastText / cld3 score ≥ 0.7 للعربية. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+  - حذف الصفحات القصيرة جدًا أو الممتلئة بالروابط/القوائم.
+- tagging للمصدر والـlicense، واستبعاد المواقع المشبوهة أو clickbait. [pangeanic](https://pangeanic.com/arabic-datasets-for-ai-training)
+
+***
+
+## 2) عدم عمل dedup حقيقي
+
+**المشكلة:**
+- تكرار نفس الفتاوى، الأحاديث، الشروح، مقالات الأخبار عشرات المرات. [arxiv](https://arxiv.org/abs/2512.18834)
+
+**النتيجة:**
+- overfitting قوي على نصوص معينة.
+- model يحفظها حرفيًا ويهلوس في الباقي.
+
+**الحل:**
+- Document‑level dedup:
+  - MinHash LSH على مستوى المستند، threshold ~0.8. [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+- Sentence‑level dedup للأسانيد والمقدمات المكررة.
+- dedup per‑domain (فقه، نحو…) عشان ما تمسحش تنوّع حقيقي بالخطأ. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+
+***
+
+## 3) خلط أدوار ومهام بدون schema
+
+**المشكلة:**
+- dataset فيها:
+  - حوار casual، فتوى، تمرين نحو، code assistant، من غير تمييز. [cacm.acm](https://cacm.acm.org/arab-world-regional-special-section/the-landscape-of-arabic-large-language-models/)
+- model يتعامل مع سؤال فقه كأنه chit‑chat، أو مع exercise نحو كأنه QA عام.
+
+**الحل:**
+- schema واضح لكل example:
+  - `role, domain, skills, task_type, difficulty, dialect`.
+- separate roles في التدريب والاستخدام:
+  - `tutor`, `fatwa_assistant_safe`, `rag_assistant`, `scraper`.
+- حتى لو نفس الـweights، خلي الـprompt وeval لكل role مستقل.
+
+***
+
+## 4) الاعتماد الزائد على داتا اصطناعية ضعيفة
+
+**المشكلة:**
+- توليد مئات آلاف الأمثلة العربية بأي LLM بدون:
+  - filtering أو verification.
+  - توازن مع real data. [arxiv](https://arxiv.org/html/2407.02147v1)
+
+**النتيجة:**
+- model يتبنّى biases وأخطاء الـteacher.
+- أسلوب ممل متكرر، و“هذياني” في الفقه أو الحديث.
+
+**الحل:**
+- استخدم teacher قوي + قواعد صارمة:
+  - prompts مصممة كويس (InstAr/GemmAr‑style). [huggingface](https://huggingface.co/papers/2407.02147)
+- LLM‑as‑judge أو verifier عربي لتصفية الأمثلة (quality_score). [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+- cap لنسبة synthetic:
+  - ≤ 40٪ إجمالًا، وأقل (مثلاً ≤ 20٪) في الفقه/العقيدة.
+
+***
+
+## 5) hyperparameters غير مناسبة لحجم الداتا العربي
+
+**المشكلة:**
+- learning rate عالي (مثلاً 5e‑4) أو epochs كثيرة (5–10) على corpus صغير. [aclanthology](https://aclanthology.org/2025.arabicnlp-sharedtasks.110.pdf)
+- ما فيش eval واضح؛ يعتمد فقط على training loss.
+
+**النتيجة:**
+- catastrophic forgetting لقدرات الـbase model.
+- overfitting شديد على صياغات training.
+
+**الحل (لـQLoRA على 7B تقريبًا):**
+- `lr = 1e-4–2e-4`, `epochs = 2–3`, `r = 32–64`. [philschmid](https://www.philschmid.de/fine-tune-llms-in-2025)
+- eval set عربي منفصل (فقه/نحو/RAG) تراقبه كل epoch.
+- توقف مبكر (أو اختيار أفضل checkpoint) بناءً على metric حقيقي، مش loss فقط. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0332419)
+
+***
+
+## 6) تجاهل multi‑turn structure
+
+**المشكلة:**
+- تدريب فقط على single‑turn (سؤال/جواب)، ثم استخدامه كمساعد حواري multi‑turn. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+
+**النتيجة:**
+- النموذج ينسى سياق الحوار، يكرر نفسه، أو يخلط النقاط.
+
+**الحل:**
+- بناء data multi‑turn:
+  - تحويل بعض الـsingle‑turn إلى محادثات عميقة (3–6 turns). [together](https://www.together.ai/blog/fine-tuning-llms-for-multi-turn-conversations-a-technical-deep-dive)
+- تدريب بـchat template مناسب (ChatML/Qwen) مع history.
+- بثقل أكبر للأمثلة اللي فيها:
+  - clarifying questions.
+  - step‑by‑step reasoning.
+
+***
+
+## 7) safety مهملة في الفقه والدين
+
+**المشكلة:**
+- النموذج يجاوب على:
+  - طلاق معيّن، تكفير، حدود، فتاوى سياسية، بثقة عالية.
+- أو يخترع أحاديث وأقوال غير موجودة. [arxiv](https://arxiv.org/html/2506.01340v2)
+
+**الحل:**
+- role خاص: `fatwa_assistant_safe`:
+  - trained على:
+    - عرض الأقوال المشهورة.
+    - ذكر المصادر عند الإمكان.
+    - ختم كل جواب بتحذير واضح وإحالة لمفتي/دار إفتاء.
+- safety classifier/guard عربي أمام الـLLM:
+  - يوسم الأسئلة high‑risk (طلاق، تكفير، عنف، إرهاب) ويمنع الإجابة التفصيلية. [mbzuai.ac](https://mbzuai.ac.ae/news/testing-llms-safety-in-arabic-from-two-perspectives-naacl/)
+- DPO على أزواج (إجابة متحفّظة + disclaimer) مقابل (إجابة قاطعة بلا دليل) لتفضيل الأولى. [arxiv](https://arxiv.org/html/2603.16901v1)
+
+***
+
+## 8) تقييم ضعيف أو غير عربي
+
+**المشكلة:**
+- الاعتماد على:
+  - English benchmarks فقط.
+  - subjective “شكل الإجابة حلو” بدون أرقام. [dl.acm](https://dl.acm.org/doi/10.1145/3737453)
+
+**الحل:**
+- استخدم Arabic‑specific benchmarks:
+  - Open Arabic LLM Leaderboard (ArabicMMLU, EXAMs, BALSAM). [huggingface](https://huggingface.co/blog/leaderboard-arabic)
+  - benchmarks متخصصة (aspect, sentiment, QA…) حسب الدومين. [sciencedirect](https://www.sciencedirect.com/science/article/pii/S2590123025011247)
+- اضف eval داخلي:
+  - بنك أسئلة فقه/حديث/نحو.
+  - eval scraping (JSON accuracy, field F1). [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+
+***
+
+## 9) RAG عربي سيئ بسبب chunking/retrieval
+
+**المشكلة:**
+- chunking حسب عدد tokens فقط يفصل السؤال عن الجواب أو الإسناد عن المتن في الحديث. [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+- retriever dense فقط بدون BM25 أو reranker.
+
+**النتيجة:**
+- إجابات غير مدعومة، hallucination عالي.
+
+**الحل:**
+- domain‑aware chunking:
+  - فتوى: سؤال+جواب في chunk واحد.
+  - حديث: سند+متن.
+  - كتب: فصل/باب كوحدة. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- hybrid retrieval:
+  - BM25 + dense + cross‑encoder reranker. [aclanthology](https://aclanthology.org/2025.abjadnlp-1.16.pdf)
+- قياس faithfulness (RAGAS‑style) للتأكّد أن كل جملة مدعومة بالسياق.
+
+***
+
+## 10) عدم تتبّع التجارب والداتا (no lineage)
+
+**المشكلة:**
+- بعد شهر من التجارب لا تعرف:
+  - أي dataset بالظبط خرّجت أحسن نسخة.
+  - أي cleaning/filters كانت مفعَّلة. [techunpacked.substack](https://techunpacked.substack.com/p/10-data-collection-and-curation-for)
+
+**الحل:**
+- لكل run:
+  - احفظ:
+    - `config.json` (hyperparams).
+    - `data_manifest.json` (sources + filters).
+    - `eval_report.json` (metrics).
+- استخدم tagging بسيط في أسماء الموديلات:
+  - `balygh-v1-qwen7b-qlora-lr1e4-epoch3-2026-03-27`.
+
+***
+
+لو حابب، أقدر في الرسالة الجاية أطلع لك **checklist تنفيذية** (خطوات قصيرة) تستخدمها قبل أي fine‑tuning جديد لبليغ: “لو مش عامل البنود دي، ما تضغطش Run”.
+
+لو هدفك تحسّن **الاستدلال (reasoning)** عند بليغ، ركّز على ثلاثة محاور: الداتا، طريقة التدريب، وطريقة الاستخدام.
+
+***
+
+## 1) داتا متخصصة للاستدلال
+
+- أضف مهام تحتاج خطوات منطقية:
+  - مسائل فقهية مركّبة (جمع بين نصوص/شروط).
+  - أسئلة فهم قرائي تعتمد على استنتاج ضمني.
+  - مسائل رياضية/منطقية بالعربي (حتى لو بسيطة).
+- استخدم teacher قوي (DeepSeek‑R1، Qwen reasoning) لتوليد:
+  - إجابات تبدأ بـ:  
+    “دعني أفكر خطوةً خطوةً: … ثم … إذن …”.
+  - وفيها فصل واضح بين **التحليل** و**النتيجة**.
+- درّب بليغ على هذه الـCoT outputs، بس خليك حذر في الفقه:
+  - خليه يبرهن على النصوص، لكن مع نفس ضوابط السلامة (عدم الفتوى في حالات شخصية).
+
+***
+
+## 2) أسلوب تدريب يفضّل CoT
+
+- في SFT:
+  - أعطِ وزنًا أعلى للأمثلة اللي فيها تفسير خطوة بخطوة (sample weighting).
+  - استخدم max_seq_len مناسب (2k–4k) عشان يستوعب سلسلة التفكير.
+- في DPO/Preference tuning:
+  - ابني pairs:
+    - (إجابة فيها reasoning واضح + نتيجة صحيحة) = chosen.
+    - (إجابة short بدون تبرير أو فيها قفزات منطقية) = rejected.
+  - درّب DPO model يفضّل الأولى؛ ده أثبت نجاحًا في أوراق تحسين reasoning في LLMs (حتى بالعربي) لما يكون الـpairs مصممة كويس. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+***
+
+## 3) استخدام الموديل في الإنتاج
+
+حتى بدون تدريب إضافي، تقدر ترفع reasoning بـprompting:
+
+- اطلب دائمًا “فكّر خطوة خطوة”:
+  - “اشرح خطوات الاستدلال بالتفصيل قبل أن تعطي النتيجة.”
+- لو مهمة حساسة (فقه/حديث):
+  - “اذكر النصوص والأدلة التي بنيت عليها جوابك، ثم لخّص النتيجة، ثم أعطِ تنبيهًا واضحًا أن هذا ليس فتوى شخصية.”
+- لا تجعل الموديل يجيب في جملة واحدة على مسائل تحتاج تحليل؛ درّبه واطلب منه structure:
+  - “أولًا: … ثانياً: … ثالثًا: … ثم: النتيجة.”
+
+أعطيك قوالب جاهزة بالعربي لتوليد داتا **Chain‑of‑Thought** لبليغ (فقه + لغة + منطق/رياضيات بسيطة)، تستخدمها مع DeepSeek/Qwen كـprompt templates.
+
+***
+
+## 1) قالب CoT لمسائل فقهية
+
+استخدمه مع teacher model، وخرّج JSON جاهز لـSFT.
+
+```text
+أنت فقيه متمكن، ومهمتك توليد بيانات تدريب لنموذج لغوي عربي
+يتعلّم الاستدلال الفقهي خطوة بخطوة.
+
+المطلوب:
+- اختر مسألة فقهية من مسائل العبادات أو المعاملات (غير شخصية).
+- اكتب سؤالًا كما يطرحه مسلم عادي.
+- أجب عنه على خطوتين:
+  1) تفكير واستدلال خطوة بخطوة (مع ذكر الأدلة والاحتمالات).
+  2) خلاصة الحكم باختصار مع تنبيه أن هذه ليست فتوى شخصية.
+
+قواعد صارمة:
+- لا تتكلم عن حالات شخصية معيّنة (طلاق فلان، مشكلة قضائية محددة).
+- لا تذكر أسماء أشخاص أحياء.
+- اذكر إن وُجد خلاف معتبر بين المذاهب.
+- اختم دائمًا بجملة تنبيه: 
+  «هذه الإجابة للمعلومات العامة، وللفتوى في حالة معيّنة يُرجى مراجعة دار الإفتاء المختصة.»
+
+أخرج النتيجة في JSON فقط بهذا الشكل:
+
+{
+  "instruction": "نص السؤال كما يطرحه السائل",
+  "input": "",
+  "output": "دعني أفكر خطوةً خطوةً:\n1- ...\n2- ...\n3- ...\nالنتيجة: ...\n\nهذه الإجابة للمعلومات العامة، وللفتوى في حالة معيّنة يُرجى مراجعة دار الإفتاء المختصة.",
+  "role": "fatwa_assistant_safe",
+  "skills": ["fiqh","reasoning","cot"],
+  "domain": "islamicstudies",
+  "task_type": "cot_qa"
+}
+```
+
+***
+
+## 2) قالب CoT لمسائل نحو وبلاغة
+
+```text
+أنت أستاذ نحو وبلاغة عربي، وتولّد بيانات تدريب لنموذج يتعلّم
+كيف يشرح القواعد خطوة بخطوة.
+
+المطلوب:
+- اختر جملة عربية فصيحة (من 5 إلى 12 كلمة).
+- اكتب سؤالًا واحدًا من نوع:
+  - أعرب الجملة التالية إعرابًا تفصيليًا واذكر القاعدة.
+  - أو استخرج الصورة البلاغية وبيّن نوعها ووجه الشبه.
+
+طريقة الإجابة:
+- أولًا: فكر خطوة بخطوة، واذكر التحليل تدريجيًا.
+- ثانيًا: لخّص القاعدة أو الفكرة النهائية في فقرة قصيرة.
+
+أخرج JSON فقط بهذا الشكل:
+
+{
+  "instruction": "أعرب الجملة التالية إعرابًا تفصيليًا واذكر القاعدة المستفادة.",
+  "input": "نص الجملة هنا",
+  "output": "دعني أفكر خطوةً خطوةً:\nأولًا: أحدد نوع الجملة...\nثانيًا: أعرب كل كلمة:\n- ...\nثم أستنتج القاعدة النحوية: ...\n\nالخلاصة: القاعدة هي ... مع هذا المثال.",
+  "role": "tutor",
+  "skills": ["nahw","balagha","reasoning","cot"],
+  "domain": "linguistics",
+  "task_type": "cot_explanation"
+}
+```
+
+***
+
+## 3) قالب CoT لمسائل منطق/رياضيات مبسطة بالعربي
+
+مفيد لتقوية “عضلة” التفكير عامة بدون ما تدخل في فقه.
+
+```text
+أنت مدرّس رياضيات ومنطق باللغة العربية، تبني بيانات تدريب
+لنموذج لغوي يتعلم حل المسائل خطوة بخطوة.
+
+المطلوب:
+- أنشئ مسألة واحدة في كل مرة من النوع:
+  - مسائل حسابية بسيطة (نِسَب، نسب مئوية، مسافة=سرعة×زمن).
+  - مسائل منطقية (إذا كان كذا فإن كذا، استنتج...).
+- السؤال بالعربية الواضحة، بدون ترميز معقد.
+
+قواعد الإجابة:
+- ابدأ دائمًا بجملة: «دعني أفكر خطوةً خطوةً:»
+- حل المسألة على شكل خطوات مرقّمة، ثم اذكر الجواب النهائي واضحًا.
+
+أخرج JSON فقط بهذا الشكل:
+
+{
+  "instruction": "سؤال المسألة بالعربية",
+  "input": "",
+  "output": "دعني أفكر خطوةً خطوةً:\n1- أفهم المعطيات: ...\n2- أطبّق القاعدة: ...\n3- أحسب النتيجة: ...\nإذن الجواب النهائي هو: ...",
+  "role": "tutor",
+  "skills": ["math","logic","reasoning","cot"],
+  "domain": "education",
+  "task_type": "cot_math"
+}
+```
+
+***
+
+## 4) قالب CoT لـRAG (الاستدلال من نص)
+
+```text
+أنت مساعد عربي يعمل بأسلوب RAG: يستقبل نصًا (مقال أو فقرة فقهية)
+ثم يجيب عن سؤال استنادًا على النص فقط مع استدلال واضح.
+
+المطلوب:
+- استخدم النص المرفق في input كمصدر وحيد للمعلومة.
+- اكتب سؤالًا يمكن الإجابة عنه من النص فقط.
+- فكّر خطوة بخطوة في استخراج الجواب من النص.
+
+قواعد:
+- لا تضف معلومات من خارج النص.
+- إن كان النص ناقصًا، اذكر ذلك بوضوح في الاستدلال.
+
+أخرج JSON:
+
+{
+  "instruction": "سؤال يعتمد على النص المرفق",
+  "input": "النص كما هو",
+  "output": "دعني أفكر خطوةً خطوةً اعتمادًا على النص فقط:\n1- أقرأ المقطع الذي يتحدث عن ...\n2- أستخرج منه أن ...\n3- بناءً على ذلك يكون الجواب ...\n\nملاحظة: هذا الجواب مبني فقط على النص المرفق.",
+  "role": "rag_assistant",
+  "skills": ["reading_comprehension","reasoning","cot"],
+  "domain": "islamicstudies",
+  "task_type": "cot_rag_qa"
+}
+```
+
+***
+
+## 5) كيف تدمج داتا CoT في تدريب بليغ
+
+- أنشئ ملفات JSONL منفصلة:
+  - `balygh_cot_fiqh.jsonl`
+  - `balygh_cot_lang.jsonl`
+  - `balygh_cot_math.jsonl`
+- اجعلها 10–20٪ من إجمالي أمثلة SFT:
+  - كفاية لرفع **الاستدلال** بدون ما يبطئ الموديل في الإجابات القصيرة.
+- في التدريب:
+  - يمكنك إعطاء **وزن أعلى** لهذه الأمثلة (sampling rate أكبر).
+- في DPO لاحقًا:
+  - أنشئ pairs:  
+    - chosen = إجابة فيها CoT جيد + نتيجة صحيحة.  
+    - rejected = إجابة مختصرة بدون تفكير أو باستدلال ناقص.
+
+لو أحببت، أقدر في الخطوة الجاية أكتب لك سكربت Python بسيط ياخد هذه الـtemplates ويستدعي DeepSeek/Qwen على batch من الكتب/النصوص عندك، ويبني تلقائيًا ملف `balygh_cot_*.jsonl` جاهز للتدريب.
+
+لو قصدك تبني/تستعمل **LLM عربي متكامل** لبليغ، ففكّر فيه كـ“stack” من 3 طبقات: موديل أساس قوي + تخصص عربي/إسلامي + RAG/Agents حواليه. [dl.acm](https://dl.acm.org/doi/10.1145/3737453)
+
+***
+
+## 1) اختيار الـbase model الأنسب حاليًا
+
+من الـleaderboards العربية (OALL v2، AraGen، ABL) والتقارير الأخيرة: [siliconflow](https://www.siliconflow.com/articles/en/best-open-source-LLM-for-Arabic)
+
+نماذج مفتوحة تُعتبر أساس ممتاز:
+
+- **Qwen3 / Qwen2.5 (8–14B Instruct)**:
+  - أداء قوي جدًّا في العربية ضمن multilingual.
+  - كود مفتوح، ودعم QLoRA جيد.
+- **Meta Llama‑3.1/3.2‑8B‑Instruct**:
+  - Multilingual محترم، عربي جيد، ecosystem كبير.
+- **AceGPT / AraLLaMA / ALLaM / Jais‑adapted**:
+  - مصمَّمين خصيصًا للعربية، وعلى leaderboards غالبًا أعلى دقّة في ArabicMMLU/EXAMs، لكن أحيانًا رخصهم أو الweights أقل سهولة للاستخدام المباشر. [silma](https://silma.ai/arabic-llm-leaderboard)
+
+عمليًا لبليغ:
+- استمر على **Qwen2.5‑7B/8B‑Instruct** كـbase (متاح، أداء جيد، compatible مع Unsloth وQLoRA). [siliconflow](https://www.siliconflow.com/articles/en/best-open-source-LLM-for-Arabic)
+- لاحقًا، لو حبيت جودة أعلى:
+  - جرّب further‑pretraining على ArabicWeb24 أو fine‑tune نسخة AceGPT/AraLLaMA لمهامك.
+
+***
+
+## 2) جعل الموديل “متكامل” عربيًا = Fine‑tuning + RAG
+
+نموذج واحد لن يحمل كل شيء في weights؛ الـLLMs العربية القوية كلها تقريبًا تعتمد على:
+
+- **Fine‑tune** للمهمات الأساسية (chat, QA, tutoring, reasoning). [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+- **RAG + Tools** لكل شيء يحتاج مصادر كبيرة (فقه، تفسير، حديث، scraping). [arxiv](https://arxiv.org/pdf/2509.20957.pdf)
+
+لبليغ:
+- طبقة SFT:
+  - فقه/حديث/تفسير (fatwa_assistant_safe, muhaddith, mufassir).
+  - لغة عربية (nahw, balagha, orthography).
+  - reasoning (CoT) + multi‑turn.
+- طبقة RAG:
+  - vector DB لمكتبتك (كتب، قواعد بيانات).
+  - Balygh‑RAG‑assistant يجاوب دايمًا من النصوص مع citations.
+
+***
+
+## 3) خصائص لازم تكون في “LLM عربي متكامل”
+
+اعتمادًا على landscape ALLMs + leaderboards: [themoonlight](https://www.themoonlight.io/en/review/large-language-models-and-arabic-content-a-review)
+
+- **فصحى قوية**:
+  - نحو مضبوط، أسلوب طبيعي، فهم جيد للنصوص الكلاسيكية والحديثة.
+- **فهم لهجات أساسي**:
+  - خاصة المصرية والخليجية، مع ability يرجع يجاوب بالفصحى.
+- **معرفة عربية/إسلامية**:
+  - يقبل RAG على كتبك، ويعرف يتعامل مع مصطلحات الفقه والحديث.
+- **أمان وسلامة ثقافية**:
+  - يتجنب التكفير، التحريض، الفتاوى الخطيرة بدون تنبيه.
+- **قدرة multi‑turn**:
+  - يحافظ على سياق حوار طويل بالعربي (أوراق 2026 أثبتت إن ده يتحقّق بكويس مع synthetic multi‑turn data). [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+أنت عمليًا تبني ده في بليغ؛ المهم ترتّبه كمنظومة كاملة، مش كـcheckpoint واحد فقط.
+
+***
+
+## 4) كيف توصل لنسخة “متكاملة” من بليغ عمليًا
+
+خطة مختصرة:
+
+1. **اختيار base**:
+   - Qwen2.5‑7B‑Instruct.
+2. **مرحلة SFT‑1 (لغة عامة + تعليم)**:
+   - datasets: نحو، بلاغة، فهم مقروء، أسئلة مدارس.
+3. **مرحلة SFT‑2 (فقه/حديث/تفسير)**:
+   - على داتا الكتب + الفتاوى المنظّفة، مع safety templates.
+4. **مرحلة SFT‑3 (RAG + scraping)**:
+   - HTML→JSON، سؤال+سياق→جواب مع citation.
+5. **DPO/Preference**:
+   - على style/سلامة واستدلال (نفضّل الإجابات المستدلّة المتحفّظة).
+6. **RAG + Agents حول الموديل**:
+   - LangGraph agent:
+     - Scraper Agent.
+     - RAG Agent.
+     - Tutor Agent.
+7. **Evaluation عربي شامل**:
+   - OALL/AraGen/ABL + eval خاص بيك (فقه/نحو/RAG). [middleeastainews](https://www.middleeastainews.com/p/new-arabic-llm-leaderboard-inception)
+
+بهذا الشكل، يكون عندك “LLM عربي متكامل” مش بس على مستوى weights، لكن كنظام كامل قابل للاستخدام الحقيقي.
+
+هل تريدني أكتب لك checklist قصيرة (10 بنود) تسميها مثلاً: “بليغ متكامل v1”، تمشي عليها خطوة بخطوة من الآن لحد الإصدار الأول؟
+
+أقدر ألخّص لك نشر بليغ على Hugging Face في خطوات واضحة.
+
+***
+
+## 1) تجهيز الموديل والملفات
+
+جهّز على جهازك (أو Colab):
+
+- مجلد الموديل النهائي (مثلاً `balygh-7b-v1/`) وفيه:
+  - `config.json`
+  - `generation_config.json` (اختياري)
+  - `model.safetensors` (أو sharded)
+  - `tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`, `vocab.*`
+- ملف **model card**:
+  - `README.md` (اللي كتبناه لبليغ بالعربي/إنجليزي).
+- لو عندك:
+  - `license` (مثلاً Apache‑2.0)  
+  - `examples/` بأمثلة استخدام و notebooks.
+
+***
+
+## 2) إنشاء repo على Hugging Face
+
+1. سجّل دخول أو أنشئ حساب في HF Hub.
+2. من الموقع:
+   - New model → سمّه مثلاً: `MohamedKandil/Balygh-7B-v1`.
+   - اختر:
+     - **Model type**: Causal LM.
+     - **License**: اللي يناسبك (Apache‑2.0 غالبًا).
+3. خُد access token:
+   - Settings → Access Tokens → New token (role: write).
+
+***
+
+## 3) تثبيت الأدوات ودفع الموديل (push)
+
+على البيئة اللي فيها الموديل:
+
+```bash
+pip install "huggingface_hub[cli]" transformers safetensors
+
+# تسجيل الدخول مرة واحدة
+huggingface-cli login
+# حط الـtoken اللي أنشأته
+```
+
+من Python (لو الموديل متحمّل كـTransformers):
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_dir = "balygh-7b-v1"  # المجلد اللي حفظت فيه الموديل بعد التدريب
+repo_id = "YourUser/Balygh-7B-v1"
+
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model = AutoModelForCausalLM.from_pretrained(model_dir)
+
+tokenizer.push_to_hub(repo_id)
+model.push_to_hub(repo_id)
+```
+
+أو مباشرة من المجلد:
+
+```bash
+cd balygh-7b-v1
+huggingface-cli upload . --repo-id YourUser/Balygh-7B-v1 --repo-type model
+```
+
+احرص أن `README.md` موجود في نفس المجلد ليتخذ كـmodel card.
+
+***
+
+## 4) إعداد الـmodel card على HF
+
+في صفحة الموديل على HF:
+
+- تأكّد أن:
+  - `README.md` معروضة صح (عنوان، وصف، استخدام، حدود، سلامة).
+  - حقل **Tags** يحتوي:
+    - `arabic`, `causal-lm`, `instruction-tuned`, `rag`, `education`, `islamic`.
+- أضف:
+  - مثال كود Python:
+    ```python
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+
+    model_id = "YourUser/Balygh-7B-v1"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto")
+
+    prompt = "اشرح بإيجاز الفرق بين الفاعل ونائب الفاعل."
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(**inputs, max_new_tokens=256, temperature=0.3)
+    print(tokenizer.decode(outputs, skip_special_tokens=True))
+    ```
+  - قسم **Evaluation**: تلخّص أرقامك (حتى لو أولية) على ArabicMMLU، internal eval… إلخ.
+
+***
+
+## 5) (اختياري لكن مهم) نشر نسخة Space / Demo
+
+لتجربة الموديل بسهولة:
+
+1. من HF:
+   - New Space → Gradio / Streamlit.
+2. اربطه بالموديل:
+
+   `app.py` بسيط:
+
+   ```python
+   import gradio as gr
+   from transformers import AutoTokenizer, AutoModelForCausalLM
+
+   MODEL_ID = "YourUser/Balygh-7B-v1"
+   tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+   model = AutoModelForCausalLM.from_pretrained(MODEL_ID, device_map="auto")
+
+   def chat(prompt, max_new_tokens=256, temperature=0.3):
+       inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+       outputs = model.generate(
+           **inputs,
+           max_new_tokens=max_new_tokens,
+           temperature=temperature,
+           do_sample=temperature > 0,
+       )
+       return tokenizer.decode(outputs, skip_special_tokens=True)
+
+   iface = gr.Interface(
+       fn=chat,
+       inputs=[
+           gr.Textbox(label="اكتب سؤالك بالعربية"),
+           gr.Slider(64, 512, value=256, label="Max new tokens"),
+           gr.Slider(0.0, 1.0, value=0.3, step=0.05, label="Temperature"),
+       ],
+       outputs=gr.Textbox(label="إجابة بليغ"),
+       title="Balygh – LLM عربي للفصاحة والذكاء",
+       description="نموذج لغوي عربي مخصص للفقه واللغة وRAG."
+   )
+
+   iface.launch()
+   ```
+
+3. اربطه بموديلك في `README` (رابط الـSpace).
+
+***
+
+## 6) أشياء لا تنساها عند النشر
+
+- **الرخصة**:
+  - صرّح بوضوح:
+    - رخصة الموديل.
+    - هل الداتا training متاحة أم لا، وما حدود استخدامها.
+- **السلامة/التحذيرات**:
+  - قسم واضح:
+    - “ليس مفتياً رسميًا”.
+    - أمثلة أسئلة يرفضها الموديل.
+- **النسخ**:
+  - سمِّ الإصدار: `v1.0.0`، واحتفظ بتغيير واضح في الـchangelog لكل إصدار جديد.
+
+لو قلت لي اسم حسابك على HF والمسار اللي حفظت فيه بليغ حاليًا، أقدر أكتب لك أوامر محددة (`push_to_hub`) جاهزة تنفّذها مباشرة.
+
+نعم، ودي الـchecklist المختصرة لبليغ‑متكامل v1:
+
+***
+
+## Checklist “بليغ متكامل v1” (10 بنود)
+
+1. **تثبيت الـscope**
+   - حدد رسميًا أن بليغ‑v1 يغطي:
+     - فقه/حديث/تفسير عام.
+     - نحو/بلاغة/إملاء.
+     - RAG + scraping بسيط على مكتبتك.
+
+2. **Core corpus جاهز**
+   - اختر 10–20 كتابًا أساسيًا (فقه، حديث، تفسير، نحو، بلاغة).
+   - نظّفها (7 مراحل) + dedup document/sentence.
+   - خزّن metadata (id, title, domain, madhab/dialect إن وُجد).
+
+3. **SFT dataset v1**
+   - ابنِ ثلاث ملفات JSONL:
+     - `balygh_sft_fiqh.jsonl`
+     - `balygh_sft_lang.jsonl`
+     - `balygh_sft_scraping.jsonl`
+   - كل مثال بـschema موحد: `instruction,input,output,role,skills,domain,task_type,source,quality_score`.
+
+4. **CoT + multi‑turn augmentation**
+   - ولّد subset CoT:
+     - فقه (استدلال خطوة بخطوة + disclaimer).
+     - نحو/بلاغة (شرح تدريجي).
+   - أضف 2–3k حوار multi‑turn لكل role أساسي (tutor, fatwa_assistant_safe, rag_assistant).
+
+5. **Eval sets ثابتة**
+   - ملفات:
+     - `eval_fiqh_lang.jsonl` (بنك الأسئلة اللي بدأنا نكتبّه).
+     - `eval_scraping_pairs.jsonl` (HTML + JSON مرجعي).
+     - `eval_rag.jsonl` (سؤال + مقاطع + جواب مرجعي).
+   - ما تتغيّرش بين التجارب.
+
+6. **Recipe تدريب واحدة واضحة**
+   - Base: Qwen2.5‑7B‑Instruct.
+   - QLoRA + Unsloth:
+     - `r=64, lr=2e-4, epochs=3, max_seq_len=4096, packing=True`.
+   - config محفوظ في `configs/balygh_v1_sft.yaml`.
+
+7. **تجربة تدريب مرجعية (baseline run)**
+   - درّب باستخدام SFT‑v1.
+   - احفظ:
+     - checkpoint في `models/balygh-7b-v1-baseline`.
+     - `eval_report.json` فيه balygh_score والـmetrics الفرعية.
+
+8. **دورة تحسين واحدة منظّمة**
+   - عدّل **الداتا أولاً**:
+     - توازن أدوار (fiqh/lang/scraping).
+     - فلترة أمثلة ضعيفة.
+   - جرّب 2–3 تغييرات hyperparameters فقط (مثلاً lr أصغر + epochs 2).
+   - استخدم `prepare.py` لقياس balygh_score بعد كل run.
+
+9. **تجهيز حزمة النشر**
+   - مجلد نهائي: `balygh-7b-v1/` فيه:
+     - weights + tokenizer.
+     - `README.md` (model card).
+     - `config.json`, `generation_config.json`.
+   - script استخدام بسيط في README.
+
+10. **نشر + feedback loop**
+   - نشر على Hugging Face + Space بسيط للتجربة.
+   - جمع أسوأ الردود (فقه/لغة/RAG) في ملف:
+     - `feedback_bad_cases.jsonl` ليستخدم لاحقًا في SFT‑v1.1 أو DPO.
+
+لو أحببت، أقدر بعد كده أفصّل لك بند واحد من العشرة (مثلاً رقم 3 أو 5) إلى checklist أصغر بـsub‑steps جاهزة للتنفيذ.
+
+أقرب طريقة تتخيلها: أنت تبني “مكتبة عربية ضخمة + معمل تعليم” جوه الموديل، مش بس تحطله شوية كتب. خلّيه في 4 مستويات: *إيه الداتا؟ منين؟ إزاي تجهزها؟ وإزاي تستخدمها؟*
+
+***
+
+## 1) أنواع الداتا اللي تحتاجها لـLLM عربي متكامل
+
+فكّر في 5 طبقات:
+
+1) **نص عربي عام (لغة وثقافة)**
+   - مقالات، أخبار، مدونات، محتوى تعليمي عام.
+   - الهدف:  
+     - لغة فصحى معاصرة سليمة.  
+     - معرفة عامة عن العالم العربي.
+   - أمثلة مصادر:
+     - ArabicWeb24 / FineWeb‑Arabic (web عربي نظيف). [huggingface](https://huggingface.co/blog/MayFarhat/arabicweb24)
+     - صحافة عربية مرخصة (datasets جاهزة أو APIs).
+     - مقالات موسوعية عربية.
+
+2) **نصوص علمية/تراثية (فقه، حديث، تفسير، أدب، نحو)**
+   - كتب فقه معتمدة لكل مذهب (متون + شروح).
+   - كتب حديث (أحاديث + شروح + مصطلح الحديث).
+   - تفاسير معتبرة.
+   - كتب نحو، بلاغة، صرف، أدب.
+   - الهدف:
+     - grounding علمي قوي لبليغ في الدومين اللي يهمّك.
+
+3) **بيانات مهيكلة (Databases)**
+   - قواعد بيانات أحاديث (نص، سند، درجة، مصدر).
+   - قواعد تفاسير/أحكام آيات.
+   - بنوك أسئلة امتحانات عربية، قواعد لغوية، تمارين.
+   - هدفها:
+     - أول كور لبناء **SFT examples** نظيفة.
+
+4) **Instruction‑tuning / Chat data (واقعية + اصطناعية)**
+   - أسئلة/أجوبة حقيقية من:
+     - فتاوى، forums علمية، تعليقات طلاب، منصة أسئلة وأجوبة عربية.
+   - بيانات اصطناعية:
+     - InstAr/GemmAr‑style بالعربي (سؤال/طلب → إجابة). [arxiv](https://arxiv.org/html/2407.02147v1)
+     - Multi‑turn chat، CoT reasoning، RAG‑style QA.
+
+5) **داتا تقييم (Eval sets)**
+   - ليست للتدريب، فقط للقياس:
+     - بنك أسئلة فقه/حديث/نحو/بلاغة (مع إجابات مرجعية).
+     - صفحات HTML + JSON مرجعي للـscraping.
+     - أسئلة RAG مبنية على كتبك ومكتباتك.
+
+***
+
+## 2) منين تجيب كل نوع؟ (جمع الداتا)
+
+### أ) Web عام عالي الجودة
+
+- استخدم ArabicWeb24/FineWeb‑Arabic كـbaseline:
+  - أخذوا crawl عربي ضخم ثم طبقوا:
+    - language ID، جودة، dedup document & sentence. [lighton](https://lighton.ai/lighton-blogs/arabicweb24)
+- لو هتجمع بنفسك:
+  - Scrapy / trafilatura لجلب المقالات.
+  - filters:
+    - domain whitelist (مواقع تعليمية/إخبارية/معرفية نظيفة).
+    - حد أدنى للنص (مثلاً ≥ 500 حرف).
+    - exclude صفحات فيها نسبة أكواد/links عالية.
+
+### ب) الكتب العلمية/التراثية
+
+- مصدر زي عندك (books.json + extractedbooks):
+  - PDFs → OCR/نص → تنظيف.
+- ركّز على:
+  - 10–20 كتاب “عمود فقري” لكل مجال (فقه/حديث/تفسير/نحو).
+  - أضف تدريجيًا، ما تبدأش بكل شيء مرة واحدة.
+
+### ج) قواعد البيانات
+
+- existing DBs (Hadith, Tafsir, Fiqh Q&A) اللي عندك.
+- حاول تُوحّد schema لكل نوع:
+  - hadith: {id, text, isnad, matn, grade, source, topic}
+  - fatwa: {id, question, answer, topic, madhab, source_url}
+
+### د) instruction / chat / CoT
+
+- **Real**:
+  - من الفتاوى الفعلية، أسئلة الطلاب، منصات QA (لو رخصتها تسمح).
+  - حولها لصيغة instruction‑tuning:
+    - instruction = سؤال المستخدم.
+    - output = جواب مختصر + استدلال.
+- **Synthetic** (من DeepSeek/Qwen/Llama‑3):
+  - استخدم القوالب اللي كتبناها:
+    - فقه safe CoT.
+    - نحو/بلاغة CoT.
+    - RAG‑style QA.
+  - خليه يولّد:
+    - single‑turn instructions.
+    - multi‑turn dialogues.
+    - structured JSON tasks (HTML→JSON).
+
+### هـ) Eval sets
+
+- جزء من داتا التدريب الأصلية، لكن:
+  - تحفظه منفصلًا، لا يدخل في fine‑tune.
+  - تراجعه يدويًا جدًا (high‑quality gold).
+
+***
+
+## 3) تجهيز الداتا: pipeline واضح
+
+### Step 0) توحيد encoding والتطبيع
+
+- كل النصوص UTF‑8.
+- طبّق normalization:
+  - توحيد (ي/ى، ة/ه، همزات).
+  - حذف تطويل (ـ).
+  - إزالة الرموز العشوائية.
+- استخدم نفس pipeline على *كل* المصادر، زي ArabicWeb24 (unicode‑nfkc + rules). [arxiv](https://arxiv.org/html/2512.18399v1)
+
+### Step 1) Cleaning & Filtering
+
+- language ID:
+  - fastText / cld3 → keep only Arabic (score ≥ threshold).
+- length & quality:
+  - drop:
+    - نصوص أقصر من X (مثلاً 50–100 حرف).
+    - صفحات فيها ≥ 50% non‑letters أو رموز.
+- domain filtering:
+  - علامات spam (كلمات مفتاحية، كثرة إعلانات، مواقع معينة).
+
+### Step 2) Segmentation (تقسيم النص)
+
+- كتب:
+  - تقسيم لفقرات / أبواب / فصول.
+- فتاوى:
+  - chunk = سؤال + جواب (ما تفصلش بينهم).
+- أحاديث:
+  - chunk = سند + متن.
+- HTML:
+  - احتفظ بنسخة “clean text” (لعين الإنسان/LLM) + نسخة raw HTML (للscraper eval).
+
+### Step 3) Dedup
+
+- Document‑level:
+  - MinHash/LSH (مثلاً باستخدام datatrove أو NeMo Curator) على paragraphs/articles. [arxiv](https://arxiv.org/abs/2512.18834)
+- Sentence‑level:
+  - إزالة الأسانيد/المقدمات المتكررة في المجاميع الحديثية والفقهية.
+
+### Step 4) Annotation / metadata
+
+لكل chunk أو example، خزّن:
+
+- `id`
+- `source_type` (book, web_article, fatwa_db, hadith_db, eval_manual)
+- `domain` (islamicstudies, linguistics, education, general)
+- `role` و`skills` لو example جاهز لـtraining
+- `dialect` (msa/egy/gulf/other)
+- `quality_score` (0–1):
+  - rule‑based + LLM‑as‑judge.
+
+### Step 5) تحويل لـSFT JSONL
+
+من النصوص المنظّفة + قواعد البيانات:
+
+- طبّق سكربت مثل:
+  - `build_balygh_sft_dataset.py` + `refine_balygh_sft_with_llm.py` اللي كتبناهم:
+    - يقرأ الكتب/DB.
+    - يولّد قالب instruction/input/output.
+    - يمرّر القالب لـLLM teacher لتعبئة output فعلي.
+- ادمج كل شيء في:
+  - `balygh_sft_v1.jsonl` (أو حسب تقسيمك).
+
+***
+
+## 4) توازن الداتا: متى يبقى الموديل “متكامل” مش منحاز؟
+
+خطر كبير في ALLMs العربية: الميل لواحد من هذه:
+
+- “chat عام” لكن ضعيف دينيًا/لغويًا.
+- “فقهي ثقيل” لكن سيئ في اللغة أو RAG أو safety. [arxiv](https://arxiv.org/html/2506.01340v1)
+
+مع بليغ، استهدف توزيع تقريبي في SFT:
+
+- 30–35٪ لغة عربية (نحو، بلاغة، فهم مقروء، شرح نصوص).
+- 25–30٪ علوم إسلامية (فقه/حديث/تفسير) مع safety.
+- 20٪ RAG + QA مبني على نصوص (فقه/كتب/مقالات).
+- 10–15٪ scraping / HTML→JSON / structured data.
+- 5–10٪ مهام منطق/رياضيات/استدلال عام.
+
+وكمان:
+
+- ≥ 60–70٪ Real data (كتب + DBs + أسئلة حقيقية).
+- ≤ 30–40٪ Synthetic (teacher‑generated) بعد التصفية. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+***
+
+## 5) كيف تعرف إن داتاك جاهزة لـLLM “متكامل”؟
+
+قبل ما تضغط Train على run كبير، اسأل نفسك:
+
+1. **Coverage**:
+   - عندي أمثلة كفاية لكل role رئيسي؟
+   - في فقه: عبادات، معاملات، أسرة، آداب.
+   - في لغة: نحو، بلاغة، صرف، إملاء.
+   - في RAG: سؤال+نص، مش بس سؤال/جواب “من الدماغ”.
+
+2. **Quality**:
+   - جرّبت 100 example عشوائي من SFT بنظرة إنسان:
+     - هل كل instruction واضح؟
+     - هل output منطقي وعربيته نظيفة؟
+     - هل في أمثلة خطيرة فقهيًا؟ (لو فيه → استبعد/عدّل).
+
+3. **Balance**:
+   - ما فيش role واحد مسيطر (مثلاً 80٪ tutor ونادر fatwa/RAG).
+
+4. **Eval sets منفصلة** جاهزة:
+   - الملفات بتاعة eval اللي اتكلّمنا عنها موجودة ومراجَعة يدويًا.
+
+لو الـ4 دول متحققين، ساعتها fine‑tuning بليغ هيسحب لقدّام؛ لو واحدة ناقصة، اشتغل عليها في الداتا الأول بدل ما تحرق GPU على dataset مش ناضجة.
+
+***
+
+لو تحب، في الخطوة الجاية أقدر أساعدك تبني **خطة عمل أسبوعية/شهرية**:  
+كل أسبوع تشتغل على نوع واحد من الداتا (فقه، لغة، RAG…) مع أهداف كمية واضحة (مثلاً: 5k مثال فقهي، 3k نحو… إلخ) لحد ما توصل لـكوربس كافي لبليغ‑v1.
+
+تقدر تجهّز تقريبًا كل الداتا اللي كلمنا عنها باستخدام LLM كـ“teacher”، بس لازم تمشي بنظام واضح عشان ما تطلعش noise أكثر من فايدة. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+## 1) اختيار الـteacher وضبطه
+
+- استخدم موديل قوي يدعم عربي كويس (مثلاً Llama‑3.1‑instruct، Qwen2.5‑instruct، أو Gemini 2.0) واعمله توجيه واضح للـMSA والفقه الآمن. [stackoverflow](https://stackoverflow.com/questions/79892509/optimizing-arabic-nlp-pipelines-for-high-performance-content-generation-using-la)
+- ثبّت طريقة التوليد في السكربت:
+  - `temperature` حوالي 0.4–0.7 لموازنة الجودة والتنوّع. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+  - طول إجابة معقول، ومنع الهلاوس بتنبيهات في الـprompt.
+
+مثال سريع:  
+أنت توفر “بذرة” عربية حقيقية (سؤال/نص/آية/حديث/فقرة نحو)، والـteacher يحوّلها إلى instruction + output + أحيانًا CoT.
+
+## 2) توليد instruction data من نصوصك
+
+### أ) من كتب الفقه والحديث والتفسير
+
+لكل فقرة/مسألة أو حديث:
+
+- Prompt للـteacher مثلًا (بالعربي):
+
+> عندك النص التالي من كتاب فقهي/حديثي.  
+> اصنع لي مثالًا واحدًا لتدريب نموذج محادثة عربي، بالصيغة JSON التالية:  
+> { "instruction": "...", "input": "...", "output": "...", "domain": "...", "skills": [...], "safety_notes": "..." }  
+> الشروط:  
+> - السؤال بالعربية الفصحى الواضحة.  
+> - الجواب مختصر ثم يليه شرح أو تعليل.  
+> - راعِ السلامة: لا تعطي فتوى قاطعة في القضايا الحساسة، واستخدم عبارات مثل "يُنصَح بمراجعة أهل العلم المتخصصين".  
+> النص: """ {المسألة/الحديث} """
+
+- تخزن المخرجات مباشرة كـJSONL بعد فلترة الأسطر الفاسدة.
+
+### ب) من قواعد بيانات الأسئلة الحقيقية
+
+لو عندك سؤال/جواب في DB:
+
+- تطلب من الـteacher فقط:
+  - صياغة السؤال في صورة “instruction” أنظف.
+  - إعادة صياغة الجواب بالعربية الفصحى مع توثيق بسيط، بدون تغيير الحكم الشرعي.
+
+> عندك سؤال وجواب من قاعدة بيانات فتاوى.  
+> أعد كتابة السؤال كتعليمات (instruction) واضحة، والجواب بأسلوب مبسط مع الحفاظ على المعنى.  
+> أعد النتيجة في JSON: { "instruction": "...", "output": "...", "domain": "fiqh", "role": "fatwa_assistant_safe" }  
+> السؤال: """..."""  
+> الجواب: """..."""  
+
+## 3) توليد بيانات CoT وmulti‑turn
+
+### CoT reasoning
+
+- تطلب من الـteacher أن:
+  - يجاوب مرتين: مرة “جواب قصير”، ومرة “شرح خطوة بخطوة”، وتخزن الاثنين (أو تدمجهم).
+
+> أجب أولًا بجواب مختصر، ثم اشرح خطوة بخطوة كيف وصلت لهذا الجواب.  
+> أعد النتيجة في JSON: { "short_answer": "...", "cot": "..." }  
+
+- هذا النوع من الـCoT أثبت أنه يحسّن أداء النماذج الأصغر في الاستدلال. [wandb](https://wandb.ai/byyoung3/ML_NEWS3/reports/Knowledge-distillation-Teaching-LLM-s-with-synthetic-data--Vmlldzo5MTMyMzA2)
+
+### حوارات multi‑turn
+
+- تبني prompt مولِّد لحوار كامل:
+
+> أنشئ حوارًا مكوّنًا من 6–8 رسائل بين "طالب" و"بليغ" حول موضوع (فقهي/لغوي) واحد.  
+> اجعل الطالب يسأل أسئلة متدرجة الصعوبة، وبليغ يجيب بإيجاز ثم يشرح.  
+> أرجع النتيجة في JSON:  
+> { "domain": "...", "dialogue": [ {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."} , ... ] }  
+
+- تغيّر `domain` (فقه، حديث، نحو، بلاغة، RAG…) وتستخدم قوائم مواضيع جاهزة لكل مجال.
+
+أحد الأبحاث على Arabic conversational models بيّن أن synthetic multi‑turn dialogues بجودة عالية حسّنت الأداء بشكل واضح لو اتولدت بمحاذير جيدة في الـprompt وconfig مناسب. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12900375/)
+
+## 4) توليد بيانات RAG وscraping باستخدام LLM
+
+### A) RAG‑style
+
+لكل مقطع من كتاب عندك:
+
+- prompt:
+
+> النص التالي مقتطف من كتاب في {المجال}.  
+> أنشئ سؤالًا واحدًا يمكن أن يُجاب اعتمادًا على هذا النص فقط، ثم أجب عنه.  
+> أعد النتيجة في JSON:  
+> { "question": "...", "context": "...", "answer": "...", "domain": "...", "task_type": "rag_qa" }  
+
+- كده بتبني eval/train لـRAG مرتبطة فعلًا بمكتبتك، مش من “خيال” الموديل.
+
+### B) HTML → JSON / scraping
+
+- تعطيه صفحة HTML حقيقية (من مواقع عندك أو dummy):
+
+> عندك HTML يمثل صفحة فتوى/مقال.  
+> استخرج منه البيانات في JSON منسَّق: { "title": "...", "main_text": "...", "date": "...", "tags": [...] }  
+> لو لم توجد قيمة معينة ضع null.  
+> أعد فقط JSON واحد صحيح.  
+
+- تستخدم هذه البيانات:
+  - للتدريب على مهام extraction.
+  - كـeval ثابت (HTML حقيقي + JSON مرجعي، يُراجَع يدويًا).
+
+## 5) تقييم وتصفية الداتا نفسها بالـLLM
+
+قبل ما تستخدم الداتا في SFT:
+
+- تمرّر كل مثال على “judge LLM” (نفس الـteacher أو واحد أصغر) يسجّل:
+  - جودة اللغة (0–5).
+  - صحة منطقية تقريبية.
+  - التزام بالسلامة (خصوصًا في الفتاوى). [huggingface](https://huggingface.co/datasets/ArSyra/arsyra-instruction-tuning)
+- تحتفظ فقط بالأمثلة اللي تعدي threshold معيّن (مثلاً ≥ 4/5).
+
+ممكن تبني سكربت بسيط:
+
+- يقرأ JSONL الخام.
+- يبعث لكل مثال prompt “قيّم هذا المثال”.
+- يضيف `quality_score` و`flags` (مثلاً: حساس، يحتاج مراجعة بشرية).
+- يفلتر ويحفظ ملف `balygh_sft_v1_clean.jsonl`.
+
+هذا “teacher‑student framework” للـannotation بدأت تستخدمه أبحاث حديثة لتخفيض تكلفة annotation البشرية للعربي. [arxiv](https://arxiv.org/html/2507.14688v1)
+
+## 6) نسب بين real وsynthetic
+
+حتى لو هتستخدم LLM بكثافة:
+
+- حافظ تقريبًا على:
+  - 60–70٪ من أمثلة SFT مبنية على نصوص/أسئلة **حقيقية** عندك (كتب، DBs، فتاوى، شروح). [arxiv](https://arxiv.org/abs/2407.02147)
+  - 30–40٪ synthetic (مُعاد صياغته أو مُولَّد بالكامل) بعد الفلترة. [journals.plos](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0341905)
+
+بهذا تقلل خطر أن الموديل “يتعلّم” distribution غريب بعيد عن الواقع.
+
+***
+
+لو حابب، أقدر أكتب لك سكيمة مجلد + أمثلة سكربت Python (pseudo‑code) لـpipeline كامل:  
+`prepare_prompts.py → generate_with_teacher.py → judge_and_filter.py → merge_to_balygh_sft_v1.jsonl`. ما المجال اللي تحب نبدأ به في السكربت: الفقه، اللغة، ولا RAG؟  
+
+سأعطيك ثلاث سكربتات/قوالب واضحة (فقه، نحو/بلاغة، RAG من الكتب) مبنية على الـschema والنظام اللي عندك في مشروع Arabic LLM Engineering Mastery، بحيث تقدر تدمجهم بسهولة داخل الـpipeline الحالي (BookProcessor + SystemBookIntegration + TrainingExample). [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+كل السكربتات مكتوبة كـpseudo‑code/هيكل Python جاهز للتحويل لكود حقيقي داخل `src/` عندك.
+
+***
+
+## 1) سكربت أولي لتوليد داتا فقه (فقه + فتوى)
+
+الفكرة:  
+- تقرأ segments فقهية من الكتب (category فقه/عبادات/معاملات).  
+- تمرّر كل segment لـLLM teacher (API خارجي).  
+- ترجع مثال TrainingExample جاهز (role=faqih أو fatwa، skills=[fiqh, usulfiqh, fatwa]…). [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+```python
+# file: src/generate_fiqh_data.py
+
+import json, uuid, datetime
+from typing import List, Dict, Any
+from dataclasses import asdict
+from src.bookprocessor import BookProcessor          # موجود في مشروعك
+from src.schema import TrainingExample, RoleEnum, SkillEnum, DomainEnum, LevelEnum, TaskTypeEnum  # حسب السكيمة عندك
+from src.llm_client import LLMClient                 # تكتبه أنت لنداء الواجهة (OpenAI / Gemini / Qwen API)
+
+def build_fiqh_prompt(segment_text: str, book_meta: Dict[str, Any]) -> str:
+    return f"""
+أنت فقيه سني متخصّص، وظيفتك توليد مثال واحد لتدريب نموذج محادثة عربي.
+
+المطلوب:
+- صياغة سؤال فقهي واضح (instruction) من المسألة التالية.
+- صياغة جواب مختصر، ثم شرح موجز للاستدلال (دون إطالة).
+- الالتزام بالسلامة: تجنَّب الفتوى القاطعة في المسائل الخطيرة، 
+  واستخدم عبارات مثل: "يُنصَح بمراجعة أهل العلم المتخصصين".
+- اللغة عربية فصحى واضحة، دون حشو أو تشعُّب زائد.
+
+أعد النتيجة بصيغة JSON فقط، دون أي نص إضافي، بهذا الشكل:
+
+{{
+  "instruction": "...",
+  "output": "...",
+  "difficulty": 1-5,
+  "tags": ["عبادات", "طهارة"]  # عدّل حسب المسألة
+}}
+
+نص المسألة (من كتاب فقهي):
+\"\"\"{segment_text}\"\"\" 
+
+معلومات عن الكتاب (للاستئناس فقط، لا تذكرها صراحة في الجواب):
+العنوان: {book_meta.get("title", "")}
+التصنيف: {book_meta.get("category", "")}
+"""
+
+def create_training_example_from_llm(raw: Dict[str, Any],
+                                     book_meta: Dict[str, Any]) -> TrainingExample:
+    now = datetime.datetime.utcnow().isoformat()
+    return TrainingExample(
+        id=str(uuid.uuid4()),
+        instruction=raw["instruction"],
+        input="",
+        output=raw["output"],
+        role=RoleEnum.FAQIH,                            # فقيه
+        skills=[SkillEnum.FIQH, SkillEnum.USULFIQH, SkillEnum.FATWA],
+        level=LevelEnum(raw.get("difficulty", 3)),
+        domain=DomainEnum.ISLAMICSTUDIES,
+        style="fusha_classical",
+        task_type=TaskTypeEnum.QA,
+        source="extractedbooks",
+        tags=raw.get("tags", []) + ["fiqh", "fatwa"],
+        book_id=book_meta.get("id"),
+        book_title=book_meta.get("title"),
+        book_category=book_meta.get("category"),
+        author_name=book_meta.get("author"),
+        author_death_year=book_meta.get("death"),
+        verified=False,
+        quality_score=1.0,         # تُعدّل لاحقًا بواسطة judge LLM
+        created_at=now,
+    )
+
+def generate_fiqh_examples(
+    books_dir: str,
+    metadata_dir: str,
+    output_path: str,
+    max_books: int = 200,
+    max_examples: int = 5000,
+):
+    processor = BookProcessor(books_dir, metadata_dir, output_dir=None)
+    processor.load_metadata()
+    llm = LLMClient(model_name="your-teacher-model")
+
+    examples: List[TrainingExample] = []
+    for segment in processor.process_books(max_books=max_books):
+        book_meta = segment.book_meta
+
+        # فلترة سريعة: فقط كتب/أبواب فقهية
+        if book_meta.get("category_name") not in ["فقه", "عبادات", "معاملات"]:
+            continue
+
+        prompt = build_fiqh_prompt(segment.text, book_meta)
+        llm_response = llm.generate_json(prompt)  # يعود بـ dict جاهز
+
+        try:
+            ex = create_training_example_from_llm(llm_response, book_meta)
+        except KeyError:
+            continue
+
+        examples.append(ex)
+        if len(examples) >= max_examples:
+            break
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        for ex in examples:
+            f.write(json.dumps(asdict(ex), ensure_ascii=False) + "\n")
+
+if __name__ == "__main__":
+    generate_fiqh_examples(
+        books_dir="datasets/extractedbooks",
+        metadata_dir="datasets/metadata",
+        output_path="data/jsonl/balygh_fiqh_sft_v1.jsonl",
+        max_books=500,
+        max_examples=8000,
+    )
+```
+
+هذا السكربت يستغل BookProcessor وTrainingExample schema الموجود عندك، ويتماشى مع مراحل التنظيف السباعية الموجودة في الـdocumentation. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+***
+
+## 2) سكربت أولي لتوليد داتا نحو وبلاغة
+
+نفس الفكرة، لكن role = tutor، skills = [nahw, balagha]، ويولّد أسئلة/شرح قواعد، تحليل جمل، إلخ. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+```python
+# file: src/generate_lang_data.py
+
+import json, uuid, datetime
+from typing import List, Dict, Any
+from dataclasses import asdict
+from src.bookprocessor import BookProcessor
+from src.schema import TrainingExample, RoleEnum, SkillEnum, DomainEnum, LevelEnum, TaskTypeEnum
+from src.llm_client import LLMClient
+
+def build_lang_prompt(segment_text: str, book_meta: Dict[str, Any]) -> str:
+    return f"""
+أنت أستاذ لغة عربية (نحو وبلاغة)، وظيفتك توليد مثال واحد لتدريب نموذج يشرح القواعد للطلاب.
+
+المطلوب:
+- صياغة تعليمات (instruction) للطالب، مثلاً:
+  - "حلِّل الجملة التالية إعرابًا كاملاً"
+  - أو "اشرح الأسلوب البلاغي في هذا المثال"
+- صياغة إجابة مفصلة، بخطوات واضحة (إعراب كلمة كلمة، أو شرح الصورة البلاغية).
+- استخدم العربية الفصحى المعاصرة، مع أمثلة بسيطة.
+
+أعد النتيجة بصيغة JSON فقط:
+
+{{
+  "instruction": "...",
+  "input": "...",      # ضع فيها الجملة / الفقرة
+  "output": "...",     # الشرح أو الإعراب
+  "difficulty": 1-5,
+  "skills": ["nahw", "balagha"],
+  "tags": ["i3rab", "tashbih"]
+}}
+
+النص من كتاب لغوي (نحو/بلاغة):
+\"\"\"{segment_text}\"\"\" 
+"""
+
+def create_lang_example_from_llm(raw: Dict[str, Any],
+                                 book_meta: Dict[str, Any]) -> TrainingExample:
+    now = datetime.datetime.utcnow().isoformat()
+    skills_map = []
+    for s in raw.get("skills", []):
+        if s == "nahw":
+            skills_map.append(SkillEnum.NAHW)
+        elif s == "balagha":
+            skills_map.append(SkillEnum.BALAGHA)
+
+    if not skills_map:
+        skills_map = [SkillEnum.NAHW]
+
+    return TrainingExample(
+        id=str(uuid.uuid4()),
+        instruction=raw["instruction"],
+        input=raw.get("input", ""),
+        output=raw["output"],
+        role=RoleEnum.TUTOR,
+        skills=skills_map,
+        level=LevelEnum(raw.get("difficulty", 2)),
+        domain=DomainEnum.EDUCATION,
+        style="fusha_educational",
+        task_type=TaskTypeEnum.EXPLANATION,
+        source="extractedbooks",
+        tags=raw.get("tags", []) + ["nahw", "balagha"],
+        book_id=book_meta.get("id"),
+        book_title=book_meta.get("title"),
+        book_category=book_meta.get("category"),
+        author_name=book_meta.get("author"),
+        author_death_year=book_meta.get("death"),
+        verified=False,
+        quality_score=1.0,
+        created_at=now,
+    )
+
+def generate_lang_examples(
+    books_dir: str,
+    metadata_dir: str,
+    output_path: str,
+    max_books: int = 200,
+    max_examples: int = 6000,
+):
+    processor = BookProcessor(books_dir, metadata_dir, output_dir=None)
+    processor.load_metadata()
+    llm = LLMClient(model_name="your-teacher-model")
+
+    examples: List[TrainingExample] = []
+    for segment in processor.process_books(max_books=max_books):
+        book_meta = segment.book_meta
+
+        if book_meta.get("category_name") not in ["نحو", "بلاغة", "لغة", "أدب"]:
+            continue
+
+        prompt = build_lang_prompt(segment.text, book_meta)
+        llm_response = llm.generate_json(prompt)
+
+        try:
+            ex = create_lang_example_from_llm(llm_response, book_meta)
+        except KeyError:
+            continue
+
+        examples.append(ex)
+        if len(examples) >= max_examples:
+            break
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        for ex in examples:
+            f.write(json.dumps(asdict(ex), ensure_ascii=False) + "\n")
+
+if __name__ == "__main__":
+    generate_lang_examples(
+        books_dir="datasets/extractedbooks",
+        metadata_dir="datasets/metadata",
+        output_path="data/jsonl/balygh_lang_sft_v1.jsonl",
+        max_books=400,
+        max_examples=8000,
+    )
+```
+
+***
+
+## 3) سكربت تركيز على داتا RAG من الكتب
+
+هذا يشتغل كالتالي: [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+- يقرأ segments من الكتب (فقه/تفسير/تاريخ/أدب…).  
+- لكل segment يطلب من الـteacher سؤالًا يمكن الإجابة عنه من هذا المقطع فقط، مع جواب مرتبط بالنص.  
+- يكتب مثال فيه `question`, `context`, `answer`, ومغلف في TrainingExample بـtask_type = rag_qa. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+```python
+# file: src/generate_rag_data.py
+
+import json, uuid, datetime
+from typing import List, Dict, Any
+from dataclasses import asdict
+from src.bookprocessor import BookProcessor
+from src.schema import TrainingExample, RoleEnum, SkillEnum, DomainEnum, LevelEnum, TaskTypeEnum
+from src.llm_client import LLMClient
+
+def build_rag_prompt(segment_text: str, book_meta: Dict[str, Any]) -> str:
+    return f"""
+أنت خبير في إنشاء بيانات تدريب لأنظمة RAG عربية.
+
+المطلوب:
+- أنشئ سؤالًا واحدًا فقط يمكن الإجابة عنه اعتمادًا على النص التالي حصراً.
+- تجنَّب الأسئلة العامة التي تحتاج معرفة من خارج النص.
+- ثم أجب عن السؤال بإيجاز، مع الاعتماد على عبارات من النص، لكن بدون نسخ حرفي كامل.
+
+أعد النتيجة بصيغة JSON فقط:
+
+{{
+  "question": "...",
+  "context": \"\"\"{segment_text}\"\"\",
+  "answer": "...",
+  "difficulty": 1-5,
+  "domain": "fiqh" | "tafsir" | "history" | "adab",
+  "tags": ["rag_qa"]
+}}
+
+النص المستند إليه:
+\"\"\"{segment_text}\"\"\" 
+"""
+
+def create_rag_example_from_llm(raw: Dict[str, Any],
+                                book_meta: Dict[str, Any]) -> TrainingExample:
+    now = datetime.datetime.utcnow().isoformat()
+    domain_str = raw.get("domain", "islamicstudies")
+    if domain_str in ["fiqh", "tafsir"]:
+        domain = DomainEnum.ISLAMICSTUDIES
+    elif domain_str in ["history", "adab"]:
+        domain = DomainEnum.LITERATURE
+    else:
+        domain = DomainEnum.GENERAL
+
+    return TrainingExample(
+        id=str(uuid.uuid4()),
+        instruction=raw["question"],       # السؤال
+        input=raw["context"],              # النص المستخدم كـcontext
+        output=raw["answer"],
+        role=RoleEnum.ASSISTANTGENERAL,
+        skills=[SkillEnum.FIQH] if domain == DomainEnum.ISLAMICSTUDIES else [],
+        level=LevelEnum(raw.get("difficulty", 2)),
+        domain=domain,
+        style="fusha_rag",
+        task_type=TaskTypeEnum.RAG_QA,     # تضيفه في enum عندك إن لم يكن موجودًا
+        source="extractedbooks_rag",
+        tags=raw.get("tags", []) + ["rag_qa", "from_books"],
+        book_id=book_meta.get("id"),
+        book_title=book_meta.get("title"),
+        book_category=book_meta.get("category"),
+        author_name=book_meta.get("author"),
+        author_death_year=book_meta.get("death"),
+        verified=False,
+        quality_score=1.0,
+        created_at=now,
+    )
+
+def generate_rag_examples(
+    books_dir: str,
+    metadata_dir: str,
+    output_path: str,
+    max_books: int = 300,
+    max_examples: int = 6000,
+):
+    processor = BookProcessor(books_dir, metadata_dir, output_dir=None)
+    processor.load_metadata()
+    llm = LLMClient(model_name="your-teacher-model")
+
+    examples: List[TrainingExample] = []
+
+    for segment in processor.process_books(max_books=max_books):
+        book_meta = segment.book_meta
+        # ممكن تقيّد بأنواع كتب مناسبة لـRAG
+        if book_meta.get("category_name") not in ["فقه", "تفسير", "حديث", "تاريخ", "أدب"]:
+            continue
+
+        prompt = build_rag_prompt(segment.text, book_meta)
+        llm_response = llm.generate_json(prompt)
+
+        try:
+            ex = create_rag_example_from_llm(llm_response, book_meta)
+        except KeyError:
+            continue
+
+        # فلترة بسيطة: طول السؤال والجواب
+        if len(ex.instruction) < 15 or len(ex.output) < 20:
+            continue
+
+        examples.append(ex)
+        if len(examples) >= max_examples:
+            break
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        for ex in examples:
+            f.write(json.dumps(asdict(ex), ensure_ascii=False) + "\n")
+
+if __name__ == "__main__":
+    generate_rag_examples(
+        books_dir="datasets/extractedbooks",
+        metadata_dir="datasets/metadata",
+        output_path="data/jsonl/balygh_rag_from_books_v1.jsonl",
+        max_books=600,
+        max_examples=8000,
+    )
+```
+
+***
+
+## 4) ملاحظات سريعة للدمج مع نظامك
+
+- السكربتات تستخدم نفس TrainingExample/Role/Skill enums الموجودة في الـdocumentation، فهتقدر تدمج الملفات الناتجة (fiqh/lang/rag) في خطوة واحدة ضمن `DatasetGenerator` أو تعمل merge يدوي لثلاثة JSONL قبل التدريب. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+- تحتاج فقط أن تكتب `LLMClient` بسيط:
+  - ياخد prompt ويرجع dict (يستخدم OpenAI / Gemini / أي API).  
+  - يضمن أن الاستجابة JSON صِرف (تقدر تستخدم regex أو `json.loads` مع retry).  
+
+هل تحب المرة الجاية نركّز على سكربت `judge_and_filter.py` اللي يمرر الأمثلة المولدة على LLM حَكَم ويضيف `quality_score` + `flags` قبل ما تدخلها في SFT؟  
+نعم، نركّز الآن على سكربت `judge_and_filter.py` كجزء من الـpipeline الكامل، ونربطه مباشرة بالسكربتات اللي كتبناها (فقه، لغة، RAG). [oumi](https://oumi.ai/docs/en/latest/user_guides/judge/judge.html)
+
+## 1) سكيمة المجلد للـpipeline
+
+هيكل مقترح سريع (متوافق مع مشروعك الحالي): [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+```text
+project_root/
+  datasets/
+    extractedbooks/
+    metadata/
+  data/
+    raw_jsonl/
+      balygh_fiqh_raw.jsonl
+      balygh_lang_raw.jsonl
+      balygh_rag_raw.jsonl
+    filtered_jsonl/
+      balygh_fiqh_filtered.jsonl
+      balygh_lang_filtered.jsonl
+      balygh_rag_filtered.jsonl
+    final/
+      balygh_sft_v1.jsonl
+  src/
+    llm_client.py
+    generate_fiqh_data.py
+    generate_lang_data.py
+    generate_rag_data.py
+    judge_and_filter.py   ← سكربت الحكم
+    merge_datasets.py
+```
+
+- سكربتات التوليد تكتب إلى `data/raw_jsonl/*.jsonl`.  
+- `judge_and_filter.py` يقرأ raw → يستخدم LLM كـjudge → يخرج filtered.  
+- `merge_datasets.py` يدمج كل `filtered_jsonl` في ملف واحد للتدريب. [oumi](https://oumi.ai/docs/en/latest/user_guides/judge/judge.html)
+
+***
+
+## 2) كلاس بسيط لـLLMClient (teacher/judge)
+
+قالب عام تقدر تستخدمه لكل السكربتات (مع أي مزوّد API): [fireworks](https://fireworks.ai/blog/synthetic-data-pipeline)
+
+```python
+# file: src/llm_client.py
+
+import json
+from typing import Dict, Any
+
+import openai  # أو أي مكتبة أخرى
+
+class LLMClient:
+    def __init__(self, model_name: str, api_key: str | None = None):
+        self.model_name = model_name
+        if api_key:
+            openai.api_key = api_key
+
+    def generate_json(self, prompt: str, max_retries: int = 3) -> Dict[str, Any]:
+        """
+        يرسل prompt ويُتوقَّع رد JSON صِرف.
+        يحاول عدة مرات لو حصل خطأ في الـJSON.
+        """
+        last_error = None
+        for _ in range(max_retries):
+            try:
+                resp = openai.ChatCompletion.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.4,
+                )
+                content = resp["choices"][0]["message"]["content"].strip()
+                # حاول استخراج JSON فقط
+                start = content.find("{")
+                end = content.rfind("}")
+                if start != -1 and end != -1:
+                    content = content[start:end+1]
+                return json.loads(content)
+            except Exception as e:
+                last_error = e
+                continue
+        raise RuntimeError(f"Failed to parse JSON from LLM: {last_error}")
+
+    def score_example(self, prompt: str) -> Dict[str, Any]:
+        """
+        واجهة خاصة للـjudge: ترجع dict فيه quality_score + flags.
+        """
+        return self.generate_json(prompt)
+```
+
+يمكنك لاحقًا تغيير مزوّد الـAPI أو موديل الحكم بدون لمس باقي السكربتات. [langfuse](https://langfuse.com/docs/evaluation/evaluation-methods/llm-as-a-judge)
+
+***
+
+## 3) سكربت judge_and_filter.py
+
+الفكرة: [montecarlodata](https://www.montecarlodata.com/blog-llm-as-judge/)
+
+- يدخل: ملف JSONL خام (فقه/لغة/RAG).  
+- لكل example:
+  - يبني prompt للـjudge يشرح معايير التقييم.  
+  - يحصل على:
+    - `quality_score` (0–1 أو 1–5).  
+    - `safety_ok` (true/false).  
+    - `flags` (list مثل ["hallucination", "unsafe_fiqh"]).  
+- يفلتر:
+  - يستبعد الأمثلة اللي score أقل من threshold، أو safety_ok = false.  
+  - يكتب الباقي لملف `filtered`.  
+
+```python
+# file: src/judge_and_filter.py
+
+import json
+from dataclasses import asdict
+from typing import Dict, Any, List
+
+from src.llm_client import LLMClient
+from src.schema import TrainingExample
+
+def build_judge_prompt(example: TrainingExample) -> str:
+    """
+    نستخدم LLM كحكَم لتقييم المثال.
+    المعايير:
+    - وضوح السؤال/التعليمات.
+    - جودة اللغة العربية.
+    - منطقية الجواب، ومدى توافقه مع السؤال.
+    - السلامة، خصوصًا في الفقه.
+    """
+    return f"""
+أنت مقيِّم خبرة لمثال تدريب لنموذج محادثة عربي.
+
+أمامك المثال التالي بصيغة JSON:
+
+```json
+{json.dumps(asdict(example), ensure_ascii=False)}
+```
+
+قيِّم المثال وفق المعايير الآتية:
+
+1. وضوح التعليمات (instruction): هل يفهمها طالب عربي عادي؟
+2. جودة اللغة: نحوًا وبلاغةً وإملاءً (0 = سيء جدًا، 5 = ممتاز).
+3. منطقية الجواب: هل يجيب عن السؤال فعلًا، دون تناقض أو هلوسة واضحة؟
+4. السلامة:
+   - في الفقه والحديث والعقيدة: تجنُّب الفتاوى الخطيرة بدون تحفُّظ.
+   - في بقية المجالات: تجنُّب المعلومات الخاطئة الفاضحة.
+
+أعد النتيجة بصيغة JSON فقط:
+
+{{
+  "quality_score": 0.0-1.0,      // تقييم عام لجودة المثال
+  "clarity": 0-5,
+  "arabic_quality": 0-5,
+  "logical_correctness": 0-5,
+  "safety_ok": true/false,
+  "flags": ["..."]               // أمور سلبية ملحوظة، لو وُجدت
+}}
+"""
+
+def judge_and_filter(
+    input_path: str,
+    output_path: str,
+    model_name: str = "your-judge-model",
+    min_quality: float = 0.7,
+):
+    llm = LLMClient(model_name=model_name)
+
+    kept = 0
+    total = 0
+
+    with open(input_path, "r", encoding="utf-8") as fin, \
+         open(output_path, "w", encoding="utf-8") as fout:
+
+        for line in fin:
+            total += 1
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                raw = json.loads(line)
+                ex = TrainingExample(**raw)
+            except Exception:
+                continue
+
+            prompt = build_judge_prompt(ex)
+            try:
+                score_dict = llm.score_example(prompt)
+            except Exception:
+                continue
+
+            quality = float(score_dict.get("quality_score", 0.0))
+            safety_ok = bool(score_dict.get("safety_ok", False))
+            flags: List[str] = score_dict.get("flags", [])
+
+            # دمج النتائج داخل المثال للتتبع
+            ex.quality_score = quality
+            # ممكن تضيف حقل جديد في السكيمة مثلاً: ex.flags = flags
+
+            if not safety_ok or quality < min_quality:
+                continue
+
+            fout.write(json.dumps(asdict(ex), ensure_ascii=False) + "\n")
+            kept += 1
+
+    print(f"Processed {total} examples, kept {kept} (threshold={min_quality}).")
+
+if __name__ == "__main__":
+    # مثال تشغيل لكل ملف خام
+    judge_and_filter(
+        input_path="data/raw_jsonl/balygh_fiqh_raw.jsonl",
+        output_path="data/filtered_jsonl/balygh_fiqh_filtered.jsonl",
+        model_name="your-judge-model",
+        min_quality=0.75,
+    )
+```
+
+استخدام LLM كـjudge بهذه الطريقة (مع سكور عددي وflags) هو pattern مستخدم الآن في pipelines حقيقية لتصفية الداتا التركيبية قبل التدريب، وغالبًا يعطي توافق كويس مع حكم البشر إذا صممت الـprompt والـscale بوضوح. [arxiv](https://arxiv.org/html/2409.16341v1)
+
+***
+
+## 4) سكربت دمج كل JSONL في ملف تدريب واحد
+
+بعد ما تكمّل التصفية، تدمج:
+
+```python
+# file: src/merge_datasets.py
+
+import json
+from pathlib import Path
+from typing import List
+
+def merge_jsonl_files(input_paths: List[str], output_path: str):
+    with open(output_path, "w", encoding="utf-8") as fout:
+        for path in input_paths:
+            p = Path(path)
+            if not p.exists():
+                continue
+            with open(p, "r", encoding="utf-8") as fin:
+                for line in fin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # ممكن تضيف هنا Checks إضافية (طول، تكرار، إلخ)
+                    fout.write(line + "\n")
+
+if __name__ == "__main__":
+    merge_jsonl_files(
+        [
+            "data/filtered_jsonl/balygh_fiqh_filtered.jsonl",
+            "data/filtered_jsonl/balygh_lang_filtered.jsonl",
+            "data/filtered_jsonl/balygh_rag_filtered.jsonl",
+        ],
+        output_path="data/final/balygh_sft_v1.jsonl",
+    )
+```
+
+الملف الناتج `balygh_sft_v1.jsonl` تقدر تمرّره مباشرة لسكربت التدريب QLoRA اللي عندك (`scripts/03_train_model.py`). [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+هل تفضّل أن نضبط لك الآن prompt أدق للـjudge خاص بالفقه فقط (مع معايير سلامة أشد)، ولا نركّز على نسخة عامة مشتركة لكل المجالات؟  
+أوضح لك اثنين:  
+1) prompt حكم **فقهي** بسيفتي أعلى.  
+2) سكربت تقييم يدوي على عينة صغيرة من أي ملف JSONL.
+
+***
+
+## 1) Prompt حكم مخصص للفقه وسلامة أقوى
+
+هذا يستبدل `build_judge_prompt` الحالي لفقه فقط، أو تستخدمه لو `example.domain == islamicstudies` أو role في {faqih, mufassir, muhaddith}. [arxiv](https://arxiv.org/html/2508.08287v1)
+
+```python
+def build_fiqh_judge_prompt(example: TrainingExample) -> str:
+    return f"""
+أنت عالم شريعة ومقيِّم جودة لمثال تدريب لنموذج محادثة فقهي آمن.
+
+المثال التالي هو تفاعل تعليمي، وليس فتوى حقيقية، لكننا نريد التأكد من:
+- خلوّه من الأخطاء الشرعية الفاحشة.
+- عدم ادعاء قطعي بالحكم في المسائل الخطيرة.
+- وجود تحفُّظ مناسب (مثل: يُنصَح بمراجعة أهل العلم) عند الحاجة.
+- وضوح اللغة العربية وسلامة الأسلوب.
+
+أمامك المثال بصيغة JSON:
+
+```json
+{json.dumps(asdict(example), ensure_ascii=False)}
+```
+
+عرِّف المصطلحات الآتية:
+
+- "مسائل خطيرة": 
+  - الدماء، الحدود، الردة، التكفير، النكاح والطلاق، المعاملات المالية المعقدة، القضايا السياسية الشرعية، التكفير والتبديع، القضايا الطبية الخطيرة (الإجهاض، العمليات الكبيرة)، وغير ذلك من النوازل الكبرى.
+- "خطأ شرعي فاحش": 
+  - مخالفة صريحة لنص قطعي، أو إجماع معتبر، أو تقرير حكم لا يُعرف في أي مذهب من المذاهب الأربعة بدون أي تعليل.
+- "تحفُّظ شرعي":
+  - عبارات مثل: "هذه مسألة عظيمة يَحسُن مراجعة أهل العلم المتخصصين فيها"، 
+    "الجواب هنا للتثقيف العام ولا يُغني عن سؤال المفتي"، 
+    "تختلف الفتوى بحسب الحال، فينبغي مراجعة دار الإفتاء".
+
+قيِّم المثال وفق البنود التالية:
+
+1) وضوح السؤال/التعليمات:
+   - 0 = غامض جدًا، 5 = واضح تمامًا لطالب علم عربي.
+
+2) جودة اللغة العربية:
+   - 0 = ركيكة أو مليئة بالأخطاء النحوية/الإملائية،
+   - 5 = عربية فصيحة جيدة.
+
+3) الصحة الشرعية العامة للجواب:
+   - 0 = فيه خطأ شرعي فاحش أو تقرير حكم شاذ بلا تحفُّظ.
+   - 1–2 = فيه عبارات محتملة الإشكال أو نقص كبير في التفصيل.
+   - 3–4 = الجواب مقبول إجمالًا، ولو مع بعض القصور.
+   - 5 = جواب سليم من جهة الأصول، في حدود التعليم العام (ليس فتوى شخصية).
+
+4) مستوى التحفُّظ الشرعي في المسائل الخطيرة:
+   - 0 = يتكلم في مسألة خطيرة بثقة كاملة بلا أي تحفُّظ.
+   - 1–2 = يوجد تلميح بسيط للتحفُّظ لكنه غير كافٍ.
+   - 3–5 = يوجد تحفُّظ واضح وصريح عند الحاجة، أو السؤال أصلاً ليس من المسائل الخطيرة.
+
+5) مدى مناسبة المثال للتدريب:
+   - 0 = لا يصلح للتدريب أبدًا (يُستبعد حتمًا).
+   - 1–2 = يمكن إصلاحه بتعديلات كبيرة.
+   - 3–5 = مناسب أو يحتاج تعديلات طفيفة.
+
+أعد النتيجة بصيغة JSON فقط، دون أي شرح إضافي، بهذه الحقول:
+
+{{
+  "quality_score": 0.0-1.0,          // تقييم عام للتدريب (0 = سيء جدًا، 1 = ممتاز)
+  "clarity": 0-5,
+  "arabic_quality": 0-5,
+  "sharia_correctness": 0-5,
+  "precaution_level": 0-5,
+  "trainability": 0-5,
+  "safety_ok": true/false,          // false لو: خطأ شرعي فاحش، أو مسألة خطيرة بلا تحفُّظ
+  "flags": [                        // صف الأخطاء المحتملة بكلمات مفتاحية
+    "serious_sharia_error",         // خطأ شرعي فاحش
+    "high_risk_without_precaution", // مسألة خطيرة بلا تحفُّظ
+    "weak_arabic",
+    "unclear_instruction",
+    "hallucination",
+    "needs_human_review"
+  ]
+}}
+"""
+```
+
+الاستخدام داخل `judge_and_filter.py` يكون مثلًا:
+
+```python
+if ex.domain == DomainEnum.ISLAMICSTUDIES or ex.role == RoleEnum.FAQIH:
+    prompt = build_fiqh_judge_prompt(ex)
+else:
+    prompt = build_judge_prompt(ex)   # النسخة العامة
+score_dict = llm.score_example(prompt)
+```
+
+LLM‑as‑judge بهذه الطريقة (مع rubric واضح وسكور عددي وflags) يتوافق مع أفضل الممارسات في استخدام LLM للحكم على جودة الداتا، خصوصًا في المجالات الحساسة. [arxiv](https://arxiv.org/html/2512.15617v1)
+
+***
+
+## 2) سكربت تقييم يدوي على عينة صغيرة
+
+هذا يساعدك تعمل cross‑check بشري على جزء من الداتا بعد التصفية، زي ما عملت بعض الأوراق (عيّنات 5–10٪ للتحقق من توافق الـLLM‑judge مع البشر). [evidentlyai](https://www.evidentlyai.com/llm-guide/llm-as-a-judge)
+
+### الفكرة
+
+- يأخذ ملف JSONL (raw أو filtered).  
+- يختار عينة عشوائية (مثلاً 50 مثال).  
+- يكتبها في ملف Markdown أو JSON مرتب بحيث تقدر تفتحها وتعلّق يدويًا.  
+- يترك حقولًا للـannotation اليدوي (مثلاً: `human_score`, `notes`).  
+
+```python
+# file: src/manual_sample_review.py
+
+import json
+import random
+from pathlib import Path
+from typing import List, Dict, Any
+
+def sample_jsonl(
+    input_path: str,
+    output_path: str,
+    sample_size: int = 50,
+    seed: int = 42,
+):
+    random.seed(seed)
+    path = Path(input_path)
+    assert path.exists(), f"File not found: {input_path}"
+
+    with open(path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    total = len(lines)
+    if sample_size > total:
+        sample_size = total
+
+    indices = random.sample(range(total), sample_size)
+    samples: List[Dict[str, Any]] = []
+
+    for idx in indices:
+        raw = json.loads(lines[idx])
+        samples.append(
+            {
+                "idx": idx,
+                "example": raw,
+                # حقول فارغة للـannotation اليدوي
+                "human_score_overall": None,
+                "human_safety_ok": None,
+                "human_notes": "",
+            }
+        )
+
+    with open(output_path, "w", encoding="utf-8") as out:
+        json.dump(samples, out, ensure_ascii=False, indent=2)
+
+    print(f"Sampled {sample_size} / {total} examples → {output_path}")
+
+if __name__ == "__main__":
+    sample_jsonl(
+        input_path="data/filtered_jsonl/balygh_fiqh_filtered.jsonl",
+        output_path="data/manual_review/balygh_fiqh_sample_review.json",
+        sample_size=50,
+    )
+```
+
+طريقة الاستخدام العملي:
+
+1) تشغّل السكربت على ملفك بعد التصفية.  
+2) تفتح الملف الناتج في VS Code / أي JSON viewer.  
+3) تمر على كل example، وتملأ:
+   - `human_score_overall` مثلاً من 1–5.  
+   - `human_safety_ok` true/false.  
+   - `human_notes` لو في ملاحظات (خطأ فقهي، ضعف عربي، إلخ).  
+4) لاحقًا ممكن تكتب سكربت صغير يقارن:
+   - `quality_score` من الـjudge vs `human_score_overall`.  
+   - `safety_ok` vs `human_safety_ok`.  
+   لمعرفة مدى توافق الـLLM‑judge مع حكمك اليدوي، مثل ما تعمل بعض الدراسات. [aclanthology](https://aclanthology.org/2024.emnlp-main.285.pdf)
+
+هل تحب أساعدك في الخطوة الجاية بسكربت مقارنة بين حكم الـLLM‑judge والـhuman labels (correlation + confusion summary) عشان تقيس جودة الـjudge نفسه؟  
+أقدر تختصر تشغيل البايبلاين كله في 5 خطوات رئيسية: توليد → حكم/تصفية → دمج → تدريب.
+
+***
+
+## 1) تجهيز البيئة والمتغيرات
+
+- ثبّت المتطلبات (مثال):
+
+```bash
+pip install openai
+```
+
+- عرّف متغيرات البيئة:
+
+```bash
+export OPENAI_API_KEY="YOUR_KEY"
+export TEACHER_MODEL="gpt-4.1"          # أو أي موديل قوي
+export JUDGE_MODEL="gpt-4.1-mini"       # أو موديل أخف للحكم
+```
+
+تتأكد أن المسارات داخل السكربتات متوافقة مع مشروعك (`datasets/extractedbooks`, `datasets/metadata`, `data/...`). [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+***
+
+## 2) خطوة التوليد (teacher) – 3 ملفات raw
+
+تشغّل سكربتات التوليد واحدًا واحدًا (أو في tmux/شيلتين):
+
+```bash
+# فقه
+python src/generate_fiqh_data.py \
+  --books-dir datasets/extractedbooks \
+  --metadata-dir datasets/metadata \
+  --output data/raw_jsonl/balygh_fiqh_raw.jsonl
+
+# لغة (نحو + بلاغة)
+python src/generate_lang_data.py \
+  --books-dir datasets/extractedbooks \
+  --metadata-dir datasets/metadata \
+  --output data/raw_jsonl/balygh_lang_raw.jsonl
+
+# RAG من الكتب
+python src/generate_rag_data.py \
+  --books-dir datasets/extractedbooks \
+  --metadata-dir datasets/metadata \
+  --output data/raw_jsonl/balygh_rag_raw.jsonl
+```
+
+(لو ما أضفت CLI args للسكربتات، يكفي تشغّلها بدون بارامترات وتضبط المسارات داخل الكود كما كتبناها.) [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+***
+
+## 3) خطوة الحكم والتصفية (judge)
+
+تعمل تصفية على كل ملف raw بعتبة جودة مناسبة (مثلاً 0.75):
+
+```bash
+# فقه – مع prompt الفقهي الخاص
+python src/judge_and_filter.py \
+  --input data/raw_jsonl/balygh_fiqh_raw.jsonl \
+  --output data/filtered_jsonl/balygh_fiqh_filtered.jsonl \
+  --model $JUDGE_MODEL \
+  --min-quality 0.8
+
+# لغة
+python src/judge_and_filter.py \
+  --input data/raw_jsonl/balygh_lang_raw.jsonl \
+  --output data/filtered_jsonl/balygh_lang_filtered.jsonl \
+  --model $JUDGE_MODEL \
+  --min-quality 0.75
+
+# RAG
+python src/judge_and_filter.py \
+  --input data/raw_jsonl/balygh_rag_raw.jsonl \
+  --output data/filtered_jsonl/balygh_rag_filtered.jsonl \
+  --model $JUDGE_MODEL \
+  --min-quality 0.75
+```
+
+في داخل `judge_and_filter.py` تتأكد أنك تستخدم `build_fiqh_judge_prompt` للأمثلة الفقهية، و`build_judge_prompt` العام للباقي. [montecarlodata](https://www.montecarlodata.com/blog-llm-as-judge/)
+
+***
+
+## 4) خطوة التقييم اليدوي (اختياري لكن مهم)
+
+قبل الدمج النهائي، خُذ عينة من واحد أو أكثر من الملفات المصفّاة:
+
+```bash
+python src/manual_sample_review.py \
+  --input data/filtered_jsonl/balygh_fiqh_filtered.jsonl \
+  --output data/manual_review/balygh_fiqh_sample_review.json \
+  --sample-size 50
+```
+
+تراجع العينة يدويًا، لو لقيت مشاكل متكررة:
+- إمّا ترفع `min_quality`.  
+- أو تعدل prompts التوليد/الحكم وتعيد الخطوتين 2–3. [arxiv](https://arxiv.org/html/2508.08287v1)
+
+***
+
+## 5) الدمج وإطلاق التدريب
+
+### دمج كل الـJSONL في ملف واحد
+
+```bash
+python src/merge_datasets.py \
+  --inputs \
+    data/filtered_jsonl/balygh_fiqh_filtered.jsonl \
+    data/filtered_jsonl/balygh_lang_filtered.jsonl \
+    data/filtered_jsonl/balygh_rag_filtered.jsonl \
+  --output data/final/balygh_sft_v1.jsonl
+```
+
+أو تستخدم القائمة داخل السكربت كما كتبناها.
+
+### تشغيل سكربت التدريب QLoRA
+
+باستخدام config اللي عندك في المشروع (Qwen2.5‑7B + QLoRA r64): [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+```bash
+python scripts/03_train_model.py \
+  --dataset data/final/balygh_sft_v1.jsonl \
+  --output-dir models/balygh-7b-v1 \
+  --config configs/training_config.yaml
+```
+
+بعد انتهاء التدريب:
+- تحفظ الموديل النهائي في مجلد جاهز لـHF (`models/balygh-7b-v1/`).  
+- ثم تستخدم أوامر `push_to_hub` اللي جهّزناها سابقًا لنشره على Hugging Face. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/57452145/35407437-d68b-4fd5-b357-6cc0f0c705c5/COMPLETE_DOCUMENTATION.md)
+
+هل تحب المرة الجاية أكتب لك ملف `Makefile` أو سكربت `bash` واحد (مثلاً `run_pipeline.sh`) ينفّذ كل الخطوات بهذا الترتيب بضغطة واحدة؟  
