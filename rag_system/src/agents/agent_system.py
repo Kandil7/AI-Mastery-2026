@@ -446,7 +446,7 @@ class AgentTeam:
 
         Args:
             task: The task description
-            required_roles: Which agent roles are needed
+            requires_roles: Which agent roles are needed
 
         Returns:
             Combined results from all agents
@@ -454,7 +454,7 @@ class AgentTeam:
 
         results = {}
 
-        for role in required_roles:
+        for role in requires_roles:  # Fixed: required_roles -> requires_roles
             agent = self.agents.get(role)
             if agent:
                 # Determine appropriate action based on role
