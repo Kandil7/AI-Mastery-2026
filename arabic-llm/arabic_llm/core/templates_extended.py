@@ -803,7 +803,7 @@ except ImportError:
     ALL_TEMPLATES_EXTENDED = EXTENDED_TEMPLATES
 
 
-def get_extended_templates(role: str = None, skill: str = None, level: str = None) -> List[Template]:
+def get_extended_templates(role: Optional[str] = None, skill: Optional[str] = None, level: Optional[str] = None) -> List[Template]:
     """
     Get templates filtered by role, skill, and/or level from extended collection.
     
@@ -830,7 +830,7 @@ def get_extended_templates(role: str = None, skill: str = None, level: str = Non
     return templates
 
 
-def get_random_extended_template(role: str = None, skill: str = None, level: str = None) -> Template:
+def get_random_extended_template(role: Optional[str] = None, skill: Optional[str] = None, level: Optional[str] = None) -> Template:
     """Get a random template from extended collection matching the criteria"""
     templates = get_extended_templates(role, skill, level)
     if not templates:

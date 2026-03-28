@@ -169,7 +169,7 @@ def get_best_checkpoint(base_dir: str, metric: str = "val_loss") -> Optional[str
     if not checkpoints:
         return None
     
-    best_checkpoint = None
+    best_checkpoint: Optional[str] = None
     best_metric = float('inf')
     
     for checkpoint in checkpoints:

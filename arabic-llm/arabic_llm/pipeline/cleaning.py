@@ -198,11 +198,11 @@ class ArabicTextCleaner:
     All cleaning operations are reversible and logged.
     """
     
-    def __init__(self, logger: logging.Logger = None):
+    def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger or logging.getLogger(__name__)
         self.operations_log = []
     
-    def clean(self, text: str, book_id: int = None) -> Tuple[str, List[str]]:
+    def clean(self, text: str, book_id: Optional[int] = None) -> Tuple[str, List[str]]:
         """
         Apply all cleaning operations in sequence.
         
@@ -413,7 +413,7 @@ class BookContentParser:
     - Content hierarchy
     """
     
-    def __init__(self, logger: logging.Logger = None):
+    def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger or logging.getLogger(__name__)
     
     def parse(self, content: str, metadata: BookMetadata) -> CleanedBook:

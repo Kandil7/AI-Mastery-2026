@@ -87,7 +87,7 @@ class SystemBookIntegration:
     4. Lucene search indexes (future integration)
     """
     
-    def __init__(self, base_dir: str, logger: logging.Logger = None):
+    def __init__(self, base_dir: str, logger: Optional[logging.Logger] = None):
         self.base_dir = Path(base_dir)
         self.logger = logger or logging.getLogger(__name__)
         

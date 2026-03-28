@@ -4834,8 +4834,8 @@ class DistillationTrainer(SFTTrainer):
 async def collect_feedback(
     query_id: str,
     rating: int,        # 1-5
-    correction: str = None,   # المستخدم يصحح الإجابة
-    flag_type: str = None     # "wrong_info" | "unsafe" | "incomplete"
+    correction: Optional[str] = None,   # المستخدم يصحح الإجابة
+    flag_type: Optional[str] = None     # "wrong_info" | "unsafe" | "incomplete"
 ):
     """
     كل تقييم سلبي + تصحيح = DPO pair جاهز:
