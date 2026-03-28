@@ -205,7 +205,7 @@ class IslamicRAGAgent:
         """Initialize default tools from pipeline."""
 
         from ..specialists.islamic_scholars import create_islamic_scholar
-        from .advanced_features import (
+        from ..specialists.advanced_features import (
             create_authority_ranker,
             create_concept_extractor,
             create_multi_hop_reasoning,
