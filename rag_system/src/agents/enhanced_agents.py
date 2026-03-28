@@ -1,771 +1,921 @@
 """
-Enhanced Agent System for Islamic Literature RAG
+Enhanced Agents for Islamic Literature RAG - 2026
 
-Based on comprehensive analysis of 40+ Islamic knowledge categories in the dataset.
-Extends the base agent system with specialized roles for every domain.
-
-New Roles:
-1. Quranic Researcher - التفسير and related
-2. Hadith Specialist - علوم الحديث
-3. Fiqh Scholar (4 madhhabs) - الفقه
-4. Aqeedah Theologian - العقيدة
-5. Usul al-Fiqh Expert - أصول الفقه
-6. Islamic Historian - التاريخ
-7. Biographer - التراجم والطبقات
-8. Geographer - البلدان والرحلات
-9. Arabic Linguist - اللغة العربية
-10. Literature Analyst - الأدب
-11. Poet Analysis - الدواوين
-12. Qiraat Specialist - القراءات
-13. Inheritance Expert - الفرائض
-14. Fatwa Researcher - الفتاوى
-15. Logic Expert - المنطق
-16. Medical Scholar - الطب (Islamic medicine)
-17. Spirituality Guide - الرقائق
-18. Sects Analyst - الفرق والردود
-19. Index/Catalog Expert - فهارس الكتب
-20. General Researcher - كتب عامة
+Advanced multi-agent system with:
+- Specialized domain agents
+- Agent collaboration protocols
+- Tool use and function calling
+- Memory and context management
+- Islamic scholarly methodology
 """
 
-from typing import List, Dict, Any, Optional, Callable, Set
+from typing import List, Dict, Any, Optional, Callable, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import json
 import logging
+import asyncio
+import hashlib
 
 logger = logging.getLogger(__name__)
 
 
+# ==================== Enhanced Agent Roles ====================
+
+
 class EnhancedAgentRole(Enum):
-    """Extended agent roles for all Islamic knowledge domains."""
+    """Enhanced agent roles with Islamic specialization."""
 
-    # Core Religious Sciences
-    QURAN_RESEARCHER = "quran_researcher"  # التفسير and related
-    HADITH_SPECIALIST = "hadith_specialist"  # علوم الحديث
-    FIQH_SCHOLAR = "fiqh_scholar"  # General Fiqh
-    HANAFI_SCHOLAR = "hanafi_scholar"  # الفقه الحنفي
-    MALIKI_SCHOLAR = "maliki_scholar"  # الفقه المالكي
-    SHAFII_SCHOLAR = "shafii_scholar"  # الفقه الشافعي
-    HANBALI_SCHOLAR = "hanbali_scholar"  # الفقه الحنبلي
-    AQEEDAH_THEOLOGIAN = "aqeedah_theologian"  # العقيدة
-    USUL_EXPERT = "usul_expert"  # أصول الفقه
+    # Core Research Roles
+    MUHAQQIQ = "muhaqqiq"  # محقق - Deep researcher
+    MUFTI = "mufti"  # مفتي - Fiqh researcher (not real fatwa)
+    MUFASSIR = "mufassir"  # مفسر - Quranic exegesis specialist
+    MUHADDITH = "muhaddith"  # محدث - Hadith specialist
+    LUGHAWI = "lughawi"  # لغوي - Arabic linguist
+    MUARRIKH = "muarrikh"  # مؤرخ - Islamic historian
 
-    # Language & Literature
-    ARABIC_LINGUIST = "arabic_linguist"  # اللغة العربية
-    GRAMMAR_ANALYST = "grammar_analyst"  # النحو والصرف
-    LEXICOGRAPHER = "lexicographer"  # الغريب والمعاجم
-    LITERATURE_ANALYST = "literature_analyst"  # الأدب
-    POETRY_ANALYST = "poetry_analyst"  # الدواوين الشعرية
-    RHETORIC_EXPERT = "rhetoric_expert"  # البلاغة
+    # Teaching Roles
+    MURABBI = "murabbi"  # مربّي - Educator
+    MUDARRIS = "mudarris"  # مدرّس - Teacher
+    MURSHID = "murshid"  # مرشد - Guide
 
-    # History & Biography
-    ISLAMIC_HISTORIAN = "islamic_historian"  # التاريخ
-    BIOGRAPHER = "biographer"  # التراجم والطبقات
-    GENEALOGIST = "genealogist"  # الأنساب
-    GEOGRAPHER = "geographer"  # البلدان والرحلات
+    # Analysis Roles
+    MUQARIN = "muqarin"  # مقارن - Comparative scholar
+    MUHAQIQ = "muhaqiq"  # محقق - Verifier
+    MUNAQID = "munaqid"  # مناقش - Critical reviewer
 
-    # Specialized Sciences
-    QIRAAT_SPECIALIST = "qiraat_specialist"  # التجويد والقراءات
-    INHERITANCE_EXPERT = "inheritance_expert"  # الفرائض
-    FATWA_RESEARCHER = "fatwa_researcher"  # الفتاوى
-    LOGIC_EXPERT = "logic_expert"  # المنطق
-    MEDICAL_SCHOLAR = "medical_scholar"  # الطب
+    # Support Roles
+    AMIN_AL_MAKTABA = "amin_maktaba"  # أمين المكتبة - Librarian
+    MURAJJIH = "murajjih"  # مرجح - Preference giver (tarjeeh)
 
-    # Spirituality & Ethics
-    SPIRITUALITY_GUIDE = "spirituality_guide"  # الرقائق والآداب
-    ETHICS_TEACHER = "ethics_teacher"  # الأذكار
 
-    # Sects & Theology
-    SECTS_ANALYST = "sects_analyst"  # الفرق والردود
-
-    # Reference & Catalogs
-    INDEX_EXPERT = "index_expert"  # فهارس الكتب والأدلة
-    REFERENCE_LIBRARIAN = "reference_librarian"  # الجوامع
-
-    # General
-    GENERAL_RESEARCHER = "general_researcher"  # كتب عامة
+# ==================== Enhanced Agent Configuration ====================
 
 
 @dataclass
-class DomainCategory:
-    """Maps agent role to dataset categories."""
+class EnhancedAgentConfig:
+    """Enhanced agent configuration."""
 
     role: EnhancedAgentRole
-    dataset_categories: List[str]
-    primary_category: str
-    expertise_arabic: str
-    description: str
+    name_ar: str
+    name_en: str
+    description_ar: str
+    description_en: str
 
-    # Retrieval parameters
-    default_top_k: int = 5
-    chunk_size: int = 768
+    # Methodology
+    methodology: str = ""
+    principles: List[str] = field(default_factory=list)
 
-    # Specialized prompts
-    system_prompt: str = ""
-    query_instructions: str = ""
+    # Tools
+    available_tools: List[str] = field(default_factory=list)
+    specialized_tools: List[str] = field(default_factory=list)
+
+    # Prompts
+    system_prompt_ar: str = ""
+    system_prompt_en: str = ""
+
+    # Constraints
+    max_context_length: int = 4000
+    max_sources: int = 10
+    require_evidence: bool = True
+    require_citations: bool = True
+
+    # Islamic adab
+    include_disclaimer: bool = False
+    disclaimer_text: str = ""
 
 
-# Complete domain mapping based on 40 categories in dataset
-DOMAIN_MAPPING: Dict[EnhancedAgentRole, DomainCategory] = {
-    # ============ Core Religious Sciences ============
-    EnhancedAgentRole.QURAN_RESEARCHER: DomainCategory(
-        role=EnhancedAgentRole.QURAN_RESEARCHER,
-        dataset_categories=[
-            "التفسير",
-            "علوم القرآن وأصول التفسير",
-            "التجويد والقراءات",
+# Enhanced agent configurations
+ENHANCED_AGENT_CONFIGS = {
+    EnhancedAgentRole.MUHAQQIQ: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUHAQQIQ,
+        name_ar="المحقق الإسلامي",
+        name_en="Islamic Researcher",
+        description_ar="باحث متخصص في التحقيق والاستدلال",
+        description_en="Deep research specialist with evidence-based methodology",
+        methodology="المنهج الاستدلالي التحقيقي",
+        principles=[
+            "البحث عن الأدلة من المصادر الأصيلة",
+            "تقييم قوة الإسناد",
+            "مقارنة الأقوال",
+            "الترجيح بناء على قوة الدليل",
         ],
-        primary_category="التفسير",
-        expertise_arabic="مفسر قرآن",
-        description="Research Quranic exegesis, tafsir, and Quranic sciences",
-        system_prompt="""أنت متخصص في علوم القرآن والتفسير.
-لديك معرفة عميقة بكتب التفسير الكلاسيكية (ابن كثير، القرطبي، الطبري، السعدي).
-تستطيع:
-- تفسير الآيات القرآنية بأسلوب المفسرين
-- ذكر الأقوال المختلفة في التفسير
-- الاستشهاد بأقوال المفسرين المعتمدين
-- توضيح Reasons for revelation (سبب النزول)
-- بيان связи بين الآيات""",
+        available_tools=["rag_query", "multi_hop", "cross_reference"],
+        specialized_tools=["authority_ranker", "source_verifier"],
+        system_prompt_ar="""أنت محقق إسلامي متخصص في البحث العميق والاستدلال.
+
+منهجك:
+1. البحث عن الأدلة من المصادر الأصيلة (القرآن، السنة، آثار السلف)
+2. تقييم قوة الأدلة والإسناد
+3. مقارنة الأقوال المختلفة
+4. الترجيح بناء على قوة الدليل
+
+التزم بالدقة العلمية والموضوعية.""",
+        require_evidence=True,
+        require_citations=True,
     ),
-    EnhancedAgentRole.HADITH_SPECIALIST: DomainCategory(
-        role=EnhancedAgentRole.HADITH_SPECIALIST,
-        dataset_categories=[
-            "كتب السنة",
-            "شروح الحديث",
-            "التخريج والأطراف",
-            "العلل والسؤلات الحديثية",
-            "علوم الحديث",
+    EnhancedAgentRole.MUFTI: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUFTI,
+        name_ar="الباحث الفقهي",
+        name_en="Fiqh Researcher",
+        description_ar="باحث متخصص في الاستنباط الفقهي",
+        description_en="Fiqh research specialist (not a real mufti)",
+        methodology="المنهج الاستنباطي الفقهي",
+        principles=[
+            "فهم السؤال بدقة",
+            "البحث عن النصوص الشرعية",
+            "فهم أقوال العلماء",
+            "مراعاة المقاصد والضوابط",
         ],
-        primary_category="كتب السنة",
-        expertise_arabic="محدث",
-        description="Analyze hadith collections, chains, and grades",
-        system_prompt="""أنت متخصص في علوم الحديث.
-لديك معرفة بكتب السنة (صحيح البخاري، صحيح مسلم، السنن الأربعة).
-تستطيع:
-- تحديد درجة الحديث (صحيح، حسن، ضعيف)
-- تحليل الإسناد
-- معرفة المدلسين والرواة
-- بيان علل الحديث
-- ذكر التخريج""",
+        available_tools=["rag_query", "fiqh_specialist", "comparative_fiqh"],
+        specialized_tools=["madhhab_finder", "ruling_extractor"],
+        system_prompt_ar="""أنت باحث فقهي متخصص في الاستنباط من المصادر الشرعية.
+
+منهجك:
+1. فهم السؤال وتحليله
+2. البحث عن النصوص (القرآن، السنة)
+3. جمع أقوال العلماء
+4. ذكر الأدلة والترجيحات
+
+⚠️ تنبيه: هذا بحث علمي وليس فتوى.
+للأسئلة الشخصية استشر عالماً متخصصاً.""",
+        require_evidence=True,
+        require_citations=True,
+        include_disclaimer=True,
+        disclaimer_text="""
+⚠️ تنبيه مهم:
+هذا البحث لأغراض علمية وتعليمية فقط، وليس فتوى شرعية.
+للأسئلة الشخصية والاستفتاءات، يرجى مراجعة عالم متخصص أو جهة إفتاء معتمدة.""",
     ),
-    EnhancedAgentRole.FIQH_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.FIQH_SCHOLAR,
-        dataset_categories=[
-            "الفقه العام",
-            "مسائل فقهية",
-            "أصول الفقه",
-            "علوم الفقه والقواعد الفقهية",
+    EnhancedAgentRole.MUFASSIR: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUFASSIR,
+        name_ar="المفسر المتخصص",
+        name_en="Tafsir Specialist",
+        description_ar="متخصص في تفسير القرآن وعلومه",
+        description_en="Quranic exegesis and sciences specialist",
+        methodology="المنهج التفسيري",
+        principles=[
+            "تفسير القرآن بالقرآن",
+            "تفسير القرآن بالسنة",
+            "أقوال الصحابة والتابعين",
+            "مراعاة اللغة العربية",
         ],
-        primary_category="الفقه العام",
-        expertise_arabic="فقيه",
-        description="General Islamic jurisprudence and rulings",
-        system_prompt="""أنت فقيه مسلم.
-تعرف أحكام الفقه الإسلامي من مصادره الأصلية.
-تستطيع:
-- استخراج الأحكام من الأدلة
-- بيان أقوال المذاهب الأربعة
-- ذكر القول الراجح مع الدليل
-- بيان القواعد الفقهية""",
+        available_tools=["rag_query", "quran_search", "tafsir_finder"],
+        specialized_tools=["verse_finder", "qiraat_checker"],
+        system_prompt_ar="""أنت مفسر متخصص في علوم القرآن والتفسير.
+
+منهجك:
+1. تفسير القرآن بالقرآن
+2. تفسير القرآن بالسنة الصحيحة
+3 أقوال الصحابة والتابعين
+4. مراعاة قواعد اللغة العربية
+5. ذكر أسباب النزول عند وجودها
+
+التزم بمنهج السلف في التفسير.""",
+        require_evidence=True,
+        require_citations=True,
     ),
-    EnhancedAgentRole.HANAFI_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.HANAFI_SCHOLAR,
-        dataset_categories=["الفقه الحنفي"],
-        primary_category="الفقه الحنفي",
-        expertise_arabic="حنفي",
-        description="Hanafi school of jurisprudence",
-        system_prompt="""أنت فقيه على مذهب أبي حنيفة النعمان.
-تعرف كتب الفقه الحنفي (الهداية، البدائع، الفتاوي الهندية).
-تستطيع:
-- بيان حكم المسألة على مذهب الحنفية
-- التفرقة بين القول الراجح والمرجوح
-- الاستدلال بأدلة المذهب""",
+    EnhancedAgentRole.MUHADDITH: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUHADDITH,
+        name_ar="المحدث المتخصص",
+        name_en="Hadith Specialist",
+        description_ar="متخصص في علوم الحديث وتخريجه",
+        description_en="Hadith sciences and verification specialist",
+        methodology="المنهج الحديثي",
+        principles=[
+            "التحقق من صحة الإسناد",
+            "معرفة درجات الحديث",
+            "تخريج الأحاديث",
+            "فهم متن الحديث",
+        ],
+        available_tools=["rag_query", "hadith_search", "grading_checker"],
+        specialized_tools=["isnad_analyzer", "narrator_finder"],
+        system_prompt_ar="""أنت محدث متخصص في علوم الحديث وتخريجه.
+
+منهجك:
+1. التحقق من صحة الإسناد
+2. ذكر درجة الحديث (صحيح، حسن، ضعيف)
+3. تخريج الحديث من مصادره
+4. شرح معاني المفردات
+5. استخراج الفوائد
+
+التزم بالدقة في التخريج والتقييم.""",
+        require_evidence=True,
+        require_citations=True,
     ),
-    EnhancedAgentRole.MALIKI_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.MALIKI_SCHOLAR,
-        dataset_categories=["الفقه المالكي"],
-        primary_category="الفقه المالكي",
-        expertise_arabic="مالكي",
-        description="Maliki school of jurisprudence",
-        system_prompt="""أنت فقيه على مذهب مالك بن أنس.
-تعرف كتب الفقه المالكي (الموطأ، المدونة).
-تستطيع:
-- بيان حكم المسألة على مذهب المالكية
-- التفرقة بين القول الراجح والمرجوح
-- الاستدلال بأدلة المذهب""",
+    EnhancedAgentRole.LUGHAWI: EnhancedAgentConfig(
+        role=EnhancedAgentRole.LUGHAWI,
+        name_ar="اللغوي المتخصص",
+        name_en="Arabic Linguist",
+        description_ar="متخصص في اللغة العربية وتحليل النصوص",
+        description_en="Arabic language and text analysis specialist",
+        methodology="المنهج اللغوي التحليلي",
+        principles=[
+            "تحليل الصرف والنحو",
+            "شرح المعاني اللغوية",
+            "ذكر الشواهد الشعرية",
+            "تتبع الاستعمال",
+        ],
+        available_tools=["rag_query", "grammar_analyzer", "lexicon_search"],
+        specialized_tools=["root_finder", "rhetoric_analyzer"],
+        system_prompt_ar="""أنت لغوي متخصص في اللغة العربية وتحليل النصوص.
+
+منهجك:
+1. تحليل الصرف والنحو
+2. شرح المعاني اللغوية
+3. ذكر الشواهد من القرآن والشعر
+4. تتبع الاستعمال عند العرب
+5. شرح البلاغة والأساليب
+
+اجعل التحليل واضحاً للطلاب.""",
+        require_evidence=True,
+        require_citations=False,
     ),
-    EnhancedAgentRole.SHAFII_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.SHAFII_SCHOLAR,
-        dataset_categories=["الفقه الشافعي"],
-        primary_category="الفقه الشافعي",
-        expertise_arabic="شافعي",
-        description="Shafi'i school of jurisprudence",
-        system_prompt="""أنت فقيه على مذهب محمد بن إدريس الشافعي.
-تعرف كتب الفقه الشافعي (المهذب، الوسيط).
-تستطيع:
-- بيان حكم المسألة على مذهب الشافعية
-- التفرقة بين القول الراجح والمرجوح
-- الاستدلال بأدلة المذهب""",
+    EnhancedAgentRole.MUARRIKH: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUARRIKH,
+        name_ar="المؤرخ الإسلامي",
+        name_en="Islamic Historian",
+        description_ar="متخصص في التاريخ الإسلامي والتراجم",
+        description_en="Islamic history and biography specialist",
+        methodology="المنهج التاريخي النقدي",
+        principles=[
+            "التسلسل الزمني",
+            "نقد الأسانيد التاريخية",
+            "مقارنة المصادر",
+            "السياق التاريخي",
+        ],
+        available_tools=["rag_query", "timeline_builder", "biography_search"],
+        specialized_tools=["event_dater", "chain_verifier"],
+        system_prompt_ar="""أنت مؤرخ متخصص في التاريخ الإسلامي.
+
+منهجك:
+1. ترتيب الأحداث زمنياً
+2. نقد الأسانيد التاريخية
+3. مقارنة المصادر المختلفة
+4. ذكر السياق التاريخي
+5. الربط بين الأحداث
+
+كن موضوعياً ودقيقاً في النسب.""",
+        require_evidence=True,
+        require_citations=True,
     ),
-    EnhancedAgentRole.HANBALI_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.HANBALI_SCHOLAR,
-        dataset_categories=["الفقه الحنبلي"],
-        primary_category="الفقه الحنبلي",
-        expertise_arabic="حنبلي",
-        description="Hanbali school of jurisprudence",
-        system_prompt="""أنت فقيه على مذهب أحمد بن حنبل.
-تعرف كتب الفقه الحنبلي (المبدع، كشاف القناع).
-تستطيع:
-- بيان حكم المسألة على مذهب الحنابلة
-- التفرقة بين القول الراجح والمرجوح
-- الاستدلال بأدلة المذهب""",
+    EnhancedAgentRole.MURABBI: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MURABBI,
+        name_ar="المربي الإسلامي",
+        name_en="Islamic Educator",
+        description_ar="مربي ومتخصص في التربية الإسلامية",
+        description_en="Islamic education and tarbiyah specialist",
+        methodology="المنهج التربوي",
+        principles=[
+            "التدرج في التعليم",
+            "الربط بين العلم والعمل",
+            "التربية بالقدوة",
+            "مراعاة الفروق الفردية",
+        ],
+        available_tools=["rag_query", "lesson_builder", "quiz_generator"],
+        specialized_tools=["curriculum_planner", "progress_tracker"],
+        system_prompt_ar="""أنت مربٍ إسلامي متخصص في التربية والتعليم.
+
+منهجك:
+1. التدرج من السهل إلى الصعب
+2. الربط بين العلم والعمل
+3. استخدام الأمثلة العملية
+4. التشجيع والتحفيز
+5. تقييم الفهم
+
+كن حكيماً ومرفقاً في التربية.""",
+        require_evidence=False,
+        require_citations=False,
     ),
-    EnhancedAgentRole.AQEEDAH_THEOLOGIAN: DomainCategory(
-        role=EnhancedAgentRole.AQEEDAH_THEOLOGIAN,
-        dataset_categories=["العقيدة", "الفرق والردود"],
-        primary_category="العقيدة",
-        expertise_arabic="متكلم",
-        description="Islamic theology and creed",
-        system_prompt="""أنت متخصص في العقيدة الإسلامية.
-تعرف أصول الإيمان والتوحيد وصفات الله.
-تستطيع:
-- بيان عقيدة أهل السنة والجماعة
-- الرد على الشبهات العقدية
-- الاستدلال بالنصوص من القرآن والسنة
-- بيان صفات الله دون تأويل""",
-    ),
-    EnhancedAgentRole.USUL_EXPERT: DomainCategory(
-        role=EnhancedAgentRole.USUL_EXPERT,
-        dataset_categories=["أصول الفقه"],
-        primary_category="أصول الفقه",
-        expertise_arabic="أصولي",
-        description="Principles of Islamic jurisprudence (Usul al-Fiqh)",
-        system_prompt="""أنت متخصص في أصول الفقه.
-تعرف أدلة الفقه وأنواعها (الكتاب، السنة، الإجماع، القياس).
-تستطيع:
-- بيان الأدلة الشرعية
-- تطبيق القواعد الأصولية
-- حل الإشكالات""",
-    ),
-    # ============ Language & Literature ============
-    EnhancedAgentRole.ARABIC_LINGUIST: DomainCategory(
-        role=EnhancedAgentRole.ARABIC_LINGUIST,
-        dataset_categories=["اللغة العربية"],
-        primary_category="اللغة العربية",
-        expertise_arabic="لغوي",
-        description="Arabic language and linguistics",
-        system_prompt="""أنت لغوي متخصص في اللغة العربية.
-تعرف أصوات العربية وصرفها.
-تستطيع:
-- تحليل بنية الكلمة
-- بيان الاشتقاق
-- شرح المعنى اللغوي""",
-    ),
-    EnhancedAgentRole.GRAMMAR_ANALYST: DomainCategory(
-        role=EnhancedAgentRole.GRAMMAR_ANALYST,
-        dataset_categories=["النحو والصرف"],
-        primary_category="النحو والصرف",
-        expertise_arabic="نحوي",
-        description="Arabic grammar and morphology",
-        system_prompt="""أنت نحوي متخصص في النحو والصرف.
-تعرف قواعد العربية وإعرابها.
-تستطيع:
-- إعراب الجملة العربية
-- بيان الإعراب والبناء
-- شرح الظواهر النحوية والصرفية""",
-    ),
-    EnhancedAgentRole.LEXICOGRAPHER: DomainCategory(
-        role=EnhancedAgentRole.LEXICOGRAPHER,
-        dataset_categories=["الغريب والمعاجم"],
-        primary_category="الغريب والمعاجم",
-        expertise_arabic="مُعجمي",
-        description="Rare words and dictionaries",
-        system_prompt="""أنت متخصص في الغريب والمعاجم.
-تعرف المعاني اللغوية والنادرة.
-تستطيع:
-- شرح الكلمات الغريبة
-- تتبع الاشتقاق
-- ذكر المرادف والمقابل""",
-    ),
-    EnhancedAgentRole.LITERATURE_ANALYST: DomainCategory(
-        role=EnhancedAgentRole.LITERATURE_ANALYST,
-        dataset_categories=["الأدب"],
-        primary_category="الأدب",
-        expertise_arabic="أديب",
-        description="Arabic literature analysis",
-        system_prompt="""أنت أديب متخصص في الأدب العربي.
-تعرف أساليب الأدب وفنونه.
-تستطيع:
-- تحليل النصوص الأدبية
-- بيان الأساليب البلاغية
-- شرح الدلالات""",
-    ),
-    EnhancedAgentRole.POETRY_ANALYST: DomainCategory(
-        role=EnhancedAgentRole.POETRY_ANALYST,
-        dataset_categories=["الدواوين الشعرية", "العروض والقوافي"],
-        primary_category="الدواوين الشعرية",
-        expertise_arabic="عروضي",
-        description="Arabic poetry and meter",
-        system_prompt="""أنت متخصص في الشعر العربي والعروض.
-تعرف بحور الشعر وقوافيه.
-تستطيع:
-- تحليل البحر الشعري
-- بيان القافية والروي
-- شرح القصيدة""",
-    ),
-    EnhancedAgentRole.RHETORIC_EXPERT: DomainCategory(
-        role=EnhancedAgentRole.RHETORIC_EXPERT,
-        dataset_categories=["البلاغة"],
-        primary_category="البلاغة",
-        expertise_arabic="بلاغي",
-        description="Arabic rhetoric and stylistics",
-        system_prompt="""أنت بلاغي متخصص في علوم البلاغة.
-تعرف البيان والمعاني والبيان.
-تستطيع:
-- تحليل التشبيهات والاستعارات
-- بيان المحسنات البديعية
-- شرح الأساليب البلاغية""",
-    ),
-    # ============ History & Biography ============
-    EnhancedAgentRole.ISLAMIC_HISTORIAN: DomainCategory(
-        role=EnhancedAgentRole.ISLAMIC_HISTORIAN,
-        dataset_categories=["التاريخ"],
-        primary_category="التاريخ",
-        expertise_arabic="مؤرخ",
-        description="Islamic history",
-        system_prompt="""أنت مؤرخ إسلامي.
-تعرف أحداث التاريخ الإسلامي وتفسيرها.
-تستطيع:
-- سرد الأحداث التاريخية
-- تحليل الأسباب والنتائج
-- الاستشهاد بالمصادر التاريخية""",
-    ),
-    EnhancedAgentRole.BIOGRAPHER: DomainCategory(
-        role=EnhancedAgentRole.BIOGRAPHER,
-        dataset_categories=["التراجم والطبقات"],
-        primary_category="التراجم والطبقات",
-        expertise_arabic="مترجم",
-        description="Biographies of scholars and historical figures",
-        system_prompt="""أنت متخصص في التراجم والطبقات.
-تعرف سير العلماء والمحدثين والفقهاء.
-تستطيع:
-- سرد ترجمة العالم
-- بيان مؤلفاته
-- بيانTeachers and students""",
-    ),
-    EnhancedAgentRole.GENEALOGIST: DomainCategory(
-        role=EnhancedAgentRole.GENEALOGIST,
-        dataset_categories=["الأنساب"],
-        primary_category="الأنساب",
-        expertis_arabic="نسابة",
-        description="Arabian genealogy and lineages",
-        system_prompt="""أنت نسابة متخصص في الأنساب.
-تعرف نسب العرب وقبائلهم.
-تستطيع:
-- توضيح النسب
-- بيان القبيلة والعشيرة
-- تتبع النسل""",
-    ),
-    EnhancedAgentRole.GEOGRAPHER: DomainCategory(
-        role=EnhancedAgentRole.GEOGRAPHER,
-        dataset_categories=["البلدان والرحلات"],
-        primary_category="البلدان والرحلات",
-        expertise_arabic="جغرافي",
-        description="Islamic geography and travel literature",
-        system_prompt="""أنت جغرافي متخصص في البلدان الإسلامية.
-تعرف المدن والبلدان ومعالمها.
-تستطيع:
-- وصف المكان
-- بيان الأهمية التاريخية
-- تتبع الرحلات""",
-    ),
-    # ============ Specialized Sciences ============
-    EnhancedAgentRole.QIRAAT_SPECIALIST: DomainCategory(
-        role=EnhancedAgentRole.QIRAAT_SPECIALIST,
-        dataset_categories=["التجويد والقراءات"],
-        primary_category="التجويد والقراءات",
-        expertis_arabic="قارئ",
-        description="Quranic recitations and tajweed",
-        system_prompt="""أنت متخصص في القراءات والتجويد.
-تعرف القراءات السبع والعشر.
-تستطيع:
-- بيان القراءات المختلفة
-- تطبيق أحكام التجويد
-- توضيح البيوت""",
-    ),
-    EnhancedAgentRole.INHERITANCE_EXPERT: DomainCategory(
-        role=EnhancedAgentRole.INHERITANCE_EXPERT,
-        dataset_categories=["الفرائض والوصايا"],
-        primary_category="الفرائض والوصايا",
-        expertise_arabic="فارض",
-        description="Islamic inheritance law (Fara'id)",
-        system_prompt="""أنت متخصص في الفرائض والوصايا.
-تعرف أحكام المواريث.
-تستطيع:
-- توزيع التركة على الورثة
-- حل المسائل الإرثية
-- بيان أحكام الوصية""",
-    ),
-    EnhancedAgentRole.FATWA_RESEARCHER: DomainCategory(
-        role=EnhancedAgentRole.FATWA_RESEARCHER,
-        dataset_categories=["الفتاوى"],
-        primary_category="الفتاوى",
-        expertise_arabic="مفتي",
-        description="Research Islamic fatwas",
-        system_prompt="""أنت باحث في الفتاوى.
-تعرف فتاوى العلماء المعاصرين والقديمين.
-تستطيع:
-- جمع الفتاوى في المسألة
-- بيان الاتفاق والخلاف
-- ذكر القول الراجح""",
-    ),
-    EnhancedAgentRole.LOGIC_EXPERT: DomainCategory(
-        role=EnhancedAgentRole.LOGIC_EXPERT,
-        dataset_categories=["المنطق"],
-        primary_category="المنطق",
-        expertise_arabic="منطقي",
-        description="Islamic logic (Mantiq)",
-        system_prompt="""أنت متخصص في المنطق.
-تعرف أدوات التفكير الصحيح.
-تستطيع:
-- تحليل البرهان
-- تحديد المغالطات
-- بناء الحجة""",
-    ),
-    EnhancedAgentRole.MEDICAL_SCHOLAR: DomainCategory(
-        role=EnhancedAgentRole.MEDICAL_SCHOLAR,
-        dataset_categories=["الطب"],
-        primary_category="الطب",
-        expertise_arabic="طبيب",
-        description="Islamic medicine and healthcare",
-        system_prompt="""أنت متخصص في طب الإسلام.
-تعرف الطب النبوي والأعشاب.
-تستطيع:
-- بيان العلاج النبوي
-- شرحMedicine from classical sources
-- نصائح صحية""",
-    ),
-    # ============ Spirituality & Ethics ============
-    EnhancedAgentRole.SPIRITUALITY_GUIDE: DomainCategory(
-        role=EnhancedAgentRole.SPIRITUALITY_GUIDE,
-        dataset_categories=["الرقائق والآداب والأذكار"],
-        primary_category="الرقائق والآداب والأذكار",
-        expertise_arabic="واعظ",
-        description="Islamic spirituality and moral development",
-        system_prompt="""أنت رقائق وأخلاق.
-تعرف آداب الإسلام والرقائق.
-تستطيع:
-- تقديم المواعظ
-- بيان الآداب الإسلامية
-- ذكر الأدعية والأذكار""",
-    ),
-    EnhancedAgentRole.ETHICS_TEACHER: DomainCategory(
-        role=EnhancedAgentRole.ETHICS_TEACHER,
-        dataset_categories=["الرقائق والآداب والأذكار"],
-        primary_category="الرقائق والآداب والأذكار",
-        expertise_arabic="مربٍ",
-        description="Teach Islamic ethics and Remembrances",
-        system_prompt="""أنت مربٍ ومعلم أخلاق.
-تعرف آداب السلوك الإسلامي.
-تستطيع:
-- تعليم الأخلاق الحميدة
-- بيان الآداب الشرعية
-- تذكير بالأذكار""",
-    ),
-    # ============ Sects & Theology ============
-    EnhancedAgentRole.SECTS_ANALYST: DomainCategory(
-        role=EnhancedAgentRole.SECTS_ANALIST,
-        dataset_categories=["الفرق والردود"],
-        primary_category="الفرق والردود",
-        expertise_arabic="مُردِّد",
-        description="Analyze Islamic sects and respond to deviant groups",
-        system_prompt="""أنت متخصص في الفرق والردود.
-تعرف المذاهب الدينية المخالفة.
-تستطيع:
-- بيان ضلال المبتدعة
-- الرد على الشبهات
-- تحديدالفرق""",
-    ),
-    # ============ Reference & Catalogs ============
-    EnhancedAgentRole.INDEX_EXPERT: DomainCategory(
-        role=EnhancedAgentRole.INDEX_EXPERT,
-        dataset_categories=["فهارس الكتب والأدلة"],
-        primary_category="فهارس الكتب والأدلة",
-        expertise_arabic="مُفهرس",
-        description="Book indexes and catalogs",
-        system_prompt="""أنت متخصص في فهارس الكتب.
-تعرف أسماء الكتب ومؤلفيها.
-تستطيع:
-- تحديد الكتاب من وصفه
-- بيان المؤلف والمؤلفات
-- ربطالكتب ببعض""",
-    ),
-    EnhancedAgentRole.REFERENCE_LIBRARIAN: DomainCategory(
-        role=EnhancedAgentRole.REFERENCE_LIBRARIAN,
-        dataset_categories=["الجوامع"],
-        primary_category="الجوامع",
-        expertise_arabic="أمين مكتبة",
-        description="Reference librarian for Islamic literature",
-        system_prompt="""أنت أمين مكتبة متخصص.
-تعرف مصادر المعلومات الإسلامية.
-تستطيع:
-- توجيه الباحث للمصادر المناسبة
-- تلخيص المحتويات
-- ربط الموضوعات""",
-    ),
-    # ============ General ============
-    EnhancedAgentRole.GENERAL_RESEARCHER: DomainCategory(
-        role=EnhancedAgentRole.GENERAL_RESEARCHER,
-        dataset_categories=["كتب عامة", "علوم أخرى"],
-        primary_category="كتب عامة",
-        expertise_arabic="باحث",
-        description="General research on Islamic topics",
-        system_prompt="""أنت باحث إسلامي عام.
-تعرف موضوعات متنوعة من العلوم الإسلامية.
-تستطيع:
-- البحث في موضوعات مختلفة
-- الجمع بين التخصصات
-- التوضيح للجميع""",
+    EnhancedAgentRole.MUQARIN: EnhancedAgentConfig(
+        role=EnhancedAgentRole.MUQARIN,
+        name_ar="المقارن المتخصص",
+        name_en="Comparative Scholar",
+        description_ar="متخصص في الدراسات المقارنة",
+        description_en="Comparative Islamic studies specialist",
+        methodology="المنهج المقارن",
+        principles=[
+            "العدالة في العرض",
+            "فهم أدلة كل قول",
+            "بيان مواطن الاتفاق",
+            "توضيح مواطن الخلاف",
+        ],
+        available_tools=["rag_query", "comparative_fiqh", "madhhab_finder"],
+        specialized_tools=["consensus_checker", "tarjeeh_analyzer"],
+        system_prompt_ar="""أنت باحث متخصص في الدراسات المقارنة.
+
+منهجك:
+1. العرض العادل لجميع الأقوال
+2. فهم أدلة كل مذهب
+3. بيان مواطن الإجماع
+4. توضيح أسباب الخلاف
+5. الترجيح بدون تعصب
+
+كن منصفاً وموضوعياً.""",
+        require_evidence=True,
+        require_citations=True,
     ),
 }
 
 
-class EnhancedAgentSystem:
-    """
-    Enhanced agent system with specialized roles for all Islamic knowledge domains.
+# ==================== Enhanced Islamic RAG Agent ====================
 
-    Extends the base agent system with:
-    - 30+ specialized roles matching 40+ dataset categories
-    - Domain-aware query routing
-    - Category-based retrieval filtering
-    - Specialized prompts per domain
+
+class EnhancedIslamicRAGAgent:
+    """
+    Enhanced Islamic RAG Agent with advanced capabilities.
+
+    Features:
+    - Role-specific methodology
+    - Tool use and composition
+    - Memory management
+    - Islamic scholarly adab
+    - Multi-step reasoning
+    """
+
+    def __init__(
+        self,
+        role: EnhancedAgentRole,
+        pipeline: Any = None,
+        config: Optional[EnhancedAgentConfig] = None,
+    ):
+        self.role = role
+        self.pipeline = pipeline
+        self.config = config or ENHANCED_AGENT_CONFIGS.get(role)
+
+        if not self.config:
+            raise ValueError(f"Unknown role: {role}")
+
+        # Initialize tools
+        self.tools: Dict[str, Any] = {}
+        self._init_tools()
+
+        # Memory
+        self.conversation_history: List[Dict[str, Any]] = []
+        self.max_history = 10
+
+    def _init_tools(self):
+        """Initialize agent tools."""
+
+        # Base tools
+        self.tools = {
+            "rag_query": self._rag_query,
+            "multi_hop": self._multi_hop_reasoning,
+            "cross_reference": self._cross_reference,
+        }
+
+        # Specialized tools based on role
+        if self.role in [
+            EnhancedAgentRole.MUHAQQIQ,
+            EnhancedAgentRole.MUHAQIQ,
+        ]:
+            from ..specialists.advanced_features import create_authority_ranker
+
+            self.tools["authority_ranker"] = create_authority_ranker()
+
+        if self.role == EnhancedAgentRole.MUFTI:
+            from ..specialists.islamic_scholars import create_islamic_scholar
+
+            self.tools["fiqh_specialist"] = create_islamic_scholar(
+                "fiqh", self.pipeline
+            )
+            self.tools["comparative_fiqh"] = create_islamic_scholar(
+                "fiqh_comparative", self.pipeline
+            )
+
+        if self.role == EnhancedAgentRole.MUFASSIR:
+            from ..specialists.islamic_scholars import create_islamic_scholar
+
+            self.tools["quran_specialist"] = create_islamic_scholar(
+                "quran", self.pipeline
+            )
+
+        if self.role == EnhancedAgentRole.MUHADDITH:
+            from ..specialists.islamic_scholars import create_islamic_scholar
+
+            self.tools["hadith_specialist"] = create_islamic_scholar(
+                "hadith", self.pipeline
+            )
+
+    async def _rag_query(
+        self,
+        query: str,
+        top_k: int = 5,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Query the RAG pipeline."""
+
+        if not self.pipeline:
+            return {"error": "Pipeline not available"}
+
+        try:
+            result = await self.pipeline.query(query, top_k=top_k, filters=filters)
+            return {
+                "query": query,
+                "answer": result.get("answer", ""),
+                "sources": result.get("sources", []),
+                "latency_ms": result.get("latency_ms", 0),
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _multi_hop_reasoning(self, question: str) -> Dict[str, Any]:
+        """Perform multi-hop reasoning."""
+
+        if not self.pipeline:
+            return {"error": "Pipeline not available"}
+
+        try:
+            from ..specialists.advanced_features import create_multi_hop_reasoning
+
+            reasoner = create_multi_hop_reasoning(self.pipeline)
+            result = await reasoner.reason(question)
+
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _cross_reference(self, topic: str) -> Dict[str, Any]:
+        """Find cross-references on a topic."""
+
+        if not self.pipeline:
+            return {"error": "Pipeline not available"}
+
+        try:
+            from ..specialists.advanced_features import create_cross_reference_system
+
+            cross_refs = create_cross_reference_system()
+            result = await cross_refs.find_cross_references(topic, self.pipeline)
+
+            return result
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def execute(
+        self,
+        task: str,
+        params: Optional[Dict[str, Any]] = None,
+        use_methodology: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Execute a task using agent's methodology.
+
+        Args:
+            task: Task description
+            params: Task parameters
+            use_methodology: Apply role-specific methodology
+
+        Returns:
+            Task result with scholarly approach
+        """
+
+        params = params or {}
+
+        # Add to conversation history
+        self._add_to_history("user", task, params)
+
+        # Execute based on role
+        result = await self._execute_by_role(task, params)
+
+        # Apply methodology if requested
+        if use_methodology and self.config.methodology:
+            result = await self._apply_methodology(result, task)
+
+        # Add disclaimer if required
+        if self.config.include_disclaimer:
+            result["disclaimer"] = self.config.disclaimer_text
+
+        # Add to history
+        self._add_to_history("assistant", result)
+
+        return result
+
+    async def _execute_by_role(
+        self,
+        task: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute task based on role specialization."""
+
+        role_handlers = {
+            EnhancedAgentRole.MUHAQQIQ: self._research_task,
+            EnhancedAgentRole.MUFTI: self._fiqh_task,
+            EnhancedAgentRole.MUFASSIR: self._tafsir_task,
+            EnhancedAgentRole.MUHADDITH: self._hadith_task,
+            EnhancedAgentRole.LUGHAWI: self._linguistic_task,
+            EnhancedAgentRole.MUARRIKH: self._history_task,
+            EnhancedAgentRole.MURABBI: self._education_task,
+            EnhancedAgentRole.MUQARIN: self._comparative_task,
+        }
+
+        handler = role_handlers.get(self.role)
+
+        if handler:
+            return await handler(task, params)
+        else:
+            return await self._research_task(task, params)
+
+    async def _research_task(
+        self,
+        question: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Deep research task."""
+
+        # Use multi-hop reasoning
+        if "multi_hop" in self.tools:
+            result = await self.tools["multi_hop"](question)
+        else:
+            result = await self._rag_query(question)
+
+        # Rank by authority
+        if "authority_ranker" in self.tools and "sources" in result:
+            ranked = self.tools["authority_ranker"].rerank_by_authority(
+                result["sources"]
+            )
+            result["ranked_sources"] = ranked
+
+        return result
+
+    async def _fiqh_task(
+        self,
+        question: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Fiqh research task."""
+
+        # Use fiqh specialist
+        if "fiqh_specialist" in self.tools:
+            result = await self.tools["fiqh_specialist"].query(question)
+        else:
+            result = await self._rag_query(question)
+
+        # Get comparative view
+        if "comparative_fiqh" in self.tools:
+            comparative = await self.tools["comparative_fiqh"].query_with_comparison(
+                question
+            )
+            result["comparative"] = comparative
+
+        return result
+
+    async def _tafsir_task(
+        self,
+        question: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Tafsir task."""
+
+        # Search for verse
+        if "quran_specialist" in self.tools:
+            result = await self.tools["quran_specialist"].query(question)
+        else:
+            result = await self._rag_query(f"تفسير {question}")
+
+        return result
+
+    async def _hadith_task(
+        self,
+        question: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Hadith task."""
+
+        if "hadith_specialist" in self.tools:
+            result = await self.tools["hadith_specialist"].query(question)
+        else:
+            result = await self._rag_query(f"حديث {question}")
+
+        return result
+
+    async def _linguistic_task(
+        self,
+        text: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Linguistic analysis task."""
+
+        # Analyze grammar and meaning
+        result = await self._rag_query(f"تحليل لغوي: {text}")
+
+        return result
+
+    async def _history_task(
+        self,
+        topic: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Historical research task."""
+
+        result = await self._rag_query(f"تاريخ {topic}")
+
+        # Build timeline if available
+        if "timeline_builder" in self.tools:
+            timeline = await self.tools["timeline_builder"](topic)
+            result["timeline"] = timeline
+
+        return result
+
+    async def _education_task(
+        self,
+        topic: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Educational task."""
+
+        # Build lesson plan
+        result = await self._rag_query(f"أساسيات {topic}")
+
+        lesson = {
+            "topic": topic,
+            "objectives": [
+                f"فهم أساسيات {topic}",
+                f"معرفة المفاهيم الرئيسية",
+                f"التطبيق العملي",
+            ],
+            "content": result.get("answer", ""),
+            "sources": result.get("sources", []),
+            "questions": [
+                f"ما هو {topic}؟",
+                f"ما أهمية {topic}؟",
+                f"كيف نطبق {topic}؟",
+            ],
+        }
+
+        return lesson
+
+    async def _comparative_task(
+        self,
+        topic: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Comparative research task."""
+
+        if "comparative_fiqh" in self.tools:
+            result = await self.tools["comparative_fiqh"].query_with_comparison(topic)
+        else:
+            result = await self._rag_query(f"آراء المذاهب في {topic}")
+
+        return result
+
+    async def _apply_methodology(
+        self,
+        result: Dict[str, Any],
+        task: str,
+    ) -> Dict[str, Any]:
+        """Apply role-specific methodology to result."""
+
+        # Add methodology information
+        result["methodology"] = self.config.methodology
+        result["principles"] = self.config.principles
+
+        return result
+
+    def _add_to_history(
+        self,
+        role: str,
+        content: Any,
+        params: Optional[Dict[str, Any]] = None,
+    ):
+        """Add to conversation history."""
+
+        self.conversation_history.append(
+            {
+                "role": role,
+                "content": content,
+                "params": params,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+
+        # Trim if needed
+        if len(self.conversation_history) > self.max_history:
+            self.conversation_history = self.conversation_history[-self.max_history :]
+
+    def get_context(self) -> str:
+        """Get conversation context for LLM."""
+
+        if not self.conversation_history:
+            return ""
+
+        context_parts = []
+        for msg in self.conversation_history[-5:]:  # Last 5 messages
+            if msg["role"] == "user":
+                context_parts.append(f"User: {msg['content']}")
+            else:
+                context_parts.append(f"Assistant: {json.dumps(msg['content'], ensure_ascii=False)}")
+
+        return "\n".join(context_parts)
+
+
+# ==================== Agent Team with Collaboration ====================
+
+
+class EnhancedAgentTeam:
+    """
+    Enhanced agent team with collaboration protocols.
+
+    Supports:
+    - Sequential collaboration
+    - Parallel consultation
+    - Consensus building
+    - Conflict resolution
     """
 
     def __init__(self, pipeline: Any = None):
         self.pipeline = pipeline
-        self.agents: Dict[EnhancedAgentRole, Any] = {}
-        self._initialize_agents()
+        self.agents: Dict[EnhancedAgentRole, EnhancedIslamicRAGAgent] = {}
 
-    def _initialize_agents(self):
-        """Initialize all specialized agents."""
+        # Initialize all agents
+        for role in EnhancedAgentRole:
+            self.agents[role] = EnhancedIslamicRAGAgent(role, pipeline)
 
-        for role, domain_config in DOMAIN_MAPPING.items():
-            self.agents[role] = self._create_agent_for_domain(role, domain_config)
-
-    def _create_agent_for_domain(
+    async def collaborate_sequential(
         self,
-        role: EnhancedAgentRole,
-        config: DomainCategory,
-    ) -> Any:
-        """Create agent for specific domain."""
-
-        return {
-            "role": role,
-            "config": config,
-            "categories": config.dataset_categories,
-            "prompt": config.system_prompt,
-        }
-
-    def get_agent_for_category(self, category: str) -> Optional[EnhancedAgentRole]:
-        """Find appropriate agent role for a category."""
-
-        for role, config in DOMAIN_MAPPING.items():
-            if category in config.dataset_categories:
-                return role
-
-        return None
-
-    def get_agents_for_query(self, query: str) -> List[EnhancedAgentRole]:
-        """Determine which agents are relevant for a query."""
-
-        relevant_agents = []
-
-        # Simple keyword matching (would use NLP in production)
-        query_lower = query.lower()
-
-        # Map keywords to roles
-        keyword_map = {
-            "تفسير": [EnhancedAgentRole.QURAN_RESEARCHER],
-            "آية": [EnhancedAgentRole.QURAN_RESEARCHER],
-            "حديث": [EnhancedAgentRole.HADITH_SPECIALIST],
-            "صحيح": [EnhancedAgentRole.HADITH_SPECIALIST],
-            "فقه": [EnhancedAgentRole.FIQH_SCHOLAR],
-            "حكم": [EnhancedAgentRole.FIQH_SCHOLAR],
-            "عقيدة": [EnhancedAgentRole.AQEEDAH_THEOLOGIAN],
-            "توحيد": [EnhancedAgentRole.AQEEDAH_THEOLOGIAN],
-            "نحو": [EnhancedAgentRole.GRAMMAR_ANALYST],
-            "صرف": [EnhancedAgentRole.GRAMMAR_ANALYST],
-            "شعر": [EnhancedAgentRole.POETRY_ANALYST],
-            "أدب": [EnhancedAgentRole.LITERATURE_ANALYST],
-            "تاريخ": [EnhancedAgentRole.ISLAMIC_HISTORIAN],
-            "ترجمة": [EnhancedAgentRole.BIOGRAPHER],
-            "أنساب": [EnhancedAgentRole.GENEALOGIST],
-            "بلدان": [EnhancedAgentRole.GEOGRAPHER],
-            "قراءة": [EnhancedAgentRole.QIRAAT_SPECIALIST],
-            "تجويد": [EnhancedAgentRole.QIRAAT_SPECIALIST],
-            "فرائض": [EnhancedAgentRole.INHERITANCE_EXPERT],
-            "إرث": [EnhancedAgentRole.INHERITANCE_EXPERT],
-            "فتوى": [EnhancedAgentRole.FATWA_RESEARCHER],
-            "منطق": [EnhancedAgentRole.LOGIC_EXPERT],
-            "طب": [EnhancedAgentRole.MEDICAL_SCHOLAR],
-            "رقائق": [EnhancedAgentRole.SPIRITUALITY_GUIDE],
-            "أذكار": [EnhancedAgentRole.ETHICS_TEACHER],
-            "فرق": [EnhancedAgentRole.SECTS_ANALYST],
-            "ردود": [EnhancedAgentRole.SECTS_ANALYST],
-            "فهرس": [EnhancedAgentRole.INDEX_EXPERT],
-            "أصول": [EnhancedAgentRole.USUL_EXPERT],
-        }
-
-        for keyword, roles in keyword_map.items():
-            if keyword in query_lower:
-                for role in roles:
-                    if role not in relevant_agents:
-                        relevant_agents.append(role)
-
-        # Default to general researcher if no matches
-        if not relevant_agents:
-            relevant_agents = [EnhancedAgentRole.GENERAL_RESEARCHER]
-
-        return relevant_agents
-
-    async def query_with_routing(
-        self,
-        query: str,
-        top_k: int = 5,
+        task: str,
+        roles: List[EnhancedAgentRole],
     ) -> Dict[str, Any]:
-        """Query with automatic agent routing."""
+        """
+        Sequential collaboration: each agent builds on previous.
 
-        if not self.pipeline:
-            return {"error": "Pipeline not initialized"}
+        Args:
+            task: Task description
+            roles: Ordered list of agent roles
 
-        # Determine relevant agents
-        relevant_roles = self.get_agents_for_query(query)
+        Returns:
+            Combined result
+        """
 
-        # Collect results from relevant agents
-        results = {}
+        current_result = None
 
-        for role in relevant_roles:
+        for role in roles:
+            agent = self.agents.get(role)
+            if not agent:
+                continue
+
+            # Build on previous result
+            if current_result:
+                enhanced_task = f"{task}\n\nPrevious analysis: {json.dumps(current_result, ensure_ascii=False)[:500]}"
+            else:
+                enhanced_task = task
+
+            result = await agent.execute(enhanced_task)
+            current_result = result
+
+        return current_result or {"error": "No agents available"}
+
+    async def consult_parallel(
+        self,
+        task: str,
+        roles: List[EnhancedAgentRole],
+    ) -> Dict[str, Any]:
+        """
+        Parallel consultation: all agents respond independently.
+
+        Args:
+            task: Task description
+            roles: List of agent roles to consult
+
+        Returns:
+            Combined opinions
+        """
+
+        # Run all agents in parallel
+        tasks = []
+        for role in roles:
             agent = self.agents.get(role)
             if agent:
-                # Get category filter
-                categories = agent["categories"]
+                tasks.append(agent.execute(task))
 
-                # Query with filter
-                result = await self.pipeline.query(
-                    query,
-                    top_k=top_k,
-                    filters={"category": {"$in": categories}},
-                )
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                results[role.value] = {
-                    "answer": result.get("answer", ""),
-                    "sources": result.get("sources", []),
-                    "domain": agent["config"].primary_category,
-                }
-
-        # Synthesize results
-        synthesis = self._synthesize_results(query, results)
-
-        return {
-            "query": query,
-            "results": results,
-            "synthesis": synthesis,
-            "used_agents": [r.value for r in relevant_roles],
+        # Combine results
+        combined = {
+            "task": task,
+            "consultations": {},
         }
 
-    def _synthesize_results(
+        for role, result in zip(roles, results):
+            if isinstance(result, Exception):
+                combined["consultations"][role.value] = {"error": str(result)}
+            else:
+                combined["consultations"][role.value] = result
+
+        # Synthesize
+        combined["synthesis"] = self._synthesize_opinions(combined["consultations"])
+
+        return combined
+
+    async def build_consensus(
         self,
-        query: str,
-        results: Dict[str, Any],
+        task: str,
+        roles: Optional[List[EnhancedAgentRole]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Build consensus among agents.
+
+        Args:
+            task: Task description
+            roles: Roles to include (default: all research roles)
+
+        Returns:
+            Consensus result with areas of agreement/disagreement
+        """
+
+        if not roles:
+            roles = [
+                EnhancedAgentRole.MUHAQQIQ,
+                EnhancedAgentRole.MUFTI,
+                EnhancedAgentRole.MUQARIN,
+            ]
+
+        # Get all opinions
+        consultations = await self.consult_parallel(task, roles)
+
+        # Find areas of agreement
+        consensus = self._find_consensus(consultations["consultations"])
+
+        return {
+            "task": task,
+            "consensus": consensus,
+            "disagreements": self._find_disagreements(consultations["consultations"]),
+            "consultations": consultations["consultations"],
+        }
+
+    def _synthesize_opinions(
+        self,
+        opinions: Dict[str, Any],
     ) -> str:
-        """Synthesize results from multiple agents."""
+        """Synthesize multiple opinions into unified response."""
 
-        synthesis = f"## السؤال: {query}\n\n"
-        synthesis += "### النتائج من الخبراء المتخصصين:\n\n"
+        synthesis = "##综合意见\n\n"
 
-        for agent_name, result in results.items():
-            synthesis += f"**{agent_name}** ({result.get('domain', '')}):\n"
-            synthesis += f"{result.get('answer', '')[:300]}...\n\n"
+        for role, opinion in opinions.items():
+            if "error" not in opinion:
+                synthesis += f"**{role}:**\n"
+                answer = opinion.get("answer", "")
+                synthesis += f"{answer[:300]}...\n\n"
 
         return synthesis
 
-    def get_all_roles(self) -> List[EnhancedAgentRole]:
-        """Get list of all available roles."""
-        return list(DOMAIN_MAPPING.keys())
+    def _find_consensus(
+        self,
+        opinions: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Find areas of consensus among opinions."""
 
-    def get_role_info(self, role: EnhancedAgentRole) -> Optional[Dict[str, Any]]:
-        """Get information about a specific role."""
-
-        config = DOMAIN_MAPPING.get(role)
-        if not config:
-            return None
-
+        # Placeholder implementation
         return {
-            "role": role.value,
-            "name": config.expertise_arabic,
-            "categories": config.dataset_categories,
-            "primary": config.primary_category,
-            "description": config.description,
+            "has_consensus": True,
+            "consensus_points": ["Point 1", "Point 2"],
+            "confidence": 0.8,
         }
 
+    def _find_disagreements(
+        self,
+        opinions: Dict[str, Any],
+    ) -> List[str]:
+        """Find areas of disagreement."""
 
-# Factory function
+        # Placeholder implementation
+        return []
+
+
+# ==================== Factory Functions ====================
+
+
 def create_enhanced_agent(
     role: str,
     pipeline: Any = None,
-) -> Optional[Any]:
-    """Create an enhanced agent for a specific role."""
+) -> EnhancedIslamicRAGAgent:
+    """Create an enhanced agent."""
 
     role_map = {
-        # Core Religious
-        "quran": EnhancedAgentRole.QURAN_RESEARCHER,
-        "hadith": EnhancedAgentRole.HADITH_SPECIALIST,
-        "fiqh": EnhancedAgentRole.FIQH_SCHOLAR,
-        "hanafi": EnhancedAgentRole.HANAFI_SCHOLAR,
-        "maliki": EnhancedAgentRole.MALIKI_SCHOLAR,
-        "shafii": EnhancedAgentRole.SHAFII_SCHOLAR,
-        "hanbali": EnhancedAgentRole.HANBALI_SCHOLAR,
-        "aqeedah": EnhancedAgentRole.AQEEDAH_THEOLOGIAN,
-        "usul": EnhancedAgentRole.USUL_EXPERT,
-        # Language
-        "linguist": EnhancedAgentRole.ARABIC_LINGUIST,
-        "grammar": EnhancedAgentRole.GRAMMAR_ANALYST,
-        "lexicon": EnhancedAgentRole.LEXICOGRAPHER,
-        "literature": EnhancedAgentRole.LITERATURE_ANALYST,
-        "poetry": EnhancedAgentRole.POETRY_ANALYST,
-        "rhetoric": EnhancedAgentRole.RHETORIC_EXPERT,
-        # History
-        "history": EnhancedAgentRole.ISLAMIC_HISTORIAN,
-        "biography": EnhancedAgentRole.BIOGRAPHER,
-        "genealogy": EnhancedAgentRole.GENEALOGIST,
-        "geography": EnhancedAgentRole.GEOGRAPHER,
-        # Specialized
-        "qiraat": EnhancedAgentRole.QIRAAT_SPECIALIST,
-        "inheritance": EnhancedAgentRole.INHERITANCE_EXPERT,
-        "fatwa": EnhancedAgentRole.FATWA_RESEARCHER,
-        "logic": EnhancedAgentRole.LOGIC_EXPERT,
-        "medicine": EnhancedAgentRole.MEDICAL_SCHOLAR,
-        # Spirituality
-        "spirituality": EnhancedAgentRole.SPIRITUALITY_GUIDE,
-        "ethics": EnhancedAgentRole.ETHICS_TEACHER,
-        # Sects
-        "seects": EnhancedAgentRole.SECTS_ANALYST,
-        # Reference
-        "index": EnhancedAgentRole.INDEX_EXPERT,
-        "library": EnhancedAgentRole.REFERENCE_LIBRARIAN,
-        # General
-        "general": EnhancedAgentRole.GENERAL_RESEARCHER,
+        "muhaqqiq": EnhancedAgentRole.MUHAQQIQ,
+        "mufti": EnhancedAgentRole.MUFTI,
+        "mufassir": EnhancedAgentRole.MUFASSIR,
+        "muhaddith": EnhancedAgentRole.MUHADDITH,
+        "lughawi": EnhancedAgentRole.LUGHAWI,
+        "muarrikh": EnhancedAgentRole.MUARRIKH,
+        "murabbi": EnhancedAgentRole.MURABBI,
+        "muqarin": EnhancedAgentRole.MUQARIN,
     }
 
     role_enum = role_map.get(role.lower())
 
     if not role_enum:
-        return None
+        raise ValueError(f"Unknown role: {role}")
 
-    system = EnhancedAgentSystem(pipeline)
-    return system.agents.get(role_enum)
+    return EnhancedIslamicRAGAgent(role_enum, pipeline)
 
 
-def create_enhanced_system(pipeline: Any = None) -> EnhancedAgentSystem:
-    """Create the complete enhanced agent system."""
+def create_enhanced_agent_team(pipeline: Any = None) -> EnhancedAgentTeam:
+    """Create an enhanced agent team."""
+    return EnhancedAgentTeam(pipeline)
 
-    return EnhancedAgentSystem(pipeline)
+
+# Import datetime
+from datetime import datetime
+
+# Import Any from typing
+from typing import Any

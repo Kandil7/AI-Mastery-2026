@@ -24,11 +24,8 @@ from .schema import (
     compute_statistics,
 )
 
-from .schema_enhanced import (
-    # Enhanced roles (15 total)
-    # Enhanced skills (48+ total)
-    pass
-)
+# Note: schema_enhanced.py merged into schema.py in v3.0
+# All enhanced roles and skills now in schema.py
 
 from .templates import (
     Template,

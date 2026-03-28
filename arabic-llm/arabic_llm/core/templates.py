@@ -12,7 +12,7 @@ Templates are organized by:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable,Optional
 import random
 
 
@@ -541,15 +541,15 @@ for role, templates in ALL_TEMPLATES.items():
         SKILL_TEMPLATES[template.skill].append(template)
 
 
-def get_templates(role: str = None, skill: str = None, level: str = None) -> List[Template]:
+def get_templates(role: Optional[str] = None, skill: Optional[str] = None, level: Optional[str] = None) -> List[Template]:
     """
     Get templates filtered by role, skill, and/or level.
-    
+
     Args:
         role: Filter by role (optional)
         skill: Filter by skill (optional)
         level: Filter by level (optional)
-        
+
     Returns:
         List of matching templates
     """
@@ -566,7 +566,7 @@ def get_templates(role: str = None, skill: str = None, level: str = None) -> Lis
     return templates
 
 
-def get_random_template(role: str = None, skill: str = None, level: str = None) -> Template:
+def get_random_template(role: Optional[str] = None, skill: Optional[str] = None, level: Optional[str] = None) -> Template:
     """Get a random template matching the criteria"""
     templates = get_templates(role, skill, level)
     if not templates:
@@ -999,7 +999,6 @@ FATWA_ASSISTANT_SAFE_AGENT = AgentSystemPrompt(
 
 ERROR_ANALYSIS_AR_AGENT = AgentSystemPrompt(
     role="proofreader",
-    skill="error_analysis_ar",
     system_prompt="""أنت محلل أخطاء لغوية عربي متخصص في تحليل وتصحيح الأخطاء.
 
 مهامك:
@@ -1026,7 +1025,6 @@ ERROR_ANALYSIS_AR_AGENT = AgentSystemPrompt(
 
 DIALECT_HANDLING_EGY_AGENT = AgentSystemPrompt(
     role="assistant_general",
-    skill="dialect_handling_egy",
     system_prompt="""أنت مساعد متخصص في اللهجة المصرية، تفهم العامية وتتقن التحويل للفصحى والعكس.
 
 مهامك:
@@ -1054,7 +1052,6 @@ DIALECT_HANDLING_EGY_AGENT = AgentSystemPrompt(
 
 LEGAL_ARABIC_DRAFTING_AGENT = AgentSystemPrompt(
     role="dataengineer_ar",
-    skill="legal_arabic_drafting",
     system_prompt="""أنت مساعد صياغة قانونية وإدارية عربي متخصص.
 
 مهامك:
@@ -1095,7 +1092,7 @@ AGENT_PROMPTS = {
 }
 
 
-def get_agent_prompt(role: str, skill: str = None) -> AgentSystemPrompt:
+def get_agent_prompt(role: str, skill: Optional[str] = None) -> AgentSystemPrompt:
     """
     Get agent system prompt for a role.
     

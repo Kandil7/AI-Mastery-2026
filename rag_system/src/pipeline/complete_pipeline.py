@@ -339,7 +339,7 @@ class CompleteRAGPipeline:
     async def _load_metadata(self):
         """Load book metadata."""
 
-        from ..data.ingestion_pipeline import MetadataIngestionPipeline
+        from ..data.multi_source_ingestion import MetadataIngestionPipeline
 
         metadata_path = os.path.join(self.config.datasets_path, "metadata")
         pipeline = MetadataIngestionPipeline(metadata_path)

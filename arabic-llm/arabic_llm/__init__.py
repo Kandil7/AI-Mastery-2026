@@ -53,9 +53,9 @@ from .core import (
 
 # Import pipeline components
 from .pipeline import (
-    TextCleaner,
-    DataCleaningPipeline,
+    ArabicTextCleaner,
     CleanedBook,
+    PipelineStats,
 )
 
 # Import integration components
@@ -65,11 +65,18 @@ from .integration import (
     TafseerRecord,
 )
 
-# Import agents
-from .agents import (
-    ResearchAgent,
-    ExperimentProposal,
-)
+# Import agents (optional - requires torch)
+try:
+    from .agents import (
+        ResearchAgent,
+        ExperimentProposal,
+    )
+except (ImportError, OSError) as e:
+    # torch or other dependencies not available
+    import warnings
+    warnings.warn(f"Agents disabled: {e}")
+    ResearchAgent = None
+    ExperimentProposal = None
 
 # Import utilities
 from .utils import (
@@ -102,9 +109,9 @@ __all__ = [
     "ExampleGenerator",
     "DatasetGenerator",
     # Pipeline
-    "TextCleaner",
-    "DataCleaningPipeline",
+    "ArabicTextCleaner",
     "CleanedBook",
+    "PipelineStats",
     # Integration
     "SystemBookIntegration",
     "HadithRecord",

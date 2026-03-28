@@ -48,9 +48,8 @@ from .pipeline.complete_pipeline import (
 )
 
 # Data Ingestion
-from .data.ingestion_pipeline import (
-    DataIngestionPipeline,
-    MetadataIngestionPipeline,
+from .data.multi_source_ingestion import (
+    MultiSourceIngestionPipeline,
     DataSource,
     DataSourceType,
 )

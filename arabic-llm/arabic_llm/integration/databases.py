@@ -66,41 +66,43 @@ class DatabaseConnection:
     def query(self, sql: str, params: tuple = ()) -> List[Dict]:
         """
         Execute SELECT query.
-        
+
         Args:
             sql: SQL query
             params: Query parameters
-            
+
         Returns:
             List of result dictionaries
         """
         if not self.conn:
             self.connect()
-        
+
+        assert self.conn is not None, "Connection not established"
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
-        
+
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
     
     def execute(self, sql: str, params: tuple = ()) -> int:
         """
         Execute INSERT/UPDATE/DELETE query.
-        
+
         Args:
             sql: SQL query
             params: Query parameters
-            
+
         Returns:
             Number of affected rows
         """
         if not self.conn:
             self.connect()
-        
+
+        assert self.conn is not None, "Connection not established"
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
         self.conn.commit()
-        
+
         return cursor.rowcount
     
     def get_tables(self) -> List[str]:

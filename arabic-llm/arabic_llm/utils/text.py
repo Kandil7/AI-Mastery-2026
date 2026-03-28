@@ -142,7 +142,7 @@ def extract_urls(text: str) -> list:
     Returns:
         List of URLs
     """
-    url_pattern = r"https?://[^\s<>"{}|\\^`\[\]]+"
+    url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
     return re.findall(url_pattern, text)
 
 
@@ -157,7 +157,7 @@ def remove_urls(text: str, replacement: str = "") -> str:
     Returns:
         Text without URLs
     """
-    url_pattern = r"https?://[^\s<>"{}|\\^`\[\]]+"
+    url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
     return re.sub(url_pattern, replacement, text)
 
 

@@ -25,7 +25,7 @@ from .schema import (
     DatasetConfig, DatasetStatistics, validate_example,
     write_jsonl, read_jsonl, compute_statistics
 )
-from .instruction_templates import (
+from .templates import (
     get_templates, get_random_template, POETRY_METERS, POETRY_TOPICS,
     ALL_TEMPLATES
 )
