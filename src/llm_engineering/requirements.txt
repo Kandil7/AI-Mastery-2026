@@ -1,0 +1,159 @@
+# LLM Engineering - Part 3 Dependencies
+# Production-ready requirements for all 8 modules
+
+# =============================================================================
+# Core Dependencies (Required for all modules)
+# =============================================================================
+httpx>=0.25.0
+tenacity>=8.2.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+
+# =============================================================================
+# Module 3.1: Running LLMs
+# =============================================================================
+# API Clients
+openai>=1.6.0
+anthropic>=0.8.0
+google-generativeai>=0.3.0
+
+# Token counting
+tiktoken>=0.5.0
+
+# Local execution
+llama-cpp-python>=0.2.0
+
+# Structured output
+outlines>=0.0.30
+instructor>=1.0.0
+
+# =============================================================================
+# Module 3.2: Building Vector Storage
+# =============================================================================
+# Document parsing
+pypdf>=4.0.0
+pdfplumber>=0.10.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+PyYAML>=6.0.0
+
+# Embeddings
+sentence-transformers>=2.3.0
+
+# Vector databases
+qdrant-client>=1.7.0
+faiss-cpu>=1.7.0
+chromadb>=0.4.0
+pinecone-client>=3.0.0
+
+# Google Drive connector (optional)
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.1.0
+
+# =============================================================================
+# Module 3.3: RAG
+# =============================================================================
+# Orchestration frameworks
+langchain>=0.1.0
+langchain-core>=0.1.0
+llama-index>=0.10.0
+
+# Evaluation
+ragas>=0.1.0
+datasets>=2.14.0
+
+# =============================================================================
+# Module 3.4: Advanced RAG
+# =============================================================================
+# Program LLM
+dspy-ai>=2.4.0
+
+# Re-ranking
+sentence-transformers>=2.3.0  # Already in Module 3.2
+
+# Search tools
+duckduckgo-search>=5.0.0
+
+# =============================================================================
+# Module 3.5: Agents
+# =============================================================================
+# Agent frameworks
+langgraph>=0.0.1
+crewai>=0.20.0
+pyautogen>=0.2.0
+
+# Protocol support
+jsonschema>=4.20.0
+
+# =============================================================================
+# Module 3.6: Inference Optimization
+# =============================================================================
+# Flash attention (requires CUDA)
+flash-attn>=2.4.0
+
+# PyTorch (required for attention implementations)
+torch>=2.1.0
+
+# =============================================================================
+# Module 3.7: Deploying LLMs
+# =============================================================================
+# Demo applications
+gradio>=4.0.0
+streamlit>=1.29.0
+
+# Server deployment
+vllm>=0.2.0
+uvicorn>=0.25.0
+fastapi>=0.109.0
+
+# Hugging Face deployment
+huggingface_hub>=0.20.0
+
+# MLC LLM (optional, platform-specific)
+# mlc-llm>=0.1.0
+
+# =============================================================================
+# Module 3.8: Securing LLMs
+# =============================================================================
+# Security scanning
+garak>=0.9.0
+
+# =============================================================================
+# Development & Testing
+# =============================================================================
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+
+# Type checking
+mypy>=1.8.0
+types-requests>=2.31.0
+
+# Code quality
+ruff>=0.1.0
+black>=23.12.0
+isort>=5.13.0
+
+# =============================================================================
+# Utilities
+# =============================================================================
+aiofiles>=23.2.0
+python-multipart>=0.0.6
+orjson>=3.9.0
+
+# =============================================================================
+# Optional: GPU Support
+# =============================================================================
+# Uncomment if using GPU
+# torch-cuda>=2.1.0
+# tensorflow>=2.15.0
+
+# =============================================================================
+# Optional: Additional Model Support
+# =============================================================================
+# transformers>=4.36.0  # Hugging Face models
+# accelerate>=0.25.0    # Model acceleration
+# bitsandbytes>=0.42.0  # Quantization
