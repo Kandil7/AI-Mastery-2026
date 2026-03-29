@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-03-29T02:53:06.144106",
+  "duration_seconds": 1.360324,
+  "total_checks": 73,
+  "passed": 61,
+  "failed": 12,
+  "pass_rate": 83.56164383561644,
+  "by_severity": {
+    "critical": {
+      "total": 0,
+      "failed": 0
+    },
+    "high": {
+      "total": 0,
+      "failed": 0
+    },
+    "medium": {
+      "total": 0,
+      "failed": 0
+    },
+    "low": {
+      "total": 12,
+      "failed": 12
+    },
+    "info": {
+      "total": 61,
+      "failed": 0
+    }
+  }
+}

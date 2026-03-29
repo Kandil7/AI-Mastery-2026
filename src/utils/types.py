@@ -21,31 +21,15 @@ Type Categories:
 - Generics: Generic type utilities
 """
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Literal,
-    Mapping,
-    Optional,
-    Protocol,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    runtime_checkable,
-    AsyncIterable,
-    Iterable,
-    Awaitable,
-)
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-import numpy as np
-from numpy.typing import NDArray, ArrayLike
+from typing import (Any, AsyncIterable, Awaitable, Callable, Dict, Generic,
+                    Iterable, List, Literal, Mapping, Optional, Protocol,
+                    Sequence, Tuple, TypeVar, Union, runtime_checkable)
 
+import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 # ============================================================
 # Basic Type Aliases
@@ -108,14 +92,15 @@ ModelT = TypeVar("ModelT")
 # Protocols (Structural Types)
 # ============================================================
 
+
 @runtime_checkable
 class DocumentProtocol(Protocol):
     """Protocol for document-like objects."""
-    
+
     id: IDType
     content: str
     metadata: MetadataDict
-    
+
     def __len__(self) -> int:
         """Return document length (e.g., character count)."""
         ...
@@ -124,13 +109,13 @@ class DocumentProtocol(Protocol):
 @runtime_checkable
 class ChunkProtocol(Protocol):
     """Protocol for chunk-like objects."""
-    
+
     id: IDType
     content: str
     doc_id: IDType
     chunk_index: int
     metadata: MetadataDict
-    
+
     start_char: Optional[int]
     end_char: Optional[int]
 
@@ -138,13 +123,13 @@ class ChunkProtocol(Protocol):
 @runtime_checkable
 class EmbeddingModelProtocol(Protocol):
     """Protocol for embedding models."""
-    
+
     dim: int
-    
+
     def encode(self, text: str) -> EmbeddingVector:
         """Encode text to embedding."""
         ...
-    
+
     def encode_batch(
         self,
         texts: Sequence[str],
@@ -157,10 +142,10 @@ class EmbeddingModelProtocol(Protocol):
 @runtime_checkable
 class VectorStoreProtocol(Protocol):
     """Protocol for vector stores."""
-    
+
     dim: int
     size: int
-    
+
     def add(
         self,
         embedding: EmbeddingVector,
@@ -169,7 +154,7 @@ class VectorStoreProtocol(Protocol):
     ) -> None:
         """Add a vector to the store."""
         ...
-    
+
     def add_batch(
         self,
         embeddings: EmbeddingMatrix,
@@ -178,7 +163,7 @@ class VectorStoreProtocol(Protocol):
     ) -> None:
         """Add multiple vectors to the store."""
         ...
-    
+
     def search(
         self,
         embedding: EmbeddingVector,
@@ -187,11 +172,11 @@ class VectorStoreProtocol(Protocol):
     ) -> List["SearchResultProtocol"]:
         """Search for similar vectors."""
         ...
-    
+
     def delete(self, document_id: IDType) -> bool:
         """Delete a vector from the store."""
         ...
-    
+
     def clear(self) -> None:
         """Clear all vectors from the store."""
         ...
@@ -200,7 +185,7 @@ class VectorStoreProtocol(Protocol):
 @runtime_checkable
 class SearchResultProtocol(Protocol):
     """Protocol for search results."""
-    
+
     id: IDType
     score: ScoreType
     metadata: Optional[MetadataDict]
@@ -209,7 +194,7 @@ class SearchResultProtocol(Protocol):
 @runtime_checkable
 class ChunkerProtocol(Protocol):
     """Protocol for chunking strategies."""
-    
+
     def chunk(self, document: DocumentProtocol) -> List[ChunkProtocol]:
         """Split document into chunks."""
         ...
@@ -218,7 +203,7 @@ class ChunkerProtocol(Protocol):
 @runtime_checkable
 class RetrieverProtocol(Protocol):
     """Protocol for retrieval strategies."""
-    
+
     def retrieve(
         self,
         query: str,
@@ -232,7 +217,7 @@ class RetrieverProtocol(Protocol):
 @runtime_checkable
 class RerankerProtocol(Protocol):
     """Protocol for reranking strategies."""
-    
+
     def rerank(
         self,
         query: str,
@@ -246,10 +231,10 @@ class RerankerProtocol(Protocol):
 @runtime_checkable
 class LLMProtocol(Protocol):
     """Protocol for LLM models."""
-    
+
     model_name: str
     max_tokens: int
-    
+
     def generate(
         self,
         prompt: str,
@@ -258,7 +243,7 @@ class LLMProtocol(Protocol):
     ) -> str:
         """Generate text from prompt."""
         ...
-    
+
     async def generate_async(
         self,
         prompt: str,
@@ -272,11 +257,11 @@ class LLMProtocol(Protocol):
 @runtime_checkable
 class CacheProtocol(Protocol):
     """Protocol for cache implementations."""
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache."""
         ...
-    
+
     def set(
         self,
         key: str,
@@ -285,15 +270,15 @@ class CacheProtocol(Protocol):
     ) -> None:
         """Set value in cache."""
         ...
-    
+
     def delete(self, key: str) -> bool:
         """Delete value from cache."""
         ...
-    
+
     def clear(self) -> None:
         """Clear cache."""
         ...
-    
+
     def exists(self, key: str) -> bool:
         """Check if key exists in cache."""
         ...
@@ -302,11 +287,11 @@ class CacheProtocol(Protocol):
 @runtime_checkable
 class SerializableProtocol(Protocol):
     """Protocol for serializable objects."""
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
         ...
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SerializableProtocol":
         """Deserialize from dictionary."""
@@ -316,19 +301,19 @@ class SerializableProtocol(Protocol):
 @runtime_checkable
 class ComparableProtocol(Protocol):
     """Protocol for comparable objects."""
-    
+
     def __lt__(self, other: Any) -> bool:
         """Less than comparison."""
         ...
-    
+
     def __le__(self, other: Any) -> bool:
         """Less than or equal comparison."""
         ...
-    
+
     def __gt__(self, other: Any) -> bool:
         """Greater than comparison."""
         ...
-    
+
     def __ge__(self, other: Any) -> bool:
         """Greater than or equal comparison."""
         ...
@@ -374,48 +359,49 @@ SuccessCallback = Callable[[T], None]
 # Result Types
 # ============================================================
 
+
 @dataclass
 class Result(Generic[T]):
     """
     Generic result type for operations that can fail.
-    
+
     Example:
         >>> def safe_divide(a: float, b: float) -> Result[float]:
         ...     if b == 0:
         ...         return Result.failure("Division by zero")
         ...     return Result.success(a / b)
-        >>> 
+        >>>
         >>> result = safe_divide(10, 2)
         >>> if result.is_success:
         ...     print(result.value)
     """
-    
+
     value: Optional[T] = None
     error: Optional[str] = None
     is_success: bool = True
-    
+
     @classmethod
     def success(cls, value: T) -> "Result[T]":
         """Create a successful result."""
         return cls(value=value, is_success=True)
-    
+
     @classmethod
     def failure(cls, error: str) -> "Result[T]":
         """Create a failed result."""
         return cls(error=error, is_success=False)
-    
+
     def map(self, func: Callable[[T], V]) -> "Result[V]":
         """Map the value if successful."""
         if self.is_success and self.value is not None:
             return Result.success(func(self.value))
         return Result.failure(self.error or "Unknown error")
-    
+
     def and_then(self, func: Callable[[T], "Result[V]"]) -> "Result[V]":
         """Chain operations if successful."""
         if self.is_success and self.value is not None:
             return func(self.value)
         return Result.failure(self.error or "Unknown error")
-    
+
     def unwrap(self) -> T:
         """Get the value or raise an exception."""
         if not self.is_success:
@@ -423,7 +409,7 @@ class Result(Generic[T]):
         if self.value is None:
             raise ValueError("Value is None")
         return self.value
-    
+
     def unwrap_or(self, default: T) -> T:
         """Get the value or return default."""
         return self.value if self.is_success and self.value is not None else default
@@ -444,17 +430,18 @@ TimestampMilliseconds = float
 # Pagination Types
 # ============================================================
 
+
 @dataclass
 class PageInfo:
     """Pagination information."""
-    
+
     page: int
     page_size: int
     total_items: int
     total_pages: int
     has_next: bool
     has_previous: bool
-    
+
     @classmethod
     def create(
         cls,
@@ -477,7 +464,7 @@ class PageInfo:
 @dataclass
 class PaginatedResult(Generic[T]):
     """Paginated result set."""
-    
+
     items: List[T]
     page_info: PageInfo
 
@@ -486,15 +473,16 @@ class PaginatedResult(Generic[T]):
 # Performance Types
 # ============================================================
 
+
 @dataclass
 class PerformanceMetrics:
     """Performance metrics for operations."""
-    
+
     duration_ms: DurationMilliseconds
     memory_mb: float = 0.0
     cpu_percent: float = 0.0
     items_processed: int = 0
-    
+
     @property
     def throughput(self) -> float:
         """Items processed per second."""
@@ -507,9 +495,10 @@ class PerformanceMetrics:
 # Strategy Pattern Types
 # ============================================================
 
+
 class Strategy(Protocol[T]):
     """Protocol for strategy pattern."""
-    
+
     def execute(self, context: Any) -> T:
         """Execute the strategy."""
         ...
@@ -519,9 +508,10 @@ class Strategy(Protocol[T]):
 # Builder Pattern Types
 # ============================================================
 
+
 class Builder(Protocol[T]):
     """Protocol for builder pattern."""
-    
+
     def build(self) -> T:
         """Build the final object."""
         ...
@@ -531,9 +521,10 @@ class Builder(Protocol[T]):
 # Observer Pattern Types
 # ============================================================
 
+
 class Observer(Protocol[T]):
     """Protocol for observer pattern."""
-    
+
     def update(self, subject: T) -> None:
         """Update observer with subject state."""
         ...
@@ -541,15 +532,15 @@ class Observer(Protocol[T]):
 
 class Subject(Protocol[T]):
     """Protocol for subject pattern."""
-    
+
     def attach(self, observer: Observer[T]) -> None:
         """Attach an observer."""
         ...
-    
+
     def detach(self, observer: Observer[T]) -> None:
         """Detach an observer."""
         ...
-    
+
     def notify(self) -> None:
         """Notify all observers."""
         ...
@@ -559,25 +550,26 @@ class Subject(Protocol[T]):
 # Repository Pattern Types
 # ============================================================
 
+
 class Repository(Protocol[T, IDType]):
     """Protocol for repository pattern."""
-    
+
     def get(self, id: IDType) -> Optional[T]:
         """Get entity by ID."""
         ...
-    
+
     def get_all(self) -> List[T]:
         """Get all entities."""
         ...
-    
+
     def add(self, entity: T) -> IDType:
         """Add entity."""
         ...
-    
+
     def update(self, entity: T) -> None:
         """Update entity."""
         ...
-    
+
     def delete(self, id: IDType) -> bool:
         """Delete entity by ID."""
         ...
@@ -586,6 +578,7 @@ class Repository(Protocol[T, IDType]):
 # ============================================================
 # Utility Functions
 # ============================================================
+
 
 def is_numeric(value: Any) -> bool:
     """Check if value is numeric."""
