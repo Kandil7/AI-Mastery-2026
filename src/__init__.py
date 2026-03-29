@@ -8,31 +8,32 @@ and machine learning operations.
 
 Import Structure:
 -----------------
-    from ai_mastery import core, ml, llm, rag, production
-    from ai_mastery.core import Adam, Matrix, Vector
-    from ai_mastery.rag import RAGPipeline, SemanticChunker
-    from ai_mastery.production import FastAPIApp, SemanticCache
+    from src import rag, embeddings, vector_stores
+    from src.rag import RAGPipeline, SemanticChunker
+    from src.agents import ReActAgent, ToolRegistry
+    from src.vector_stores import FAISSStore, QdrantStore
 
 Quick Start:
 ------------
-    >>> from ai_mastery import rag, embeddings, vector_stores
-    >>> from ai_mastery.rag.chunking import SemanticChunker
-    >>> 
+    >>> from src import rag, embeddings, vector_stores
+    >>> from src.rag.chunking import SemanticChunker
+    >>> from src.vector_stores import FAISSStore, VectorStoreConfig
+    >>>
     >>> # Initialize components
-    >>> embed_model = embeddings.SentenceTransformerEmbeddings("all-MiniLM-L6-v2")
-    >>> vector_store = vector_stores.FAISSVectorStore(dim=384)
+    >>> embed_model = TextEmbedder("all-MiniLM-L6-v2")
+    >>> vector_store = FAISSStore(VectorStoreConfig(dim=384))
     >>> chunker = SemanticChunker(chunk_size=512)
-    >>> 
+    >>>
     >>> # Create RAG pipeline
     >>> pipeline = rag.RAGPipeline(embed_model, vector_store, chunker)
-    >>> 
+    >>>
     >>> # Add documents
-    >>> docs = [rag.Document(id="1", content="AI is transforming industries.")]
+    >>> docs = [{"id": "1", "content": "AI is transforming industries."}]
     >>> pipeline.add_documents(docs)
-    >>> 
+    >>>
     >>> # Query
     >>> results = pipeline.query("How is AI impacting business?")
-    >>> print(results[0].document.content)
+    >>> print(results[0].content)
 
 Modules:
 --------
@@ -40,96 +41,86 @@ Modules:
 - **ml**: Classical and deep learning implementations
 - **llm**: Transformer architectures and attention mechanisms
 - **rag**: Unified RAG pipeline with chunking, retrieval, reranking
-- **rag_engine**: Production-ready RAG with hexagonal architecture
 - **rag_specialized**: Advanced RAG architectures (multimodal, temporal, graph)
-- **embeddings**: Unified embedding model interfaces
-- **vector_stores**: Vector database adapters (FAISS, Qdrant, Weaviate, pgvector)
 - **agents**: Multi-agent systems and tool orchestration
+- **embeddings**: Unified embedding model interfaces
+- **vector_stores**: Vector database adapters (FAISS, Qdrant, Chroma)
 - **evaluation**: LLM and RAG evaluation frameworks
 - **production**: Production components (API, caching, monitoring, auth)
 - **orchestration**: Workflow orchestration and pipelines
 - **safety**: AI safety, guardrails, content moderation
 - **utils**: Shared utilities (logging, errors, config, types)
 
-Version: 2.0.0
+Version: 2.1.0
 Author: AI-Mastery-2026 Team
 License: MIT
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "AI-Mastery-2026 Team"
 __email__ = "medokandeal7@gmail.com"
 __license__ = "MIT"
+
 __all__ = [
     # Version info
     "__version__",
     "__author__",
     "__email__",
     "__license__",
+    
     # Core modules
     "core",
     "ml",
     "llm",
     "rag",
-    "rag_engine",
     "rag_specialized",
+    "agents",
     "embeddings",
     "vector_stores",
-    "agents",
     "evaluation",
     "production",
     "orchestration",
     "safety",
     "utils",
-    # Convenience imports (populated below)
-    "Adam",
-    "SGD",
-    "Matrix",
-    "Vector",
-    "RAGPipeline",
-    "SemanticChunker",
-    "HybridRetrieval",
-    "FastAPIApp",
-    "SemanticCache",
-    "Document",
-    "DocumentChunk",
 ]
 
-# Import all submodules
+# Import all submodules (lazy to avoid circular imports)
 from src import core
 from src import ml
 from src import llm
 from src import rag
-from src import rag_engine
 from src import rag_specialized
+from src import agents
 from src import embeddings
 from src import vector_stores
-from src import agents
 from src import evaluation
 from src import production
 from src import orchestration
 from src import safety
 from src import utils
 
-# Convenience imports from core
-try:
-    from src.core.optimization import Adam, SGD
-    from src.core.linear_algebra import Vector, Matrix
-except ImportError:
-    pass
-
 # Convenience imports from rag
 try:
-    from src.rag.core import RAGPipeline, Document, DocumentChunk
     from src.rag.chunking import SemanticChunker
-    from src.rag.retrieval import HybridRetrieval
+    from src.rag.chunking import RecursiveChunker
 except ImportError:
     pass
 
-# Convenience imports from production
+# Convenience imports from embeddings
 try:
-    from src.production.api import FastAPIApp
-    from src.production.caching import SemanticCache
+    from src.embeddings import TextEmbedder, ImageEmbedder
+except ImportError:
+    pass
+
+# Convenience imports from vector_stores
+try:
+    from src.vector_stores import FAISSStore, MemoryVectorStore, VectorStoreConfig
+except ImportError:
+    pass
+
+# Convenience imports from utils
+try:
+    from src.utils.logging import get_logger, log_performance
 except ImportError:
     pass
 
@@ -144,11 +135,6 @@ __module_info__ = {
             "optimization",
             "probability",
             "statistics",
-            "mcmc",
-            "variational_inference",
-            "causal_inference",
-            "explainable_ai",
-            "differential_privacy",
         ],
     },
     "ml": {
@@ -169,7 +155,6 @@ __module_info__ = {
             "rag",
             "advanced_rag",
             "agents",
-            "support_agent",
         ],
     },
     "rag": {
@@ -180,15 +165,7 @@ __module_info__ = {
             "retrieval",
             "reranking",
             "advanced",
-        ],
-    },
-    "rag_engine": {
-        "description": "Production-ready RAG with hexagonal architecture",
-        "submodules": [
-            "application",
-            "domain",
-            "adapters",
-            "api",
+            "specialized",
         ],
     },
     "rag_specialized": {
@@ -201,41 +178,33 @@ __module_info__ = {
             "continual_learning",
         ],
     },
+    "agents": {
+        "description": "Multi-agent systems and tool orchestration",
+        "submodules": [
+            "core",
+            "tools",
+            "multi_agent_systems",
+            "integrations",
+        ],
+    },
     "embeddings": {
         "description": "Unified embedding model interfaces and implementations",
         "submodules": [
-            "base",
-            "sentence_transformers",
-            "openai_embeddings",
-            "local_embeddings",
+            "embeddings",
         ],
     },
     "vector_stores": {
         "description": "Vector database adapters",
         "submodules": [
             "base",
+            "memory",
             "faiss_store",
-            "qdrant_store",
-            "weaviate_store",
-            "pgvector_store",
-            "memory_store",
-        ],
-    },
-    "agents": {
-        "description": "Multi-agent systems and tool orchestration",
-        "submodules": [
-            "base_agent",
-            "tools",
-            "orchestrator",
-            "multi_agent_systems",
         ],
     },
     "evaluation": {
         "description": "LLM and RAG evaluation frameworks",
         "submodules": [
-            "ragas_integration",
-            "llm_judge",
-            "metrics",
+            "evaluation",
         ],
     },
     "production": {
@@ -246,20 +215,14 @@ __module_info__ = {
             "monitoring",
             "observability",
             "auth",
-            "rate_limiting",
-            "health",
             "data_pipeline",
             "query_enhancement",
-            "trust_layer",
-            "feature_store",
-            "edge_ai",
         ],
     },
     "orchestration": {
         "description": "Workflow orchestration and pipelines",
         "submodules": [
-            "workflows",
-            "pipelines",
+            "orchestration",
         ],
     },
     "safety": {
@@ -267,7 +230,6 @@ __module_info__ = {
         "submodules": [
             "guardrails",
             "content_moderation",
-            "safety_classifier",
         ],
     },
     "utils": {
@@ -285,13 +247,13 @@ __module_info__ = {
 def get_module_info(module_name: str) -> dict:
     """
     Get information about a specific module.
-    
+
     Args:
         module_name: Name of the module
-    
+
     Returns:
         Dictionary with module description and submodules
-    
+
     Example:
         >>> info = get_module_info("rag")
         >>> print(info["description"])
@@ -303,10 +265,10 @@ def get_module_info(module_name: str) -> dict:
 def list_modules() -> list[str]:
     """
     List all available modules.
-    
+
     Returns:
         List of module names
-    
+
     Example:
         >>> modules = list_modules()
         >>> print(modules)
@@ -318,7 +280,7 @@ def list_modules() -> list[str]:
 def print_module_tree() -> None:
     """
     Print a tree view of all modules and submodules.
-    
+
     Example:
         >>> print_module_tree()
         AI-Mastery-2026 Modules
@@ -334,7 +296,7 @@ def print_module_tree() -> None:
     """
     print("AI-Mastery-2026 Modules")
     print("=" * 40)
-    
+
     for module_name, info in __module_info__.items():
         print(f"\n{module_name}")
         print(f"  {info['description']}")
