@@ -1,0 +1,182 @@
+# Pre-commit configuration for AI-Mastery-2026
+# =============================================
+# Install: make setup-pre-commit
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Core pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: "Trims trailing whitespace"
+      - id: end-of-file-fixer
+        description: "Ensures files end with a newline"
+      - id: check-yaml
+        description: "Checks YAML syntax"
+        args: ["--unsafe"]
+      - id: check-json
+        description: "Checks JSON syntax"
+      - id: check-toml
+        description: "Checks TOML syntax"
+      - id: check-added-large-files
+        description: "Prevents large files from being added"
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+        description: "Checks for merge conflict markers"
+      - id: check-case-conflict
+        description: "Checks for case conflicts in filenames"
+      - id: detect-private-key
+        description: "Detects private keys"
+      - id: check-docstring-first
+        description: "Checks for docstrings in functions"
+
+  # Python code formatter
+  - repo: https://github.com/psf/black
+    rev: 24.1.0
+    hooks:
+      - id: black
+        name: "Black: Format Python code"
+        language_version: python3.10
+        args: ["--line-length", "100"]
+
+  # Python import sorter
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: "isort: Sort Python imports"
+        args: ["--profile", "black", "--line-length", "100"]
+
+  # Python linter
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: "flake8: Lint Python code"
+        args: [
+          "--max-line-length=100",
+          "--extend-ignore=E203",
+          "--exclude=.venv,venv,.git,__pycache__,build,dist",
+        ]
+        additional_dependencies:
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-docstrings
+
+  # Python type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: "mypy: Type check Python code"
+        args: [
+          "--ignore-missing-imports",
+          "--pretty",
+          "--exclude=.venv|venv|__pycache__|build|dist",
+        ]
+        additional_dependencies:
+          - types-requests
+          - types-PyYAML
+          - types-python-dateutil
+          - pydantic
+
+  # Security scanner
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.7
+    hooks:
+      - id: bandit
+        name: "bandit: Security scan Python code"
+        args: ["-ll", "-ii", "-r", "src/"]
+
+  # Dependency checker
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+        description: "Checks for blanket noqa comments"
+      - id: python-check-blanket-type-ignore
+        description: "Checks for blanket type ignore comments"
+      - id: python-no-log-warn
+        description: "Checks for log.warn usage"
+      - id: python-use-type-annotations
+        description: "Encourages type annotations over type comments"
+
+  # Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: "detect-secrets: Detect secrets"
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: "package.lock.json"
+
+  # Notebook cleaner
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        name: "nbstripout: Clean Jupyter notebooks"
+        args: [
+          "--extra-keys",
+          "metadata.kernelspec metadata.language_info.version",
+        ]
+
+  # Shell script linter
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: "shellcheck: Lint shell scripts"
+        files: \.(sh|bash)$
+
+  # Dockerfile linter
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: "hadolint: Lint Dockerfiles"
+        args: ["--ignore", "DL3008", "--ignore", "DL3013"]
+
+  # Git commit message linter (optional)
+  # - repo: https://github.com/commitizen-tools/commitizen
+  #   rev: v3.13.0
+  #   hooks:
+  #     - id: commitizen
+  #       stages: [commit-msg]
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3.10
+
+# Skip specific files
+exclude: |
+  (?x)^(
+    .venv/|
+    venv/|
+    __pycache__/|
+    build/|
+    dist/|
+    .git/|
+    .mypy_cache/|
+    .pytest_cache/|
+    htmlcov/|
+    .*\.egg-info/|
+    node_modules/|
+    \.secrets\.baseline|
+    docs/.*\.md|
+    research/.*\.ipynb
+  )$
+
+# CI mode
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit autoupdate"
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
