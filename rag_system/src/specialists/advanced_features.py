@@ -191,7 +191,8 @@ class CrossReferenceSystem:
 
             if concept:
                 self.concepts[concept].update(related)
-                self.concept_cepts[concept].append(book_title)
+                # Fixed: concept_cepts -> concept_books (typo)
+                self.concept_books[concept].append(book_title)
 
                 # Track relationships
                 for rel in related:

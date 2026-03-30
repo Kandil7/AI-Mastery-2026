@@ -31,11 +31,18 @@ from transformers import (
     BitsAndBytesConfig,
     get_cosine_schedule_with_warmup,
 )
-from peft import (
-    LoraConfig,
-    get_peft_model,
-    prepare_model_for_kbit_training,
-)
+
+# Optional PEFT import (install with: pip install peft)
+try:
+    from peft import (
+        LoraConfig,
+        get_peft_model,
+        prepare_model_for_kbit_training,
+    )
+    PEFT_AVAILABLE = True
+except ImportError:
+    PEFT_AVAILABLE = False
+    print("⚠️  PEFT not installed. Install with: pip install peft")
 
 # Import fixed utilities
 from prepare import (
@@ -286,11 +293,12 @@ def train():
     
     model.train()
     start_time = time.time()
-    
+
     step = 0
     total_loss = 0.0
     best_val_loss = float('inf')
-    
+    elapsed = 0.0  # Initialize to avoid unbound variable warning
+
     for epoch in range(1):  # Single epoch, cut by time budget
         for batch in train_loader:
             step_start = time.time()
