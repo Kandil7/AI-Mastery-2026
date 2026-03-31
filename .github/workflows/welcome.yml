@@ -1,0 +1,57 @@
+# GitHub Welcome Bot Configuration
+# Welcomes new contributors to the repository
+
+name: 'Welcome New Contributors'
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            👋 Hello! Thank you for opening your first issue in AI-Mastery-2026!
+            
+            We appreciate your contribution to the project. Here's what happens next:
+            
+            1. A maintainer will review your issue within 48 hours
+            2. We may ask for additional information or clarification
+            3. Once we have enough context, we'll label and prioritize the issue
+            
+            In the meantime:
+            - Please check if similar issues already exist
+            - Make sure to follow our [Code of Conduct](CODE_OF_CONDUCT.md)
+            - Feel free to join our [Discussions](https://github.com/Kandil7/AI-Mastery-2026/discussions)
+            
+            Thanks again for helping improve AI-Mastery-2026! 🎉
+
+          pr-message: |
+            🎉 Thank you for your first pull request to AI-Mastery-2026!
+            
+            We're excited about your contribution! Here's what to expect:
+            
+            1. **Automated Checks**: CI/CD workflows will run automatically
+            2. **Review**: A maintainer will review your PR within 1 week
+            3. **Feedback**: We may suggest changes or improvements
+            4. **Merge**: Once approved, your PR will be merged
+            
+            Before we review, please ensure:
+            - [ ] You've read our [Contributing Guide](CONTRIBUTING.md)
+            - [ ] Tests pass locally (`make test`)
+            - [ ] Code is formatted (`make format`)
+            - [ ] Linters pass (`make lint`)
+            - [ ] Documentation is updated (if applicable)
+            
+            Need help? Check out:
+            - [Development Setup](docs/00_introduction/01_user_guide.md)
+            - [Code Style Guide](docs/guides/code-style.md)
+            - [Ask in Discussions](https://github.com/Kandil7/AI-Mastery-2026/discussions)
+            
+            Thanks for making AI-Mastery-2026 better! 🚀

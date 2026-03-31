@@ -1,0 +1,101 @@
+# Labeler Configuration for AI-Mastery-2026
+# Automatically labels PRs based on file patterns
+# Documentation: https://github.com/actions/labeler
+
+# Documentation changes
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**/*'
+          - '**/*.md'
+          - '**/*.rst'
+          - 'mkdocs.yml'
+          - 'README*'
+          - 'CONTRIBUTING*'
+          - 'LICENSE*'
+
+# Core mathematics module
+core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/core/**/*'
+
+# Machine learning module
+ml:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/ml/**/*'
+
+# LLM engineering module
+llm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/llm/**/*'
+
+# RAG systems module
+rag:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/rag/**/*'
+
+# AI agents module
+agents:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/agents/**/*'
+
+# Production infrastructure
+production:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/production/**/*'
+          - 'Dockerfile*'
+          - 'docker-compose*.yml'
+
+# Configuration changes
+configuration:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pyproject.toml'
+          - 'setup.py'
+          - 'requirements*.txt'
+          - '.pre-commit-config.yaml'
+          - '.editorconfig'
+          - 'codecov.yml'
+          - 'mkdocs.yml'
+
+# GitHub Actions workflows
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**/*'
+
+# Test changes
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**/*'
+          - '**/test_*.py'
+          - '**/conftest.py'
+
+# Examples and tutorials
+examples:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'examples/**/*'
+          - 'notebooks/**/*'
+
+# Scripts
+scripts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'scripts/**/*'
+          - 'Makefile'
+          - '*.sh'
+
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'requirements*.txt'
+          - 'pyproject.toml'
