@@ -1,13 +1,16 @@
 """
-Feature Store Module
-====================
+Feature Store Submodule
+=======================
 
 Production-grade feature store for ML systems.
 
-NOTE: This module is now a compatibility wrapper.
-The implementation has been moved to the `feature_store` submodule.
+Inspired by Uber Michelangelo Palette architecture:
+- Batch Pipeline: Historical feature computation
+- Streaming Pipeline: Near-real-time features (interface)
+- Feature Registry: Versioning and lineage tracking
+- Online-Offline Consistency: Validation framework
 
-New import style:
+Usage:
     from src.production.feature_store import (
         FeatureStore,
         FeatureRegistry,
@@ -17,43 +20,59 @@ New import style:
         ComputationType,
     )
 
-This module maintains backward compatibility by re-exporting
-from the submodule.
+Example:
+    >>> store = FeatureStore()
+    >>> store.register_batch_transform(AvgOrderValueTransform())
+    >>> results = store.run_batch(entity_ids, get_raw_data)
+    >>> features = store.get_online_features("user_123", ["feature_name"])
 
 Author: AI-Mastery-2026
-Version: 2.0.0 (modular)
+Version: 2.0.0
 """
 
-# Re-export all from submodule
-from src.production.feature_store import (
-    BatchPipeline,
-    BatchResults,
+# Types and enums
+from .types import (
     ComputationType,
-    ConsistencyValidator,
-    EntityFeatureMap,
     FeatureDefinition,
-    FeatureFreshnessTracker,
     FeatureGroup,
-    FeatureMap,
-    FeatureRegistry,
-    FeatureStore,
-    FeatureTransform,
     FeatureType,
     FeatureValue,
-    FeatureVector,
-    GigascaleStreamingPipeline,
-    OnlineFeatureServer,
     SerializationFormat,
     StreamingFeatureConfig,
-    StreamingPipeline,
-    # Example transforms
+    BatchResults,
+    EntityFeatureMap,
+    FeatureMap,
+    FeatureVector,
+)
+
+# Registry
+from .registry import FeatureRegistry
+
+# Transforms
+from .transforms import (
+    FeatureTransform,
     AvgOrderValueTransform,
     SessionCountTransform,
     UserEngagementScoreTransform,
     ItemPopularityTransform,
-    # Example usage
-    example_usage,
 )
+
+# Pipelines
+from .batch import BatchPipeline
+from .streaming import (
+    FeatureFreshnessTracker,
+    GigascaleStreamingPipeline,
+    StreamingPipeline,
+)
+
+# Online serving
+from .online import OnlineFeatureServer
+
+# Validation
+from .validation import ConsistencyValidator
+
+# Main class
+from .store import FeatureStore, example_usage
 
 __all__ = [
     # Types
