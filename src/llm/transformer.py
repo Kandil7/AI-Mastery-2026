@@ -19,9 +19,9 @@ from typing import Optional, Tuple
 import math
 
 try:
-    from src.ml.deep_learning import Layer, Dense, Activation, Dropout, LayerNorm
+    from src.ml.neural_networks_scratch import Layer, Dense, Activation, Dropout, LayerNorm
 except ImportError:
-    from ..ml.deep_learning import Layer, Dense, Activation
+    from ..ml.neural_networks_scratch import Layer, Dense, Activation
 
 
 # ============================================================

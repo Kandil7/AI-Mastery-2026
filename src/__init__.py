@@ -8,16 +8,18 @@ and machine learning operations.
 
 Import Structure:
 -----------------
-    from src import rag, embeddings, vector_stores
-    from src.rag import RAGPipeline, SemanticChunker
-    from src.agents import ReActAgent, ToolRegistry
-    from src.vector_stores import FAISSStore, QdrantStore
+    from src import rag, core, llm, ml, agents, production
+    from src.rag import RAGPipeline
+    from src.rag.chunking import SemanticChunker
+    from src.agents import ReActAgent
+    from src.rag.vector_stores import FAISSStore
 
 Quick Start:
 ------------
-    >>> from src import rag, embeddings, vector_stores
+    >>> from src import rag
     >>> from src.rag.chunking import SemanticChunker
-    >>> from src.vector_stores import FAISSStore, VectorStoreConfig
+    >>> from src.rag.vector_stores import FAISSStore, VectorStoreConfig
+    >>> from src.rag.embeddings import TextEmbedder
     >>>
     >>> # Initialize components
     >>> embed_model = TextEmbedder("all-MiniLM-L6-v2")
@@ -37,26 +39,21 @@ Quick Start:
 
 Modules:
 --------
-- **core**: Mathematics from scratch (linear algebra, optimization, probability)
+- **core**: Mathematics from scratch (linear algebra, optimization, probability, utils)
 - **ml**: Classical and deep learning implementations
-- **llm**: Transformer architectures and attention mechanisms
-- **rag**: Unified RAG pipeline with chunking, retrieval, reranking
-- **rag_specialized**: Advanced RAG architectures (multimodal, temporal, graph)
-- **agents**: Multi-agent systems and tool orchestration
-- **embeddings**: Unified embedding model interfaces
-- **vector_stores**: Vector database adapters (FAISS, Qdrant, Chroma)
-- **evaluation**: LLM and RAG evaluation frameworks
-- **production**: Production components (API, caching, monitoring, auth)
-- **orchestration**: Workflow orchestration and pipelines
-- **safety**: AI safety, guardrails, content moderation
-- **utils**: Shared utilities (logging, errors, config, types)
+- **llm**: Transformer architectures, attention, safety, and evaluation
+- **rag**: Unified RAG pipeline with chunking, retrieval, reranking, and specialized architectures
+- **agents**: Multi-agent systems, tool orchestration, and workflow orchestration
+- **production**: Production components (API, caching, monitoring, auth, MLOps)
+- **api**: REST and GraphQL API interfaces
+- **app**: Main application entry points
 
-Version: 2.1.0
+Version: 2.2.0
 Author: AI-Mastery-2026 Team
 License: MIT
 """
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 __author__ = "AI-Mastery-2026 Team"
 __email__ = "medokandeal7@gmail.com"
 __license__ = "MIT"
@@ -73,54 +70,33 @@ __all__ = [
     "ml",
     "llm",
     "rag",
-    "rag_specialized",
     "agents",
-    "embeddings",
-    "vector_stores",
-    "evaluation",
     "production",
-    "orchestration",
-    "safety",
-    "utils",
+    "api",
+    "app",
 ]
 
-# Import all submodules (lazy to avoid circular imports)
+# Import submodules
 from src import core
 from src import ml
 from src import llm
 from src import rag
-from src import rag_specialized
 from src import agents
-from src import embeddings
-from src import vector_stores
-from src import evaluation
 from src import production
-from src import orchestration
-from src import safety
-from src import utils
+from src import api
+from src import app
 
 # Convenience imports from rag
 try:
-    from src.rag.chunking import SemanticChunker
-    from src.rag.chunking import RecursiveChunker
+    from src.rag.chunking import SemanticChunker, RecursiveChunker
+    from src.rag.embeddings import TextEmbedder, ImageEmbedder
+    from src.rag.vector_stores import FAISSStore, MemoryVectorStore, VectorStoreConfig
 except ImportError:
     pass
 
-# Convenience imports from embeddings
+# Convenience imports from core
 try:
-    from src.embeddings import TextEmbedder, ImageEmbedder
-except ImportError:
-    pass
-
-# Convenience imports from vector_stores
-try:
-    from src.vector_stores import FAISSStore, MemoryVectorStore, VectorStoreConfig
-except ImportError:
-    pass
-
-# Convenience imports from utils
-try:
-    from src.utils.logging import get_logger, log_performance
+    from src.core.utils.logging import get_logger, log_performance
 except ImportError:
     pass
 
@@ -128,13 +104,13 @@ except ImportError:
 # Module metadata
 __module_info__ = {
     "core": {
-        "description": "Mathematics from scratch - linear algebra, calculus, optimization, probability",
+        "description": "Mathematics from scratch and shared utilities",
         "submodules": [
             "linear_algebra",
-            "calculus",
             "optimization",
             "probability",
-            "statistics",
+            "utils",
+            "data",
         ],
     },
     "ml": {
@@ -147,161 +123,75 @@ __module_info__ = {
         ],
     },
     "llm": {
-        "description": "Transformer architectures and LLM implementations",
+        "description": "Transformer architectures, LLM engineering, safety and evaluation",
         "submodules": [
             "transformer",
             "attention",
             "fine_tuning",
-            "rag",
-            "advanced_rag",
-            "agents",
+            "safety",
+            "evaluation",
+            "benchmarks",
         ],
     },
     "rag": {
-        "description": "Unified RAG pipeline with chunking, retrieval, and reranking",
+        "description": "Unified RAG pipeline and advanced architectures",
         "submodules": [
-            "core",
             "chunking",
             "retrieval",
             "reranking",
-            "advanced",
+            "embeddings",
+            "vector_stores",
             "specialized",
         ],
     },
-    "rag_specialized": {
-        "description": "Advanced RAG architectures",
-        "submodules": [
-            "adaptive_multimodal",
-            "temporal_aware",
-            "graph_enhanced",
-            "privacy_preserving",
-            "continual_learning",
-        ],
-    },
     "agents": {
-        "description": "Multi-agent systems and tool orchestration",
+        "description": "Multi-agent systems and orchestration",
         "submodules": [
-            "core",
             "tools",
             "multi_agent_systems",
-            "integrations",
-        ],
-    },
-    "embeddings": {
-        "description": "Unified embedding model interfaces and implementations",
-        "submodules": [
-            "embeddings",
-        ],
-    },
-    "vector_stores": {
-        "description": "Vector database adapters",
-        "submodules": [
-            "base",
-            "memory",
-            "faiss_store",
-        ],
-    },
-    "evaluation": {
-        "description": "LLM and RAG evaluation frameworks",
-        "submodules": [
-            "evaluation",
+            "orchestration",
         ],
     },
     "production": {
-        "description": "Production-ready components",
+        "description": "Production-ready components and MLOps",
         "submodules": [
-            "api",
             "caching",
             "monitoring",
             "observability",
             "auth",
-            "data_pipeline",
-            "query_enhancement",
+            "llm_ops",
         ],
     },
-    "orchestration": {
-        "description": "Workflow orchestration and pipelines",
-        "submodules": [
-            "orchestration",
-        ],
+    "api": {
+        "description": "API interfaces (REST, GraphQL)",
+        "submodules": [],
     },
-    "safety": {
-        "description": "AI safety and content moderation",
-        "submodules": [
-            "guardrails",
-            "content_moderation",
-        ],
-    },
-    "utils": {
-        "description": "Shared utilities",
-        "submodules": [
-            "logging",
-            "errors",
-            "config",
-            "types",
-        ],
+    "app": {
+        "description": "Application entry points",
+        "submodules": [],
     },
 }
 
 
 def get_module_info(module_name: str) -> dict:
-    """
-    Get information about a specific module.
-
-    Args:
-        module_name: Name of the module
-
-    Returns:
-        Dictionary with module description and submodules
-
-    Example:
-        >>> info = get_module_info("rag")
-        >>> print(info["description"])
-        Unified RAG pipeline with chunking, retrieval, and reranking
-    """
+    """Get information about a specific module."""
     return __module_info__.get(module_name, {})
 
 
 def list_modules() -> list[str]:
-    """
-    List all available modules.
-
-    Returns:
-        List of module names
-
-    Example:
-        >>> modules = list_modules()
-        >>> print(modules)
-        ['core', 'ml', 'llm', 'rag', ...]
-    """
+    """List all available modules."""
     return list(__module_info__.keys())
 
 
 def print_module_tree() -> None:
-    """
-    Print a tree view of all modules and submodules.
-
-    Example:
-        >>> print_module_tree()
-        AI-Mastery-2026 Modules
-        =======================
-        core
-          ├── linear_algebra
-          ├── calculus
-          └── ...
-        ml
-          ├── classical
-          └── ...
-        ...
-    """
+    """Print a tree view of all modules and submodules."""
     print("AI-Mastery-2026 Modules")
     print("=" * 40)
 
     for module_name, info in __module_info__.items():
         print(f"\n{module_name}")
         print(f"  {info['description']}")
-        print("  Submodules:")
-        for submodule in info["submodules"][:5]:  # Show first 5
-            print(f"    - {submodule}")
-        if len(info["submodules"]) > 5:
-            print(f"    ... and {len(info['submodules']) - 5} more")
+        if info['submodules']:
+            print("  Submodules:")
+            for submodule in info["submodules"]:
+                print(f"    - {submodule}")

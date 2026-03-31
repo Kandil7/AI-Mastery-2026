@@ -1,4 +1,4 @@
-"""
+﻿"""
 Comprehensive test suite for the AI-Mastery-2026 project.
 This file includes tests for all major components of the project.
 """
@@ -45,7 +45,7 @@ from src.ml.deep_learning import (
     NeuralNetwork
 )
 
-from src.llm.rag import (
+from src.rag.legacy_rag import (
     Document, RetrievalResult, TextChunker,
     EmbeddingModel, Retriever, Reranker,
     ContextAssembler, RAGPipeline
@@ -363,14 +363,15 @@ def run_all_tests():
                 try:
                     method = getattr(test_instance, attr_name)
                     method()
-                    print(f"  ✓ {attr_name} passed")
+                    print(f"  âœ“ {attr_name} passed")
                 except Exception as e:
-                    print(f"  ✗ {attr_name} failed: {e}")
+                    print(f"  âœ— {attr_name} failed: {e}")
                     return False
     
-    print("\nAll tests passed! ✓")
+    print("\nAll tests passed! âœ“")
     return True
 
 
 if __name__ == "__main__":
     run_all_tests()
+

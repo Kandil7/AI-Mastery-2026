@@ -1,0 +1,52 @@
+# Citation
+
+If you use AI-Mastery-2026 in your research or work, please cite it as follows:
+
+## BibTeX
+
+```bibtex
+@software{ai_mastery_2026,
+  author = {Kandil7},
+  title = {AI-Mastery-2026: The Ultimate AI Engineering Toolkit},
+  year = {2026},
+  url = {https://github.com/Kandil7/AI-Mastery-2026},
+  version = {0.1.0},
+  description = {A comprehensive AI Engineer toolkit built from first principles - from mathematical foundations to production deployment},
+  keywords = {artificial-intelligence, machine-learning, deep-learning, llm, rag, mlops, education}
+}
+```
+
+## APA Style
+
+Kandil7 (2026). AI-Mastery-2026: The Ultimate AI Engineering Toolkit (Version 0.1.0) [Computer software]. GitHub. https://github.com/Kandil7/AI-Mastery-2026
+
+## MLA Style
+
+Kandil7. "AI-Mastery-2026: The Ultimate AI Engineering Toolkit." GitHub, 2026, github.com/Kandil7/AI-Mastery-2026.
+
+## Chicago Style
+
+Kandil7. 2026. "AI-Mastery-2026: The Ultimate AI Engineering Toolkit." Version 0.1.0. GitHub. https://github.com/Kandil7/AI-Mastery-2026.
+
+## Harvard Style
+
+Kandil7 (2026) AI-Mastery-2026: The Ultimate AI Engineering Toolkit. Version 0.1.0. Available at: https://github.com/Kandil7/AI-Mastery-2026 (Accessed: DD Month YYYY).
+
+---
+
+## Acknowledgments
+
+This project builds upon the work of many open-source contributors and the broader AI research community. Special thanks to:
+
+- The PyTorch team
+- The Hugging Face team
+- The LangChain team
+- All open-source AI/ML library maintainers
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+**Last Updated:** March 31, 2026

@@ -1,0 +1,435 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "llm-token-tracking",
+    "title": "LLM Token Tracking Dashboard",
+    "description": "Comprehensive token usage and cost monitoring for LLM applications",
+    "tags": ["llm", "tokens", "cost", "monitoring"],
+    "timezone": "browser",
+    "editable": true,
+    "refresh": "10s",
+    "schemaVersion": 38,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "query": "label_values(llm_tokens_input_total, environment)",
+          "refresh": 1,
+          "current": {
+            "text": "development",
+            "value": "development"
+          },
+          "label": "Environment"
+        },
+        {
+          "name": "model",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "query": "label_values(llm_tokens_input_total{environment=\"$environment\"}, model)",
+          "refresh": 1,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "label": "Model",
+          "multi": true,
+          "includeAll": true
+        },
+        {
+          "name": "endpoint",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "query": "label_values(llm_tokens_input_total{environment=\"$environment\"}, endpoint)",
+          "refresh": 1,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "label": "Endpoint",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "type": "stat",
+        "title": "Total Input Tokens",
+        "description": "Cumulative input tokens processed",
+        "targets": [
+          {
+            "expr": "sum(llm_tokens_input_total{environment=\"$environment\"})",
+            "legendFormat": "Input Tokens",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "blue", "value": null}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "type": "stat",
+        "title": "Total Output Tokens",
+        "description": "Cumulative output tokens generated",
+        "targets": [
+          {
+            "expr": "sum(llm_tokens_output_total{environment=\"$environment\"})",
+            "legendFormat": "Output Tokens",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "type": "stat",
+        "title": "Total Cost (USD)",
+        "description": "Cumulative cost in USD",
+        "targets": [
+          {
+            "expr": "sum(llm_cost_usd_total{environment=\"$environment\"})",
+            "legendFormat": "Total Cost",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "type": "stat",
+        "title": "Total Requests",
+        "description": "Total requests processed",
+        "targets": [
+          {
+            "expr": "sum(llm_requests_total{environment=\"$environment\"})",
+            "legendFormat": "Requests",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "purple", "value": null}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "type": "timeseries",
+        "title": "Token Usage Over Time",
+        "description": "Input and output tokens per minute",
+        "targets": [
+          {
+            "expr": "sum(rate(llm_tokens_input_total{environment=\"$environment\"}[5m])) * 60",
+            "legendFormat": "Input tokens/min",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(llm_tokens_output_total{environment=\"$environment\"}[5m])) * 60",
+            "legendFormat": "Output tokens/min",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "type": "timeseries",
+        "title": "Cost Over Time",
+        "description": "Cost per minute in USD",
+        "targets": [
+          {
+            "expr": "sum(rate(llm_cost_usd_total{environment=\"$environment\"}[5m]))",
+            "legendFormat": "Cost/min",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12},
+        "type": "piechart",
+        "title": "Token Usage by Model",
+        "description": "Distribution of tokens across models",
+        "targets": [
+          {
+            "expr": "sum(increase(llm_tokens_input_total{environment=\"$environment\"}[1h])) by (model)",
+            "legendFormat": "{{model}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie"
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12},
+        "type": "piechart",
+        "title": "Cost by Model",
+        "description": "Cost distribution across models",
+        "targets": [
+          {
+            "expr": "sum(increase(llm_cost_usd_total{environment=\"$environment\"}[1h])) by (model)",
+            "legendFormat": "{{model}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie"
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+        "type": "histogram",
+        "title": "Tokens per Request Distribution",
+        "description": "Distribution of token counts per request",
+        "targets": [
+          {
+            "expr": "sum(rate(llm_tokens_per_request_bucket{model=\"$model\"}[5m])) by (le)",
+            "legendFormat": "{{le}}",
+            "refId": "A",
+            "format": "heatmap"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "type": "table",
+        "title": "Model Usage Summary",
+        "description": "Detailed breakdown by model",
+        "targets": [
+          {
+            "expr": "sum(increase(llm_tokens_input_total{environment=\"$environment\"}[1h])) by (model)",
+            "legendFormat": "{{model}} - Input",
+            "refId": "A",
+            "instant": true
+          },
+          {
+            "expr": "sum(increase(llm_tokens_output_total{environment=\"$environment\"}[1h])) by (model)",
+            "legendFormat": "{{model}} - Output",
+            "refId": "B",
+            "instant": true
+          },
+          {
+            "expr": "sum(increase(llm_cost_usd_total{environment=\"$environment\"}[1h])) by (model)",
+            "legendFormat": "{{model}} - Cost",
+            "refId": "C",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "model": "Model",
+                "Value #A": "Input Tokens",
+                "Value #B": "Output Tokens",
+                "Value #C": "Cost (USD)"
+              }
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Cost (USD)",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "type": "timeseries",
+        "title": "Request Rate",
+        "description": "Requests per second over time",
+        "targets": [
+          {
+            "expr": "sum(rate(llm_requests_total{environment=\"$environment\"}[5m]))",
+            "legendFormat": "Requests/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "lineWidth": 2
+          }
+        }
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 28},
+        "type": "stat",
+        "title": "Quick Stats",
+        "description": "Key metrics at a glance",
+        "targets": [
+          {
+            "expr": "avg(rate(llm_tokens_input_total{environment=\"$environment\"}[5m])) * 60",
+            "legendFormat": "Avg Input/min",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(rate(llm_tokens_output_total{environment=\"$environment\"}[5m])) * 60",
+            "legendFormat": "Avg Output/min",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(rate(llm_cost_usd_total{environment=\"$environment\"}[1h])) * 60",
+            "legendFormat": "Avg Cost/hr",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "center"
+        },
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 28}
+      }
+    ]
+  }
+}

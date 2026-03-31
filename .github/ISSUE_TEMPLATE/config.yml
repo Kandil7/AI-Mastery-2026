@@ -1,0 +1,16 @@
+# Issue Template Configuration
+# =============================
+# GitHub issue forms configuration
+# Documentation: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+
+blank_issues_enabled: true
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/Kandil7/AI-Mastery-2026/discussions
+    about: Please ask and answer questions here.
+  - name: Security Reports
+    url: https://github.com/Kandil7/AI-Mastery-2026/blob/main/SECURITY.md
+    about: Please report security vulnerabilities via email or according to SECURITY.md.
+  - name: Email Contact
+    url: mailto:medokandeal7@gmail.com
+    about: For other inquiries, please email us.

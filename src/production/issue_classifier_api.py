@@ -162,7 +162,7 @@ async def load_model():
         vectorizer.idf_ = np.array(data["vectorizer_idf"])
 
         # Rebuild model
-        from src.ml.deep_learning import (Activation, Dense, Dropout,
+        from src.ml.neural_networks_scratch import (Activation, Dense, Dropout,
                                           NeuralNetwork)
 
         classifier = NeuralNetwork()

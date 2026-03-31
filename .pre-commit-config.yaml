@@ -145,6 +145,15 @@ repos:
   #     - id: commitizen
   #       stages: [commit-msg]
 
+  # Code coverage check
+  - repo: https://github.com/codecov/codecov-action
+    rev: v4.0.0
+    hooks:
+      - id: codecov
+        name: "codecov: Upload coverage reports"
+        stages: [post-commit]
+        require_serial: true
+
 # Configuration for specific hooks
 default_language_version:
   python: python3.10

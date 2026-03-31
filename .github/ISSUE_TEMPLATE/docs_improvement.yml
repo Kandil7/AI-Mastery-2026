@@ -1,0 +1,48 @@
+name: Documentation Improvement
+description: Suggest improvements to documentation
+labels: ["documentation", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping to improve our documentation!
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type of Improvement
+      description: What type of documentation improvement is this?
+      options:
+        - Fix typo or error
+        - Add missing documentation
+        - Improve existing documentation
+        - Add example or tutorial
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Affected Documentation Page
+      description: Link to or describe the affected documentation page.
+      placeholder: ex. docs/README.md or https://...
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the improvement you'd like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this improvement important?
+    validations:
+      required: true

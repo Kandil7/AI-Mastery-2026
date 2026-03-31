@@ -1,0 +1,321 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-mastery-2026"
+version = "0.1.0"
+description = "The Ultimate AI Engineering Toolkit - From First Principles to Production Scale"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Kandil7", email = "medokandeal7@gmail.com"}
+]
+maintainers = [
+    {name = "Kandil7", email = "medokandeal7@gmail.com"}
+]
+keywords = [
+    "ai",
+    "machine-learning",
+    "deep-learning",
+    "llm",
+    "rag",
+    "mlops",
+    "fastapi",
+    "pytorch",
+    "tensorflow",
+    "nlp",
+    "computer-vision",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Education",
+    "Typing :: Typed",
+]
+
+# Core dependencies (essential for src/core and src/ml)
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "scikit-learn>=1.0.0",
+    "fastapi>=0.78.0",
+    "uvicorn[standard]>=0.17.0",
+    "pydantic>=1.9.0",
+    "requests>=2.28.0",
+    "tqdm>=4.64.0",
+    "python-dotenv>=0.20.0",
+    "joblib>=1.1.0",
+]
+
+[project.optional-dependencies]
+# Machine Learning
+ml = [
+    "torch>=1.12.0",
+    "torchvision>=0.13.0",
+    "torchdiffeq>=0.2.0",
+    "tensorflow>=2.9.0",
+    "keras>=2.9.0",
+    "numba>=0.55.0",
+]
+
+# LLM and NLP
+llm = [
+    "transformers>=4.20.0",
+    "tokenizers>=0.12.0",
+    "langchain>=0.0.200",
+    "openai>=1.0.0",
+    "anthropic>=0.25.0",
+    "sentence-transformers>=2.2.0",
+    "rank-bm25>=0.2.2",
+    "accelerate>=0.12.0",
+    "datasets>=2.0.0",
+]
+
+# Vector Databases
+vector = [
+    "faiss-cpu>=1.7.0",
+    "hnswlib>=0.7.0",
+    "pgvector>=0.2.5",
+    "qdrant-client>=1.8.0",
+    "weaviate-client>=3.25.0",
+]
+
+# Visualization
+viz = [
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "plotly>=5.10.0",
+]
+
+# Database
+db = [
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=1.4.0",
+]
+
+# Evaluation
+eval = [
+    "ragas>=0.1.0",
+]
+
+# Web UI
+ui = [
+    "streamlit>=1.10.0",
+]
+
+# Production
+prod = [
+    "gunicorn>=20.1.0",
+    "prometheus-client>=0.14.0",
+]
+
+# Development
+dev = [
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-watch>=4.2.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-mock>=3.12.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.2.0",
+    # Coverage
+    "coverage>=7.4.0",
+    "coverage-badge>=1.1.0",
+    # Code Quality
+    "black>=24.1.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
+    "flake8-bugbear>=24.1.0",
+    "flake8-comprehensions>=3.14.0",
+    "flake8-docstrings>=1.7.0",
+    "mypy>=1.8.0",
+    "mypy-extensions>=1.0.0",
+    # Type stubs
+    "types-requests>=2.31.0",
+    "types-PyYAML>=6.0.12",
+    "types-python-dateutil>=2.8.19",
+    # Security
+    "bandit>=1.7.5",
+    "safety>=3.0.0",
+    "detect-secrets>=1.4.0",
+    # Pre-commit
+    "pre-commit>=3.6.0",
+    # Documentation
+    "mkdocs>=1.5.3",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings>=0.24.0",
+    "mkdocstrings-python>=1.8.0",
+    # Development tools
+    "ipython>=8.20.0",
+    "ipdb>=0.13.13",
+    "jupyter>=1.0.0",
+    "jupyterlab>=4.0.0",
+    "notebook>=7.0.0",
+    # Profiling
+    "py-spy>=0.3.14",
+    "memory-profiler>=0.61.0",
+    "line-profiler>=4.1.0",
+    # Debugging
+    "debugpy>=1.8.0",
+    # Utilities
+    "rich>=13.7.0",
+]
+
+# All dependencies
+all = [
+    "ai-mastery-2026[ml,llm,vector,viz,db,eval,ui,prod,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/Kandil7/AI-Mastery-2026"
+Documentation = "https://github.com/Kandil7/AI-Mastery-2026/docs"
+Repository = "https://github.com/Kandil7/AI-Mastery-2026"
+Issues = "https://github.com/Kandil7/AI-Mastery-2026/issues"
+Changelog = "https://github.com/Kandil7/AI-Mastery-2026/CHANGELOG.md"
+
+[project.scripts]
+ai-train = "scripts.train_save_models:main"
+ai-benchmark = "scripts.run_benchmarks:main"
+ai-app = "src.production.api:start_server"
+
+[tool.setuptools]
+packages = ["src"]
+package-dir = {"" = "."}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.yaml", "*.yml", "*.json"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | archive
+  | \.qwen
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip = ["archive", ".qwen", ".git", "__pycache__", "node_modules"]
+skip_glob = ["**/archive/**", "**/.qwen/**"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+no_implicit_reexport = false
+strict_equality = true
+ignore_missing_imports = true
+exclude = ["archive/", ".qwen/", "build/", "dist/"]
+
+[[tool.mypy.overrides]]
+module = "src.core.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "src.ml.*"
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "gpu: marks tests that require GPU",
+]
+asyncio_mode = "auto"
+timeout = 300
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/archive/*",
+    "*/setup.py",
+    "*/conftest.py",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+show_missing = true
+precision = 2
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "archive",
+    ".qwen",
+    ".venv",
+]
+per-file-ignores = [
+    "__init__.py:F401",
+    "src/__init__.py:F401",
+]
+docstring-convention = "google"
+
+[tool.bandit]
+exclude_dirs = ["tests", "archive", ".qwen"]
+targets = "src/"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
+update_changelog_on_bump = true

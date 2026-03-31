@@ -1,4 +1,4 @@
-"""
+﻿"""
 RAG Retrieval Module
 ====================
 
@@ -13,7 +13,7 @@ Provides:
 
 Quick Start:
     >>> from src.rag.retrieval import HybridRetrieval, SimilarityRetriever
-    >>> from src.vector_stores import FAISSStore, VectorStoreConfig
+    >>> from src.rag.vector_stores import FAISSStore, VectorStoreConfig
     >>>
     >>> # Create vector store
     >>> config = VectorStoreConfig(dim=384)
@@ -41,3 +41,4 @@ __all__ = [
     "MultiQueryRetriever",
     "HyDERetriever",
 ]
+

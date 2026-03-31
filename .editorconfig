@@ -1,0 +1,74 @@
+# EditorConfig for AI-Mastery-2026
+# https://editorconfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Python files
+[*.py]
+indent_size = 4
+indent_style = space
+
+# Jupyter Notebooks
+[*.ipynb]
+indent_size = 4
+indent_style = space
+trim_trailing_whitespace = false
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 100
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+indent_style = space
+
+# JSON files
+[*.json]
+indent_size = 2
+indent_style = space
+
+# Shell scripts
+[*.{sh,bash}]
+indent_size = 4
+indent_style = space
+
+# Docker files
+[Dockerfile*]
+indent_size = 2
+indent_style = space
+
+# Makefile
+[Makefile]
+indent_style = tab
+
+# Configuration files
+[.{pre-commit-config.yaml,pyproject.toml,setup.cfg}]
+indent_size = 2
+indent_style = space
+
+# Documentation files
+[docs/**/*.md]
+max_line_length = 120
+
+# Test files
+[tests/**/*.py]
+indent_size = 4
+indent_style = space
+
+# Ignore node_modules and virtual environments
+[{node_modules,.venv,venv,.git}/**]
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

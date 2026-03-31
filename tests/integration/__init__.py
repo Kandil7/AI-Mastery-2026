@@ -1,1 +1,1 @@
-# Integration tests for AI Mastery 2026
+﻿# Integration tests for AI Mastery 2026

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Multi-Query Retrieval
 =====================
 
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Callable
 from collections import defaultdict
 
 from .base import BaseRetriever, RetrievalResult, RetrievalResults
-from src.vector_stores.base import VectorStore
+from src.rag.vector_stores.base import VectorStore
 
 
 class MultiQueryRetriever(BaseRetriever):
@@ -160,3 +160,4 @@ class MultiQueryRetriever(BaseRetriever):
 
     def __repr__(self) -> str:
         return f"MultiQueryRetriever(store={self.vector_store}, strategy={self.merge_strategy})"
+

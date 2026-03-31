@@ -21,9 +21,9 @@ import numpy as np
 from typing import Tuple, Optional, List
 
 try:
-    from src.ml.deep_learning import Layer, BatchNormalization, Activation
+    from src.ml.neural_networks_scratch import Layer, BatchNormalization, Activation
 except ImportError:
-    from .deep_learning import Layer, BatchNormalization, Activation
+    from .neural_networks_scratch import Layer, BatchNormalization, Activation
 
 
 # ============================================================

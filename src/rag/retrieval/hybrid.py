@@ -1,4 +1,4 @@
-"""
+﻿"""
 Hybrid Retrieval
 ================
 
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 from .base import BaseRetriever, RetrievalResult, RetrievalResults
-from src.vector_stores.base import VectorStore
+from src.rag.vector_stores.base import VectorStore
 
 
 @dataclass
@@ -142,7 +142,7 @@ class HybridRetrieval(BaseRetriever):
 
         RRF score = sum(1 / (k + rank)) for each result
         """
-        from src.vector_stores.base import SearchResult
+        from src.rag.vector_stores.base import SearchResult
 
         # Calculate RRF scores
         rrf_scores: Dict[str, float] = {}
@@ -179,3 +179,4 @@ class HybridRetrieval(BaseRetriever):
 
     def __repr__(self) -> str:
         return f"HybridRetrieval(dense={self.dense_store}, sparse={self.sparse_store})"
+

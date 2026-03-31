@@ -1,10 +1,12 @@
 """
 RAG Module - Unified Retrieval-Augmented Generation
-====================================================
+===================================================
 
 Complete RAG implementation with chunking, retrieval, and reranking.
 
 Components:
+- **types**: Core type definitions (Document, Chunk, Query, RAGResult)
+- **core**: Main RAGPipeline implementation
 - **chunking**: Document splitting strategies (fixed, recursive, semantic, hierarchical)
 - **retrieval**: Search strategies (similarity, hybrid, multi-query, HyDE)
 - **reranking**: Result refinement (cross-encoder, LLM, diversity)
@@ -13,12 +15,12 @@ Components:
 
 Quick Start:
 ------------
-    >>> from src.rag import RAGPipeline, Document, DocumentChunk
+    >>> from src.rag import RAGPipeline, RAGConfig, Document
     >>> from src.rag.chunking import SemanticChunker
     >>> from src.rag.retrieval import HybridRetrieval
     >>> from src.rag.reranking import CrossEncoderReranker
-    >>> from src.vector_stores import FAISSStore, VectorStoreConfig
-    >>> from src.embeddings import TextEmbedder
+    >>> from src.rag.vector_stores import FAISSStore, VectorStoreConfig
+    >>> from src.rag.embeddings import TextEmbedder
     >>>
     >>> # Initialize components
     >>> embedder = TextEmbedder("all-MiniLM-L6-v2")
@@ -37,16 +39,14 @@ Quick Start:
     ... )
     >>>
     >>> # Add documents
-    >>> docs = [
-    ...     {"id": "1", "content": "AI is transforming industries."},
-    ...     {"id": "2", "content": "Machine learning powers modern AI."},
-    ... ]
+    >>> docs = [Document(id="1", content="AI is transforming industries.")]
     >>> pipeline.add_documents(docs)
     >>>
     >>> # Query
-    >>> results = pipeline.query("How does AI work?")
+    >>> from src.rag import Query
+    >>> results = pipeline.query(Query(text="How does AI work?", top_k=5))
     >>> for result in results:
-    ...     print(f"{result.id}: {result.content}")
+    ...     print(f"{result.score:.3f}: {result.content[:100]}...")
 
 Structure:
 ----------
@@ -56,13 +56,32 @@ Structure:
     ├── chunking/            # Chunking strategies
     ├── retrieval/           # Retrieval strategies
     ├── reranking/           # Reranking strategies
+    ├── embeddings/          # Embedding models
+    ├── vector_stores/       # Vector storage
     ├── advanced/            # Advanced techniques
     └── specialized/         # Specialized RAG variants
 """
 
-# Core RAG pipeline
-from .core import RAGPipeline, RAGConfig
-from .types import Document, DocumentChunk, Query, RAGResult
+# Core types and pipeline
+from .types import (
+    ChunkMetadata,
+    Document,
+    DocumentChunk,
+    Query,
+    RAGResult,
+    RetrievalMetrics,
+    ChunkList,
+    ResultList,
+    FilterDict,
+    Embedding,
+    EmbeddingList,
+)
+
+from .core import (
+    RAGConfig,
+    RAGMetrics,
+    RAGPipeline,
+)
 
 # Chunking strategies
 from .chunking import (
@@ -73,7 +92,7 @@ from .chunking import (
     HierarchicalChunker,
     TokenAwareChunker,
     CodeChunker,
-    ChunkingFactory,
+    ChunkerFactory,
 )
 
 # Retrieval strategies
@@ -99,11 +118,19 @@ __all__ = [
     # Core
     "RAGPipeline",
     "RAGConfig",
+    "RAGMetrics",
     "Document",
     "DocumentChunk",
     "Query",
     "RAGResult",
-    
+    "RetrievalMetrics",
+    "ChunkMetadata",
+    # Type aliases
+    "ChunkList",
+    "ResultList",
+    "FilterDict",
+    "Embedding",
+    "EmbeddingList",
     # Chunking
     "BaseChunker",
     "FixedSizeChunker",
@@ -112,8 +139,7 @@ __all__ = [
     "HierarchicalChunker",
     "TokenAwareChunker",
     "CodeChunker",
-    "ChunkingFactory",
-    
+    "ChunkerFactory",
     # Retrieval
     "BaseRetriever",
     "SimilarityRetriever",
@@ -121,7 +147,6 @@ __all__ = [
     "MultiQueryRetriever",
     "HyDERetriever",
     "RetrievalResults",
-    
     # Reranking
     "BaseReranker",
     "CrossEncoderReranker",
@@ -129,3 +154,5 @@ __all__ = [
     "DiversityReranker",
     "RerankResults",
 ]
+
+__version__ = "2.0.0"

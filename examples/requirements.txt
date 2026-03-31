@@ -1,0 +1,79 @@
+# Requirements for AI-Mastery-2026 Examples
+# ==========================================
+# Install: pip install -r examples/requirements.txt
+
+# Core dependencies (should already be installed)
+# -e .[dev]
+
+# Additional example dependencies
+
+# Data processing
+polars>=0.20.0
+pyarrow>=14.0.0
+
+# Visualization
+plotly>=5.18.0
+seaborn>=0.13.0
+wordcloud>=1.9.0
+
+# NLP
+nltk>=3.8.0
+spacy>=3.7.0
+gensim>=4.3.0
+
+# Datasets
+datasets>=2.14.0
+
+# Vector databases (for RAG examples)
+chromadb>=0.4.0
+lancedb>=0.5.0
+
+# LLM APIs (optional, for API examples)
+openai>=1.0.0
+anthropic>=0.25.0
+cohere>=4.0.0
+
+# Web scraping (for data collection examples)
+beautifulsoup4>=4.12.0
+scrapy>=2.11.0
+selenium>=4.15.0
+
+# Time series
+prophet>=1.1.0
+statsmodels>=0.14.0
+
+# Recommendation
+implicit>=0.7.0
+lightfm>=1.17.0
+
+# Graph
+networkx>=3.2.0
+igraph>=0.11.0
+
+# Production
+redis>=5.0.0
+celery>=5.3.0
+kafka-python>=2.0.0
+
+# Cloud (optional)
+boto3>=1.34.0  # AWS
+google-cloud-storage>=2.13.0  # GCP
+azure-storage-blob>=12.18.0  # Azure
+
+# Monitoring
+prometheus-client>=0.19.0
+grafana-api>=1.0.0
+
+# Testing (examples)
+hypothesis>=6.92.0
+faker>=21.0.0
+
+# Jupyter
+jupyter>=1.0.0
+jupyterlab>=4.0.0
+ipywidgets>=8.1.0
+nbconvert>=7.13.0
+
+# Documentation (examples)
+pandas>=2.1.0
+polars>=0.20.0

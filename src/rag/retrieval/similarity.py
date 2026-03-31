@@ -1,4 +1,4 @@
-"""
+﻿"""
 Similarity Retriever
 ====================
 
@@ -8,7 +8,7 @@ Basic similarity-based retrieval using vector search.
 from typing import Any, Dict, List, Optional
 
 from .base import BaseRetriever, RetrievalResult, RetrievalResults
-from src.vector_stores.base import VectorStore
+from src.rag.vector_stores.base import VectorStore
 
 
 class SimilarityRetriever(BaseRetriever):
@@ -18,7 +18,7 @@ class SimilarityRetriever(BaseRetriever):
     Uses vector similarity search to find relevant documents.
 
     Example:
-        >>> from src.vector_stores import FAISSStore, VectorStoreConfig
+        >>> from src.rag.vector_stores import FAISSStore, VectorStoreConfig
         >>>
         >>> store = FAISSStore(VectorStoreConfig(dim=384))
         >>> retriever = SimilarityRetriever(store, top_k=5)
@@ -102,3 +102,4 @@ class SimilarityRetriever(BaseRetriever):
 
     def __repr__(self) -> str:
         return f"SimilarityRetriever(store={self.vector_store}, top_k={self.top_k})"
+

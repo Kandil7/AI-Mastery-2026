@@ -95,3 +95,118 @@ from src.core.differential_privacy import (
 from src.core.energy_efficient import (
     EnergyEfficientIntegrator, DeviceProfile, DEVICE_PROFILES
 )
+
+__all__ = [
+    # Integration
+    "trapezoidal_rule",
+    "simpsons_rule",
+    "adaptive_quadrature",
+    "gauss_legendre",
+    "gauss_hermite_expectation",
+    "monte_carlo_integrate",
+    "importance_sampling",
+    "stratified_sampling",
+    "BayesianQuadrature",
+    "rbf_kernel",
+    # Normalizing Flows
+    "PlanarFlow",
+    "RadialFlow",
+    "FlowChain",
+    "gaussian_base_log_prob",
+    "gaussian_base_sampler",
+    # Time Series
+    "GaussianState",
+    "FilterResult",
+    "ExtendedKalmanFilter",
+    "UnscentedKalmanFilter",
+    "ParticleFilter",
+    "rts_smoother",
+    "create_linear_system",
+    "simulate_system",
+    "compare_filters",
+    # Optimization
+    "Optimizer",
+    "GradientDescent",
+    "Momentum",
+    "Adam",
+    "RMSprop",
+    "AdaGrad",
+    "NAdam",
+    "LearningRateScheduler",
+    "StepDecay",
+    "ExponentialDecay",
+    "CosineAnnealing",
+    "WarmupScheduler",
+    "minimize",
+    "lagrange_multipliers",
+    "newton_raphson",
+    # MCMC
+    "MCMCResult",
+    "metropolis_hastings",
+    "HamiltonianMonteCarlo",
+    "nuts_sampler",
+    "effective_sample_size",
+    "gelman_rubin_diagnostic",
+    "mcmc_diagnostics",
+    "autocorrelation",
+    "thinning",
+    "trace_plot_data",
+    "bayesian_logistic_regression_hmc",
+    # Advanced Integration
+    "NeuralODE",
+    "ODEFunc",
+    "MultiModalIntegrator",
+    "FederatedIntegrator",
+    "biased_lending_simulation",
+    # Variational Inference
+    "VIResult",
+    "GaussianVariational",
+    "compute_elbo",
+    "compute_elbo_gradient",
+    "MeanFieldVI",
+    "StochasticVI",
+    "coordinate_ascent_vi",
+    "BayesianLinearRegressionVI",
+    "svgd",
+    # Hardware Acceleration
+    "HardwareAcceleratedIntegrator",
+    "monte_carlo_cpu",
+    "NUMBA_AVAILABLE",
+    "TORCH_AVAILABLE",
+    # PPL
+    "BayesianRegressionBase",
+    "NumpyMCMCRegression",
+    "PPLResult",
+    "PYMC_AVAILABLE",
+    "TFP_AVAILABLE",
+    # Adaptive
+    "AdaptiveIntegrator",
+    "FunctionFeatures",
+    # RL
+    "RLIntegrationSystem",
+    "Episode",
+    "PolicyGradientResult",
+    # Causal
+    "CausalInferenceSystem",
+    "ATEResult",
+    "CATEResult",
+    # GNN
+    "BayesianGCN",
+    "BayesianGCNLayer",
+    "GraphData",
+    "generate_synthetic_graph",
+    # XAI
+    "ExplainableModel",
+    "TreeSHAP",
+    "FeatureExplanation",
+    "GlobalExplanation",
+    # Privacy
+    "DifferentiallyPrivateIntegrator",
+    "DifferentiallyPrivateBayesianQuadrature",
+    "PrivacyBudget",
+    "PrivateEstimate",
+    # Energy
+    "EnergyEfficientIntegrator",
+    "DeviceProfile",
+    "DEVICE_PROFILES",
+]

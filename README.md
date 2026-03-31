@@ -13,7 +13,7 @@
 **From First Principles to Production Scale.**
 *A comprehensive roadmap to master the mathematics, algorithms, and engineering of modern AI.*
 
-[Quick Start](#-quick-start) • [Learning Roadmap](docs/01_learning_roadmap/README.md) • [Module Deep Dive](#-module-deep-dive) • [Documentation](docs/README.md) • [Contributing](docs/00_introduction/CONTRIBUTING.md)
+[Quick Start](#-quick-start) • [Learning Roadmap](docs/01_learning_roadmap/README.md) • [Module Deep Dive](#-module-deep-dive) • [Documentation](docs/README.md) • [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -57,6 +57,36 @@ Explore the structured learning path designed to take you from foundational conc
 
 *   **[Full Learning Roadmap](docs/01_learning_roadmap/README.md)**: A detailed, phase-by-phase curriculum covering all aspects of AI engineering.
 *   **[Project Roadmaps Overview](docs/01_learning_roadmap/project_roadmaps_overview.md)**: Insights into development priorities, completion status, and strategic decisions.
+
+---
+
+## 📁 Project Structure
+
+```
+AI-Mastery-2026/
+├── src/                          # Source code
+│   ├── core/                     # Mathematical foundations (pure Python)
+│   ├── ml/                       # Classical & Deep Learning
+│   ├── llm/                      # LLM Engineering (Transformers, Attention)
+│   ├── rag/                      # RAG Systems (Chunking, Retrieval, Reranking)
+│   ├── agents/                   # AI Agents (Orchestration, Multi-Agent)
+│   ├── production/               # Production Infrastructure (API, Caching, Monitoring)
+│   └── api/                      # API routes and schemas
+├── tests/                        # Test suites
+│   ├── unit/                     # Unit tests
+│   └── integration/              # Integration tests
+├── docs/                         # Documentation
+│   ├── 00_introduction/          # Getting started guides
+│   ├── 01_learning_roadmap/      # Learning paths
+│   ├── architecture/             # Architecture docs
+│   └── README.md                 # Documentation index
+├── notebooks/                    # Jupyter notebooks
+├── scripts/                      # Utility scripts
+├── archive/                      # Legacy/deprecated code
+├── pyproject.toml                # Project configuration (PEP 621)
+├── CONTRIBUTING.md               # Contribution guidelines
+└── README.md                     # This file
+```
 
 ---
 

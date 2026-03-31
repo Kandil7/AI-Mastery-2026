@@ -1,0 +1,44 @@
+# Prometheus Configuration for Lab 1: Token Tracking
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'llm-lab1'
+    environment: 'development'
+
+# Alertmanager configuration (optional for this lab)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (optional for this lab)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    labels:
+      service: 'prometheus'
+
+  # LLM Service - Main application metrics
+  - job_name: 'llm-service'
+    static_configs:
+      - targets: ['llm-service:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    labels:
+      service: 'llm-application'
+      team: 'ml-platform'
+
+  # Node exporter for system metrics (optional)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    labels:
+      service: 'infrastructure'

@@ -1,0 +1,140 @@
+# Codecov Configuration for AI-Mastery-2026
+# ==========================================
+# Upload coverage reports to Codecov
+# See: https://docs.codecov.com/docs/codecovyml-reference
+
+codecov:
+  require_ci_to_pass: true
+  notify:
+    after_n_builds: 3  # Wait for 3 builds before notifying
+    wait_for_ci: true
+
+# Coverage settings
+coverage:
+  precision: 2  # 2 decimal places
+  round: down
+  range: "70...100"  # Coverage range for color coding
+
+  # Status checks
+  status:
+    project:
+      default:
+        target: 85%  # Target coverage for project
+        threshold: 2%  # Allow 2% drop
+        if_ci_failed: error
+        paths:
+          - "src/"
+
+    patch:
+      default:
+        target: 90%  # Target for new code
+        threshold: 5%
+        only_pulls: true
+
+    changes:
+      default:
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+
+  # Component tracking
+  component_management:
+    default_rules:
+      statuses:
+        - type: project
+          target: 85%
+        - type: patch
+          target: 90%
+
+    individual_components:
+      - component_id: core_math
+        name: "Core Mathematics"
+        paths:
+          - "src/core/**"
+        statuses:
+          - type: project
+            target: 95%
+
+      - component_id: ml_module
+        name: "Machine Learning"
+        paths:
+          - "src/ml/**"
+        statuses:
+          - type: project
+            target: 90%
+
+      - component_id: llm_module
+        name: "LLM Engineering"
+        paths:
+          - "src/llm/**"
+        statuses:
+          - type: project
+            target: 85%
+
+      - component_id: rag_module
+        name: "RAG Systems"
+        paths:
+          - "src/rag/**"
+        statuses:
+          - type: project
+            target: 85%
+
+      - component_id: agents_module
+        name: "AI Agents"
+        paths:
+          - "src/agents/**"
+        statuses:
+          - type: project
+            target: 85%
+
+      - component_id: production_module
+        name: "Production"
+        paths:
+          - "src/production/**"
+        statuses:
+          - type: project
+            target: 80%
+
+# Ignore patterns
+ignore:
+  - "tests/"
+  - "scripts/"
+  - "**/__init__.py"
+  - "**/conftest.py"
+  - "archive/"
+  - "**/legacy*.py"
+  - "**/test_*.py"
+  - "docs/"
+  - "notebooks/"
+
+# Comment settings
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
+
+# Flags for different test types
+flags:
+  unit_tests:
+    paths:
+      - "tests/unit/"
+    carryforward: true
+
+  integration_tests:
+    paths:
+      - "tests/integration/"
+    carryforward: true
+
+# GitHub integration
+github_checks:
+  annotations: true
+
+# Slack notifications (optional)
+# notify:
+#   - type: slack
+#     after_n_builds: 3
+#     threshold: 1%
+#     url: secret_slack_webhook_url

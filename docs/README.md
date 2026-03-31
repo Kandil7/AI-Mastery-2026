@@ -2,249 +2,198 @@
 
 <div align="center">
 
-![Documentation Status](https://img.shields.io/badge/docs-100%25%20complete-brightgreen.svg)
-![Last Updated](https://img.shields.io/badge/last%20updated-March%2028%2C%202026-blue.svg)
+![Documentation Status](https://img.shields.io/badge/documentation-complete-brightgreen.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**Comprehensive documentation for the Ultimate AI Engineering Toolkit**
+**Complete documentation for the Ultimate AI Engineering Toolkit**
 
-[Getting Started](#-getting-started) • [User Guides](#-user-guides) • [API Reference](#-api-reference) • [Tutorials](#-tutorials) • [Knowledge Base](#-knowledge-base) • [FAQ](#-faq)
+[Getting Started](#-getting-started) • [Learning Roadmap](#-learning-roadmap) • [API Reference](#-api-reference) • [Contributing](#-contributing)
 
 </div>
 
 ---
 
-## 📚 Documentation Overview
+## 📚 Documentation Structure
 
-Welcome to the AI-Mastery-2026 documentation hub. This comprehensive resource covers everything from foundational concepts to production deployment of AI systems.
+### 🎯 Quick Start
 
-### Documentation Structure
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](00_introduction/01_getting_started.md) | Your first steps with AI-Mastery-2026 |
+| [Installation](00_introduction/01_user_guide.md) | Set up your environment |
+| [Quick Start](00_introduction/QUICK_START.md) | 5-minute tutorial |
+
+### 📖 Learning Roadmap
+
+The complete learning path from foundational concepts to advanced AI engineering:
+
+- **[Full Learning Roadmap](01_learning_roadmap/README.md)** - Phase-by-phase curriculum
+- **[Project Roadmaps Overview](01_learning_roadmap/project_roadmaps_overview.md)** - Development priorities
+
+### 🏗️ Architecture
+
+- **[Architecture Overview](architecture/README.md)** - System design and components
+- **[Module Documentation](architecture/modules/README.md)** - Detailed module docs
+
+### 📚 Curriculum
+
+- **[Student Guide](01_student_guide/README.md)** - Learning materials for students
+- **[Instructor Guide](02_instructor_guide/README.md)** - Teaching resources
+- **[Technical Reference](03_technical_reference/README.md)** - In-depth technical docs
+
+### 🔌 API Reference
+
+- **[API Documentation](api/README.md)** - Complete API reference
+- **[SDK Documentation](sdk/README.md)** - SDK usage guides
+
+### 🧠 Knowledge Base
+
+- **[Concepts](kb/concepts/README.md)** - Core AI/ML concepts
+- **[Best Practices](kb/best-practices/README.md)** - Development best practices
+- **[FAQ](kb/faq/README.md)** - Frequently asked questions
+
+### 🛠️ Development
+
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
+- **[Code Style Guide](guides/code-style.md)** - Coding conventions
+- **[Testing Guide](guides/testing.md)** - Testing best practices
+
+---
+
+## 📂 Directory Structure
 
 ```
 docs/
-├── guides/              # User guides and how-to documentation
-│   ├── getting-started.md
-│   ├── installation.md
-│   ├── configuration.md
-│   └── deployment.md
-├── api/                 # Complete API reference
-│   ├── overview.md
-│   ├── endpoints/
-│   ├── sdk/
-│   └── examples/
-├── tutorials/           # Step-by-step tutorials
-│   ├── beginner/
-│   ├── intermediate/
-│   └── advanced/
-├── reference/           # Technical reference material
-│   ├── architecture.md
-│   ├── glossary.md
-│   └── changelog.md
-├── kb/                  # Knowledge base articles
-│   ├── concepts/
-│   ├── best-practices/
-│   └── troubleshooting/
-├── faq/                 # Frequently asked questions
-│   ├── general.md
-│   ├── technical.md
-│   └── troubleshooting.md
-└── troubleshooting/     # Detailed troubleshooting guides
-    ├── common-issues.md
-    ├── error-codes.md
-    └── debugging.md
+├── README.md                    # This file - documentation index
+├── INDEX.md                     # Complete documentation index
+├── CONTRIBUTING.md              # Contribution guidelines
+├── 00_introduction/             # Getting started guides
+│   ├── 01_getting_started.md
+│   ├── 01_user_guide.md
+│   └── QUICK_START.md
+├── 01_learning_roadmap/         # Learning paths and curriculum
+│   ├── README.md
+│   └── project_roadmaps_overview.md
+├── 01_student_guide/            # Student resources
+├── 02_instructor_guide/         # Instructor resources
+├── 03_technical_reference/      # Technical documentation
+├── architecture/                # Architecture documentation
+├── api/                         # API reference
+├── curriculum/                  # Curriculum materials
+├── guides/                      # How-to guides
+├── kb/                          # Knowledge base
+├── tutorials/                   # Interactive tutorials
+├── reports/                     # Project reports
+└── assets/                      # Documentation assets
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🎓 Module Documentation
 
-### Quick Start
+### Core Mathematics (`src/core/`)
+- [Linear Algebra](reference/math/linear-algebra.md)
+- [Calculus](reference/math/calculus.md)
+- [Optimization](reference/math/optimization.md)
+- [Statistics](reference/math/statistics.md)
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Kandil7/AI-Mastery-2026.git
-   cd AI-Mastery-2026
-   ```
+### Machine Learning (`src/ml/`)
+- [Classical ML](reference/ml/classical.md)
+- [Deep Learning](reference/ml/deep-learning.md)
+- [Computer Vision](reference/ml/vision.md)
+- [GNN Recommenders](reference/ml/gnn.md)
 
-2. **Install dependencies:**
-   ```bash
-   make install
-   ```
+### LLM Engineering (`src/llm/`)
+- [Transformers](reference/llm/transformers.md)
+- [Attention Mechanisms](reference/llm/attention.md)
+- [Fine-tuning](reference/llm/fine-tuning.md)
+- [Evaluation](reference/llm/evaluation.md)
 
-3. **Verify installation:**
-   ```bash
-   make test
-   ```
+### RAG Systems (`src/rag/`)
+- [Chunking Strategies](reference/rag/chunking.md)
+- [Retrieval Methods](reference/rag/retrieval.md)
+- [Reranking](reference/rag/reranking.md)
+- [Specialized RAGs](reference/rag/specialized.md)
 
-### Learning Paths
+### Agents (`src/agents/`)
+- [Orchestration](reference/agents/orchestration.md)
+- [Multi-Agent Systems](reference/agents/multi-agent.md)
+- [Support Agent](reference/agents/support-agent.md)
 
-| Path | Level | Duration | Focus |
-|------|-------|----------|-------|
-| [Foundations](01_foundations/README.md) | Beginner | 2-3 weeks | Math & Core Concepts |
-| [Intermediate](02_intermediate/README.md) | Intermediate | 4-6 weeks | ML & Deep Learning |
-| [Advanced](03_advanced/README.md) | Advanced | 6-8 weeks | LLM & RAG Systems |
-| [Production](04_production/README.md) | Expert | 4-6 weeks | Deployment & Scale |
-
----
-
-## 📖 User Guides
-
-### For Learners
-- [Getting Started Guide](guides/getting-started.md) - Your first steps with AI-Mastery-2026
-- [Installation Guide](guides/installation.md) - Detailed setup instructions
-- [Learning Roadmap](01_learning_roadmap/README.md) - Structured learning path
-- [Module Tutorials](tutorials/) - Hands-on exercises
-
-### For Developers
-- [Architecture Overview](reference/architecture.md) - System design and components
-- [Contribution Guidelines](00_introduction/CONTRIBUTING.md) - How to contribute
-- [Code Style Guide](reference/code-style.md) - Coding standards
-- [Testing Guide](reference/testing.md) - Testing best practices
-
-### For DevOps
-- [Deployment Guide](guides/deployment.md) - Production deployment
-- [Docker Guide](guides/docker.md) - Containerization
-- [Kubernetes Guide](guides/kubernetes.md) - Orchestration
-- [Monitoring Guide](guides/monitoring.md) - Observability
+### Production (`src/production/`)
+- [API Development](reference/production/api.md)
+- [Caching](reference/production/caching.md)
+- [Observability](reference/production/observability.md)
 
 ---
 
-## 🔌 API Reference
+## 🔍 Search Guide
 
-### REST API
-- [API Overview](api/overview.md) - Introduction to the API
-- [Authentication](api/authentication.md) - Auth methods and security
-- [Endpoints](api/endpoints/) - Complete endpoint reference
-- [Error Codes](api/error-codes.md) - Error handling
+### By Topic
 
-### SDK Documentation
-- [Python SDK](api/sdk/python.md) - Python client library
-- [JavaScript SDK](api/sdk/javascript.md) - JavaScript client library
-- [CLI Tool](api/cli.md) - Command-line interface
+| Topic | Location |
+|-------|----------|
+| Installation | `00_introduction/01_user_guide.md` |
+| Quick Start | `00_introduction/QUICK_START.md` |
+| Learning Path | `01_learning_roadmap/README.md` |
+| API Reference | `api/README.md` |
+| Contributing | `CONTRIBUTING.md` |
 
-### Code Examples
-- [Basic Examples](api/examples/basic.md) - Getting started with API
-- [Advanced Examples](api/examples/advanced.md) - Complex use cases
-- [Integration Examples](api/examples/integrations.md) - Third-party integrations
+### By Role
 
----
-
-## 📚 Tutorials
-
-### Beginner Tutorials
-1. [Your First Neural Network](tutorials/beginner/first-neural-network.md)
-2. [Building a Classifier](tutorials/beginner/classifier.md)
-3. [Introduction to RAG](tutorials/beginner/intro-rag.md)
-
-### Intermediate Tutorials
-1. [Fine-Tuning LLMs](tutorials/intermediate/finetuning-llm.md)
-2. [Building RAG Systems](tutorials/intermediate/building-rag.md)
-3. [Creating AI Agents](tutorials/intermediate/ai-agents.md)
-
-### Advanced Tutorials
-1. [Multi-Modal RAG](tutorials/advanced/multimodal-rag.md)
-2. [Temporal-Aware RAG](tutorials/advanced/temporal-rag.md)
-3. [Production LLM Systems](tutorials/advanced/production-llm.md)
-
-### Interactive Notebooks
-- [Mathematical Foundations](../notebooks/01_mathematical_foundations/)
-- [Classical ML](../notebooks/02_classical_ml/)
-- [Deep Learning](../notebooks/03_deep_learning/)
-- [RAG Systems](../notebooks/RAG/)
+| Role | Recommended Docs |
+|------|------------------|
+| **Student** | Learning Roadmap, Student Guide, Tutorials |
+| **Instructor** | Instructor Guide, Curriculum |
+| **Developer** | API Reference, Contributing Guide, Code Style |
+| **Researcher** | Technical Reference, Reports |
 
 ---
 
-## 🧠 Knowledge Base
+## 📝 Documentation Conventions
 
-### Core Concepts
-- [Transformer Architecture](kb/concepts/transformer.md)
-- [Attention Mechanisms](kb/concepts/attention.md)
-- [RAG Fundamentals](kb/concepts/rag.md)
-- [Embedding Models](kb/concepts/embeddings.md)
-- [Vector Databases](kb/concepts/vector-db.md)
+### File Naming
+- Use lowercase with hyphens: `getting-started.md`
+- Number sequential guides: `01_getting_started.md`
 
-### Best Practices
-- [Prompt Engineering](kb/best-practices/prompt-engineering.md)
-- [RAG Optimization](kb/best-practices/rag-optimization.md)
-- [LLM Evaluation](kb/best-practices/evaluation.md)
-- [Cost Optimization](kb/best-practices/cost-optimization.md)
-- [Security Practices](kb/best-practices/security.md)
+### Markdown Style
+- Use GitHub-flavored Markdown
+- Include tables of contents for long documents
+- Use code blocks with language specifiers
 
-### Troubleshooting
-- [Common Issues](troubleshooting/common-issues.md)
-- [Error Codes](troubleshooting/error-codes.md)
-- [Debugging Guide](troubleshooting/debugging.md)
-- [Performance Issues](troubleshooting/performance.md)
-
----
-
-## ❓ FAQ
-
-### General Questions
-- [What is AI-Mastery-2026?](faq/general.md#what-is-ai-mastery-2026)
-- [Who is this for?](faq/general.md#who-is-this-for)
-- [Prerequisites?](faq/general.md#prerequisites)
-
-### Technical Questions
-- [Installation Issues](faq/technical.md#installation)
-- [Model Selection](faq/technical.md#models)
-- [Performance Tuning](faq/technical.md#performance)
-
-### Troubleshooting
-- [Common Errors](faq/troubleshooting.md#errors)
-- [Debugging Tips](faq/troubleshooting.md#debugging)
-- [Getting Help](faq/troubleshooting.md#help)
-
----
-
-## 📊 Additional Resources
-
-### Reference Materials
-- [Glossary](reference/glossary.md) - Terms and definitions
-- [Changelog](reference/changelog.md) - Version history
-- [Roadmap](reference/roadmap.md) - Future plans
-
-### External Resources
-- [Research Papers](reference/papers.md) - Key academic papers
-- [Tools & Libraries](reference/tools.md) - Recommended tools
-- [Community](reference/community.md) - Join the community
-
-### Project Documentation
-- [README](../README.md) - Project overview
-- [License](../LICENSE) - MIT License
-- [Contributing](00_introduction/CONTRIBUTING.md) - Contribution guide
-
----
-
-## 🔍 Search Tips
-
-Use the following strategies to find what you need:
-
-1. **By Topic**: Browse the category folders above
-2. **By Level**: Filter tutorials by difficulty
-3. **By Type**: Choose between guides, API docs, or tutorials
-4. **Search**: Use your browser's search (Ctrl+F) for keywords
+### Versioning
+- Documentation version matches project version
+- Changelog maintained in `CHANGELOG.md`
 
 ---
 
 ## 🤝 Contributing to Documentation
 
-We welcome documentation contributions! See our [Documentation Guidelines](00_introduction/DOCUMENTATION_GUIDELINES.md) for:
+We welcome documentation contributions! See our [Contributing Guide](CONTRIBUTING.md) for guidelines.
 
-- Writing style and format
-- Adding new pages
-- Updating existing content
-- Review process
+### Quick Docs Contribution
+
+1. Find the relevant documentation file
+2. Make your changes following our style guide
+3. Submit a pull request
+
+For major documentation changes, please open an issue first to discuss the proposed changes.
 
 ---
 
 ## 📞 Support
 
-- **GitHub Issues**: Report documentation bugs or request topics
-- **Discussions**: Ask questions and share knowledge
-- **Discord**: Join our community for real-time help
+- **Issues**: [GitHub Issues](https://github.com/Kandil7/AI-Mastery-2026/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Kandil7/AI-Mastery-2026/discussions)
+- **Email**: medokandeal7@gmail.com
 
 ---
 
-**Last Updated:** March 28, 2026  
-**Version:** 1.0.0  
-**Maintained By:** AI-Mastery-2026 Team
+<div align="center">
+
+**Last Updated:** March 31, 2026
+
+[Back to Top](#ai-mastery-2026-documentation)
+
+</div>

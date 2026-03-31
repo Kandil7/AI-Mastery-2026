@@ -1,4 +1,4 @@
-"""
+﻿"""
 HyDE Retrieval
 ==============
 
@@ -10,7 +10,7 @@ Reference: Gao et al. "Precise Zero-Shot Dense Retrieval without Relevance Label
 from typing import Any, Dict, List, Optional, Callable
 
 from .base import BaseRetriever, RetrievalResult, RetrievalResults
-from src.vector_stores.base import VectorStore
+from src.rag.vector_stores.base import VectorStore
 
 
 class HyDERetriever(BaseRetriever):
@@ -160,3 +160,4 @@ class HyDERetriever(BaseRetriever):
 
     def __repr__(self) -> str:
         return f"HyDERetriever(store={self.vector_store})"
+

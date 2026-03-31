@@ -1,0 +1,55 @@
+# GitHub CODEOWNERS for AI-Mastery-2026
+# ======================================
+# Defines default reviewers for pull requests
+# Documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-codeowners
+
+# Default owners for the entire repository
+* @Kandil7
+
+# Core mathematics module
+/src/core/ @Kandil7
+
+# Machine learning module
+/src/ml/ @Kandil7
+
+# LLM engineering module
+/src/llm/ @Kandil7
+
+# RAG systems module
+/src/rag/ @Kandil7
+
+# AI agents module
+/src/agents/ @Kandil7
+
+# Production infrastructure
+/src/production/ @Kandil7
+
+# Configuration and types
+/src/config/ @Kandil7
+/src/types/ @Kandil7
+
+# Documentation
+/docs/ @Kandil7
+*.md @Kandil7
+
+# Tests
+/tests/ @Kandil7
+
+# GitHub Actions workflows
+/.github/workflows/ @Kandil7
+
+# Docker and containerization
+/Dockerfile* @Kandil7
+/.devcontainer/ @Kandil7
+
+# Examples and notebooks
+/examples/ @Kandil7
+/notebooks/ @Kandil7
+
+# Scripts
+/scripts/ @Kandil7
+
+# Configuration files
+/pyproject.toml @Kandil7
+/mkdocs.yml @Kandil7
+/.pre-commit-config.yaml @Kandil7

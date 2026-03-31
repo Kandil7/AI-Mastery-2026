@@ -1,0 +1,155 @@
+# AI-Mastery-2026 Documentation
+
+site_name: AI-Mastery-2026
+site_description: The Ultimate AI Engineering Toolkit - From First Principles to Production Scale
+site_author: Kandil7
+site_url: https://kandil7.github.io/AI-Mastery-2026/
+
+# Repository
+repo_name: Kandil7/AI-Mastery-2026
+repo_url: https://github.com/Kandil7/AI-Mastery-2026
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2026 Kandil7
+
+# Theme
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+
+# Custom CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: Kandil7
+      repo: AI-Mastery-2026
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Introduction: 00_introduction/01_getting_started.md
+    - Installation: 00_introduction/01_user_guide.md
+    - Quick Start: 00_introduction/QUICK_START.md
+  - Learning:
+    - Roadmap: 01_learning_roadmap/README.md
+    - Student Guide: 01_student_guide/README.md
+    - Instructor Guide: 02_instructor_guide/README.md
+  - Technical:
+    - Architecture:
+      - Overview: architecture/README.md
+      - Decisions:
+        - Index: architecture/decisions/README.md
+        - ADR-001: architecture/decisions/adr-001-project-structure.md
+        - ADR-002: architecture/decisions/adr-002-configuration-management.md
+        - ADR-003: architecture/decisions/adr-003-type-definitions.md
+    - API Reference: api/README.md
+    - Technical Reference: 03_technical_reference/README.md
+  - Contributing:
+    - Guide: ../CONTRIBUTING.md
+    - Code Style: guides/code-style.md
+    - Migration: ../MIGRATION_GUIDE.md
+  - Project Info:
+    - Changelog: ../CHANGELOG.md
+    - Security: ../SECURITY.md
+    - Technical Debt: ../TECHNICAL_DEBT.md
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            merge_init_into_class: true
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Kandil7/AI-Mastery-2026
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ai-mastery-2026/
+  version:
+    provider: mike
+
+# Validation
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
