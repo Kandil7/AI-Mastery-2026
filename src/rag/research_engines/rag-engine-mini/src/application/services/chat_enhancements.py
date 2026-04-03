@@ -363,15 +363,52 @@ class SessionManager:
 def get_session_turns(
     session_id: str,
     max_turns: int = 20,
+    tenant_id: Optional[TenantId] = None,
 ) -> List[dict[str, str]]:
     """
-    Get chat turns for a session (placeholder for database integration).
+    Get chat turns for a session from database.
 
-    الحصول على دورات المحادثة لجلسة
+    الحصول على دورات المحادثة لجلسة من قاعدة البيانات
+    
+    Args:
+        session_id: Chat session ID
+        max_turns: Maximum number of turns to retrieve
+        tenant_id: Tenant ID for authorization
+        
+    Returns:
+        List of chat turns (question, answer pairs)
     """
-    # TODO: Implement database query
-    # return db.query(ChatTurn).filter_by(session_id=session_id).all()
-    return []
+    try:
+        # Import here to avoid circular dependencies
+        from src.adapters.persistence.postgres.repo_chat import PostgresChatRepo
+        
+        if tenant_id is None:
+            # Create a default tenant ID for backward compatibility
+            tenant_id = TenantId("default")
+        
+        # Get turns from database
+        repo = PostgresChatRepo()
+        turns = repo.get_session_turns(
+            tenant_id=tenant_id,
+            session_id=session_id,
+            limit=max_turns,
+        )
+        
+        # Convert to dict format
+        return [
+            {
+                "question": turn.question,
+                "answer": turn.answer,
+                "sources": turn.sources,
+                "created_at": turn.created_at.isoformat() if turn.created_at else None,
+            }
+            for turn in turns
+        ]
+        
+    except Exception as e:
+        log.error(f"Failed to retrieve session turns from database: {e}")
+        # Fallback to empty list
+        return []
 
 
 def create_sample_session() -> List[dict[str, str]]:

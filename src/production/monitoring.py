@@ -213,7 +213,8 @@ class SystemMonitor:
                 gpu = gpus[0]  # Use first GPU
                 gpu_percent = gpu.load * 100
                 gpu_memory_percent = gpu.memoryUtil * 100
-        except:
+        except (ImportError, Exception) as e:
+            logger.debug(f"GPU metrics unavailable: {e}")
             pass  # GPU not available
 
         # Record metrics

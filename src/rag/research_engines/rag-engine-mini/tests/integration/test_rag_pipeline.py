@@ -6,6 +6,7 @@ End-to-end tests for key user workflows.
 اختبارات التكامل لخط أنبوب RAG
 """
 
+import os
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import create_engine
@@ -342,7 +343,7 @@ def sample_user():
     return User(
         id="user-123",
         email="test@example.com",
-        api_key="sk_test1234567890123456789",
+        api_key=os.environ.get("TEST_API_KEY", "test-key-for-ci-only"),
     )
 
 

@@ -10,7 +10,7 @@ All settings are loaded from environment variables or .env file.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,6 +53,33 @@ class Settings(BaseSettings):
         default=15, description="Access token lifetime in minutes"
     )
     jwt_refresh_expire_days: int = Field(default=7, description="Refresh token lifetime in days")
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def require_jwt_secret_in_prod(cls, v, info) -> str:
+        """
+        Require JWT secret key in production environment.
+
+        Args:
+            v: The field value
+            info: Validation info with data
+
+        Returns:
+            The validated JWT secret key
+
+        Raises:
+            ValueError: If JWT secret is missing in production
+        """
+        # Get the env value from data
+        env = info.data.get("env", "dev")
+
+        if env == "prod" and not v:
+            raise ValueError(
+                "JWT secret key is required in production. "
+                "Set JWT_SECRET_KEY environment variable."
+            )
+
+        return v
 
     # =========================================================================
     # Database / قاعدة البيانات

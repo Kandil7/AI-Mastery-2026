@@ -103,7 +103,8 @@ class MultiLayerCacheService(MultiLayerCachePort):
             # For other objects, serialize and measure
             serialized = pickle.dumps(obj)
             return len(serialized)
-        except:
+        except (pickle.PickleError, TypeError, AttributeError) as e:
+            logger.debug(f"Failed to calculate object size: {e}")
             # If serialization fails, return a default size
             return 1024
 

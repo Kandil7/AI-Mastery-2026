@@ -63,7 +63,8 @@ async def readiness_check():
                 # Perform a simple check to ensure DB is accessible
                 # In a real implementation, this would be a lightweight query
                 checks["database"] = True
-        except:
+        except Exception as e:
+            logger.debug(f"Database health check failed: {e}")
             checks["database"] = False
 
         try:
@@ -73,7 +74,8 @@ async def readiness_check():
                 await cache.set("health_check", "test", 1)
                 val = await cache.get("health_check")
                 checks["redis"] = val == "test"
-        except:
+        except Exception as e:
+            logger.debug(f"Redis health check failed: {e}")
             checks["redis"] = False
 
         try:
@@ -82,7 +84,8 @@ async def readiness_check():
                 # Perform a simple check to verify vector store connectivity
                 # This would be a lightweight operation in a real implementation
                 checks["qdrant"] = True
-        except:
+        except Exception as e:
+            logger.debug(f"Qdrant health check failed: {e}")
             checks["qdrant"] = False
 
         try:
@@ -90,7 +93,8 @@ async def readiness_check():
             if llm:
                 # Check that LLM is accessible (but don't make a real call to save costs)
                 checks["llm"] = True
-        except:
+        except Exception as e:
+            logger.debug(f"LLM health check failed: {e}")
             checks["llm"] = False
 
         # Overall readiness is based on all critical components

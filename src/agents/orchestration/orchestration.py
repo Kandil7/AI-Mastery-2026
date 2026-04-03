@@ -413,20 +413,96 @@ class CalculatorTool(Tool):
         )
     
     def run(self, expression: str = "", **kwargs) -> ToolResult:
-        """Evaluate a mathematical expression."""
+        """
+        Evaluate a mathematical expression safely using AST.
+
+        Args:
+            expression: Mathematical expression (e.g., "2 + 3 * 4")
+
+        Returns:
+            ToolResult with calculation output or error
+
+        Raises:
+            None - errors are caught and returned in ToolResult
+        """
         try:
-            # Safe evaluation (only math operations)
-            allowed = set("0123456789+-*/.() ")
-            if not all(c in allowed for c in expression):
-                return ToolResult(
-                    output=None,
-                    success=False,
-                    error="Invalid characters in expression"
-                )
-            result = eval(expression)
+            # Parse and validate expression using AST
+            result = self._safe_eval(expression)
             return ToolResult(output=result, success=True)
-        except Exception as e:
+        except ValueError as e:
             return ToolResult(output=None, success=False, error=str(e))
+        except SyntaxError as e:
+            return ToolResult(output=None, success=False, error=f"Syntax error: {e}")
+        except Exception as e:
+            return ToolResult(output=None, success=False, error=f"Calculation error: {e}")
+
+    def _safe_eval(self, expression: str) -> float:
+        """
+        Safely evaluate a mathematical expression using AST.
+
+        Only allows: numbers, basic arithmetic operators (+, -, *, /)
+        Parentheses and unary minus are also supported.
+
+        Args:
+            expression: Mathematical expression string
+
+        Returns:
+            Result of evaluation
+
+        Raises:
+            ValueError: If expression contains disallowed operations
+            SyntaxError: If expression has invalid syntax
+        """
+        import ast
+        import operator
+
+        # Define allowed operators
+        OPERATORS = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.Pow: operator.pow,
+            ast.USub: operator.neg,
+            ast.UAdd: operator.pos,
+        }
+
+        def _eval_node(node: ast.AST) -> float:
+            """Recursively evaluate AST node."""
+            if isinstance(node, ast.Expression):
+                return _eval_node(node.body)
+
+            elif isinstance(node, ast.Num):  # Python <3.8
+                return float(node.n)
+
+            elif isinstance(node, ast.Constant):  # Python >=3.8
+                if isinstance(node.value, (int, float)):
+                    return float(node.value)
+                raise ValueError("Only numeric constants are allowed")
+
+            elif isinstance(node, ast.BinOp):
+                left = _eval_node(node.left)
+                right = _eval_node(node.right)
+                op_type = type(node.op)
+                if op_type not in OPERATORS:
+                    raise ValueError(f"Operator {op_type.__name__} not allowed")
+                return OPERATORS[op_type](left, right)
+
+            elif isinstance(node, ast.UnaryOp):
+                operand = _eval_node(node.operand)
+                op_type = type(node.op)
+                if op_type not in OPERATORS:
+                    raise ValueError(f"Unary operator {op_type.__name__} not allowed")
+                return OPERATORS[op_type](operand)
+
+            else:
+                raise ValueError(f"Disallowed syntax: {type(node).__name__}")
+
+        # Parse expression into AST
+        tree = ast.parse(expression.strip(), mode='eval')
+
+        # Evaluate safely
+        return _eval_node(tree)
 
 
 class SearchTool(Tool):

@@ -18,6 +18,7 @@ Usage:
 """
 
 import asyncio
+import os
 from unittest.mock import AsyncMock, patch, MagicMock, Mock
 
 import pytest
@@ -25,6 +26,12 @@ from aiohttp import ClientError, ClientConnectionError, ClientTimeout
 
 from src.adapters.llm.huggingface_llm import HuggingFaceLLM
 from src.domain.errors import LLMError, RateLimitError
+
+
+@pytest.fixture
+def api_key():
+    """Fixture providing test API key from environment or default test value."""
+    return os.environ.get("TEST_HF_API_KEY", "test-key-for-ci-only")
 
 
 class TestBasicFunctionality:
@@ -42,7 +49,7 @@ class TestBasicFunctionality:
             yield mock
 
     @pytest.mark.asyncio
-    async def test_huggingface_generate_success(self, mock_huggingface_hub):
+    async def test_huggingface_generate_success(self, mock_huggingface_hub, api_key):
         """
         Test successful text generation.
 
@@ -57,7 +64,7 @@ class TestBasicFunctionality:
         mock_response.choices[0].message.content = "Mocked HF Response"
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key", model_name="mistral")
+        adapter = HuggingFaceLLM(api_key=api_key, model_name="mistral")
 
         response = await adapter.generate("Hello")
 
@@ -65,7 +72,7 @@ class TestBasicFunctionality:
         mock_client.chat_completion.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_huggingface_generate_stream_success(self, mock_huggingface_hub):
+    async def test_huggingface_generate_stream_success(self, mock_huggingface_hub, api_key):
         """
         Test successful streaming text generation.
 
@@ -85,7 +92,7 @@ class TestBasicFunctionality:
 
         mock_client.chat_completion.return_value = mock_stream()
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         chunks = []
         async for chunk in adapter.generate_stream("Hi"):
@@ -94,7 +101,7 @@ class TestBasicFunctionality:
         assert chunks == ["Hello ", "World"]
 
     @pytest.mark.asyncio
-    async def test_huggingface_generate_with_system_prompt(self, mock_huggingface_hub):
+    async def test_huggingface_generate_with_system_prompt(self, mock_huggingface_hub, api_key):
         """
         Test generation with system prompt.
 
@@ -107,7 +114,7 @@ class TestBasicFunctionality:
         mock_response.choices[0].message.content = "Response"
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         await adapter.generate("User message", system_prompt="You are a helpful assistant")
 
@@ -132,7 +139,7 @@ class TestErrorHandling:
             yield mock
 
     @pytest.mark.asyncio
-    async def test_generate_api_error(self, mock_huggingface_hub):
+    async def test_generate_api_error(self, mock_huggingface_hub, api_key):
         """
         Test handling of API errors.
 
@@ -149,7 +156,7 @@ class TestErrorHandling:
             "Model not found", response=MagicMock(status_code=404)
         )
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError) as exc_info:
             await adapter.generate("Hello")
@@ -168,7 +175,7 @@ class TestErrorHandling:
 
         mock_client.chat_completion.side_effect = ClientConnectionError("Connection refused")
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError) as exc_info:
             await adapter.generate("Hello")
@@ -187,7 +194,7 @@ class TestErrorHandling:
 
         mock_client.chat_completion.side_effect = asyncio.TimeoutError()
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError) as exc_info:
             await adapter.generate("Hello")
@@ -209,7 +216,7 @@ class TestErrorHandling:
         mock_response.choices = []  # Empty choices
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError) as exc_info:
             await adapter.generate("Hello")
@@ -230,7 +237,7 @@ class TestErrorHandling:
         mock_response.choices[0].message.content = ""  # Empty content
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         # Should return empty string without error
         response = await adapter.generate("Hello")
@@ -248,7 +255,7 @@ class TestErrorHandling:
         mock_response.choices[0].message.content = None
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         response = await adapter.generate("Hello")
         assert response == ""
@@ -289,7 +296,7 @@ class TestRetryLogic:
             mock_response,
         ]
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         # If retry logic is implemented, this should eventually succeed
         try:
@@ -317,7 +324,7 @@ class TestRetryLogic:
             "Bad Request", response=MagicMock(status_code=400)
         )
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError):
             await adapter.generate("Hello")
@@ -342,7 +349,7 @@ class TestRetryLogic:
             "Server Error", response=MagicMock(status_code=503)
         )
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(LLMError) as exc_info:
             await adapter.generate("Hello")
@@ -388,7 +395,7 @@ class TestRateLimiting:
             "Rate limit exceeded", response=mock_response
         )
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(RateLimitError) as exc_info:
             await adapter.generate("Hello")
@@ -416,7 +423,7 @@ class TestRateLimiting:
             "Rate limit exceeded", response=mock_response
         )
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises(RateLimitError) as exc_info:
             await adapter.generate("Hello")
@@ -464,7 +471,7 @@ class TestStreamingEdgeCases:
 
         mock_client.chat_completion.return_value = mock_stream()
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         chunks = []
         async for chunk in adapter.generate_stream("Hi"):
@@ -497,7 +504,7 @@ class TestStreamingEdgeCases:
 
         mock_client.chat_completion.return_value = mock_stream()
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         chunks = []
         async for chunk in adapter.generate_stream("Hi"):
@@ -525,7 +532,7 @@ class TestStreamingEdgeCases:
 
         mock_client.chat_completion.return_value = mock_stream_with_error()
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         chunks = []
         with pytest.raises(LLMError):
@@ -586,7 +593,7 @@ class TestInputValidation:
         mock_response.choices[0].message.content = "Response"
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         # Very long input (100KB)
         long_input = "word " * 20000
@@ -610,7 +617,7 @@ class TestInputValidation:
         mock_response.choices[0].message.content = "Response with emoji 🎉"
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         special_inputs = [
             "Hello with emoji 🎉🎊",
@@ -638,7 +645,7 @@ class TestInputValidation:
         mock_response.choices[0].message.content = "I need more information"
         mock_client.chat_completion.return_value = mock_response
 
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         response = await adapter.generate("")
 
@@ -652,7 +659,7 @@ class TestInputValidation:
 
         Should raise appropriate error.
         """
-        adapter = HuggingFaceLLM(api_key="fake-key")
+        adapter = HuggingFaceLLM(api_key=api_key)
 
         with pytest.raises((LLMError, TypeError)):
             await adapter.generate(None)

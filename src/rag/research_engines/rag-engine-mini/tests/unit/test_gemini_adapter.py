@@ -1,25 +1,34 @@
+import os
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from src.adapters.llm.gemini_llm import GeminiLLM
+
+
+@pytest.fixture
+def api_key():
+    """Fixture providing test API key from environment or default test value."""
+    return os.environ.get("TEST_GEMINI_API_KEY", "test-key-for-ci-only")
+
 
 @pytest.fixture
 def mock_genai():
     with patch("src.adapters.llm.gemini_llm.genai") as mock:
         yield mock
 
+
 @pytest.mark.asyncio
-async def test_gemini_generate(mock_genai):
+async def test_gemini_generate(mock_genai, api_key):
     # Setup mock
     mock_model = MagicMock()
     mock_genai.GenerativeModel.return_value = mock_model
-    
+
     # Mock return value for generate_content_async
     mock_response = MagicMock()
     mock_response.text = "Mocked Gemini Response"
     # generate_content_async is an async method
     mock_model.generate_content_async = AsyncMock(return_value=mock_response)
-    
-    adapter = GeminiLLM(api_key="fake-key", model_name="gemini-1.5-flash")
+
+    adapter = GeminiLLM(api_key=api_key, model_name="gemini-1.5-flash")
     
     response = await adapter.generate("Hello")
     
@@ -27,17 +36,17 @@ async def test_gemini_generate(mock_genai):
     mock_model.generate_content_async.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_gemini_generate_stream(mock_genai):
+async def test_gemini_generate_stream(mock_genai, api_key):
     # Setup mock
     mock_model = MagicMock()
     mock_genai.GenerativeModel.return_value = mock_model
-    
+
     # Mock streaming chunks
     mock_chunk1 = MagicMock()
     mock_chunk1.text = "Hello "
     mock_chunk2 = MagicMock()
     mock_chunk2.text = "World"
-    
+
     class AsyncGeneratorMock:
         def __init__(self, items):
             self.items = items
@@ -50,8 +59,8 @@ async def test_gemini_generate_stream(mock_genai):
 
     # generate_content_async returns an awaitable that resolves to the generator
     mock_model.generate_content_async = AsyncMock(return_value=AsyncGeneratorMock([mock_chunk1, mock_chunk2]))
-    
-    adapter = GeminiLLM(api_key="fake-key")
+
+    adapter = GeminiLLM(api_key=api_key)
     
     chunks = []
     async for chunk in adapter.generate_stream("Hi"):

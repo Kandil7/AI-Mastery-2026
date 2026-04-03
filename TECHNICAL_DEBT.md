@@ -2,8 +2,8 @@
 
 This document tracks all TODO, FIXME, XXX, HACK, and BUG comments in the AI-Mastery-2026 codebase.
 
-**Last Updated:** March 31, 2026  
-**Total Items:** 27
+**Last Updated:** April 2, 2026
+**Total Items:** 21 (6 resolved in this update)
 
 ---
 
@@ -11,7 +11,7 @@ This document tracks all TODO, FIXME, XXX, HACK, and BUG comments in the AI-Mast
 
 | Priority | Count | Description |
 |----------|-------|-------------|
-| 🔴 High | 6 | Critical functionality missing |
+| ✅ Resolved | 6 | Critical functionality now complete |
 | 🟡 Medium | 12 | Important improvements needed |
 | 🟢 Low | 9 | Nice-to-have enhancements |
 
@@ -21,49 +21,122 @@ This document tracks all TODO, FIXME, XXX, HACK, and BUG comments in the AI-Mast
 
 | Location | Count |
 |----------|-------|
-| `src/rag/research_engines/rag-engine-mini/` | 27 |
+| `src/rag/research_engines/rag-engine-mini/` | 21 (was 27) |
 | Notebooks | 19 |
-| Source files | 8 |
+| Source files | 2 |
 
 ---
 
-## High Priority (🔴)
+## ✅ Resolved High Priority Items (April 2, 2026)
 
-### 1. Document Management - Storage Integration
+### 1. ✅ Document Storage Integration - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py:185`
-- **Comment:** `# TODO: Integrate with file storage (S3, GCS, Azure Blob)`
-- **Impact:** Document upload functionality incomplete
-- **Suggested Fix:** Implement storage adapter pattern with support for major cloud providers
+- **Status:** ✅ Implemented
+- **Solution:** Integrated with existing file storage adapters (`LocalFileStore`, `S3FileStore`, `GCSFileStore`, `AzureBlobFileStore`) via factory pattern
+- **Files Modified:** `document_management.py`
+- **Dependencies Added:** `boto3>=1.26.0` to pyproject.toml
 
-### 2. Document Management - Queue Integration
+### 2. ✅ Document Queue Integration - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py:197`
-- **Comment:** `# TODO: Integrate with Celery/Redis queue`
-- **Impact:** Background processing not implemented
-- **Suggested Fix:** Add Celery task queue for async document processing
+- **Status:** ✅ Implemented
+- **Solution:** Integrated with `CeleryTaskQueue` adapter for async document processing
+- **Files Modified:** `document_management.py`
+- **Dependencies Added:** `celery>=5.3.0`, `redis>=4.5.0` to pyproject.toml
 
-### 3. Document Merging - Implementation
+### 3. ✅ Document Merging Implementation - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py:326`
-- **Comment:** `# TODO: Implement actual merging based on file types`
-- **Impact:** Document merge feature non-functional
-- **Suggested Fix:** Implement type-specific merge handlers (PDF, images, text)
+- **Status:** ✅ Implemented
+- **Solution:** Implemented type-specific merge handlers:
+  - PDF: Using `pypdf` library
+  - Text/Markdown: Concatenation with separators
+  - Other: Binary-safe concatenation
+- **Files Modified:** `document_management.py`
 
-### 4. PDF Merging
+### 4. ✅ PDF Merging - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py:337`
-- **Comment:** `# TODO: Implement PDF merging with PyPDF2`
-- **Impact:** PDF merge specifically not working
-- **Suggested Fix:** Add PyPDF2 dependency and implement merge logic
+- **Status:** ✅ Implemented
+- **Solution:** Full PDF merging using `pypdf` (modern PyPDF2 fork) with graceful fallback
+- **Files Modified:** `document_management.py`
+- **Dependencies Added:** `pypdf>=3.0.0` to pyproject.toml
 
-### 5. Document Upload - Queue
+### 5. ✅ Document Upload Queue - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py:357`
-- **Comment:** `# TODO: Integrate with Celery/Redis queue`
-- **Impact:** Upload processing synchronous (blocking)
-- **Suggested Fix:** Same as #2
+- **Status:** ✅ Implemented
+- **Solution:** Same as #2 - Celery integration for async upload processing
+- **Files Modified:** `document_management.py`
 
-### 6. Chat Enhancements - Database
+### 6. ✅ Chat History Database - RESOLVED
 - **Location:** `src/rag/research_engines/rag-engine-mini/src/application/services/chat_enhancements.py:372`
-- **Comment:** `# TODO: Implement database query`
-- **Impact:** Chat history/persistence not working
-- **Suggested Fix:** Implement database repository for chat data
+- **Status:** ✅ Implemented
+- **Solution:** Integrated with `PostgresChatRepo` for persistent chat history retrieval
+- **Files Modified:** `chat_enhancements.py`
+- **Implementation:** `get_session_turns()` now queries PostgreSQL database
+
+---
+
+## Implementation Details
+
+### Document Management Service Updates
+
+**File:** `src/rag/research_engines/rag-engine-mini/src/application/services/document_management.py`
+
+**Changes:**
+1. Added imports for settings, file store factory, and Celery queue
+2. Replaced placeholder `FileStorageService` with production-ready implementation
+3. Implemented `_store_file()` using configured storage backend
+4. Implemented `_queue_reindexing()` using Celery task queue
+5. Implemented `_merge_pdfs()` using pypdf library
+6. Added graceful fallbacks for when optional dependencies unavailable
+
+**New Features:**
+- Multi-backend storage (Local, S3, GCS, Azure)
+- Async task queuing for document processing
+- Type-aware document merging
+- PDF merging with page preservation
+
+### Chat Enhancements Service Updates
+
+**File:** `src/rag/research_engines/rag-engine-mini/src/application/services/chat_enhancements.py`
+
+**Changes:**
+1. Updated `get_session_turns()` to query PostgreSQL database
+2. Added tenant ID parameter for authorization
+3. Integrated with `PostgresChatRepo`
+4. Added error handling with fallback to empty list
+
+**New Features:**
+- Persistent chat history retrieval
+- Multi-tenant support
+- Structured turn data with sources and timestamps
+
+---
+
+## Testing Recommendations
+
+### Unit Tests to Add
+
+```python
+# test_document_management.py
+def test_pdf_merge_multiple_documents():
+    # Test merging 2+ PDFs
+    
+def test_document_storage_s3_backend():
+    # Test S3 storage integration
+    
+def test_document_queue_celery():
+    # Test Celery task queuing
+    
+def test_chat_history_database_retrieval():
+    # Test database chat turn retrieval
+```
+
+### Integration Tests
+
+1. End-to-end document upload → queue → index → search
+2. Multi-tenant chat session persistence
+3. Storage backend failover (S3 → Local)
+
+---
 
 ---
 

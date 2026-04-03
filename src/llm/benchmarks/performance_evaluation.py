@@ -201,7 +201,8 @@ class ModelBenchmark:
             import pickle
             model_bytes = len(pickle.dumps(self.model))
             model_size_mb = model_bytes / (1024 * 1024)
-        except:
+        except (pickle.PickleError, TypeError, AttributeError) as e:
+            logger.warning(f"Failed to pickle model for size calculation: {e}")
             pass  # If model can't be pickled, skip size calculation
         
         # Update metrics
@@ -234,9 +235,9 @@ class ModelBenchmark:
                     self.metrics.precision = float(precision_score(self.y_test, y_pred, average='weighted', zero_division=0))
                     self.metrics.recall = float(recall_score(self.y_test, y_pred, average='weighted', zero_division=0))
                     self.metrics.f1_score = float(f1_score(self.y_test, y_pred, average='weighted', zero_division=0))
-                except:
-                    # If precision/recall/f1 can't be calculated, skip them
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Failed to calculate precision/recall/f1: {e}")
+                    pass  # If precision/recall/f1 can't be calculated, skip them
         else:
             # Regression metrics
             self.metrics.mse = float(mean_squared_error(self.y_test, y_pred))

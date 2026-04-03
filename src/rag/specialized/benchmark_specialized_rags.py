@@ -128,7 +128,8 @@ class RAGBenchmarkSuite:
                 peak_memory = peak / 1024 / 1024  # Convert to MB
             else:
                 peak_memory = current_memory
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to get peak memory: {e}")
             peak_memory = current_memory
             
         return current_memory, peak_memory
@@ -228,7 +229,8 @@ class RAGBenchmarkSuite:
             else:  # unified
                 system.add_documents([doc])
                 system.query(query, k=1)
-        except:
+        except Exception as e:
+            logger.debug(f"Ignored error during warmup: {e}")
             pass  # Ignore errors during warmup
     
     def benchmark_add_documents(self, iterations: int = 10) -> List[BenchmarkResult]:

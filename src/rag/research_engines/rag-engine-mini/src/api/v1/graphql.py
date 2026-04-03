@@ -1788,7 +1788,8 @@ class Mutation:
             # Unsubscribe when done
             try:
                 event_manager.unsubscribe("document.indexed", on_document_indexed)
-            except:
+            except Exception as e:
+                log.warning(f"Failed to unsubscribe from document events: {e}")
                 pass
 
     @strawberry.subscription
@@ -1876,7 +1877,8 @@ class Mutation:
             # Unsubscribe when done
             try:
                 event_manager.unsubscribe("chat.updated", on_chat_updated)
-            except:
+            except Exception as e:
+                log.warning(f"Failed to unsubscribe from chat events: {e}")
                 pass
 
     @strawberry.mutation

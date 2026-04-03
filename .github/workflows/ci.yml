@@ -42,7 +42,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/unit -v --tb=short --cov=src --cov-report=xml
+          pytest tests/unit -v --tb=short --cov=src --cov-report=xml --cov-report=html --cov-fail-under=80
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -50,6 +50,13 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-html-${{ matrix.python-version }}-${{ matrix.os }}
+          path: htmlcov/
 
   security:
     name: Security Scan

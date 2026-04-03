@@ -461,7 +461,8 @@ class KubernetesDeployer(ModelDeployer):
         else:
             try:
                 config.load_incluster_config()  # For in-cluster config
-            except:
+            except (config.ConfigException, FileNotFoundError) as e:
+                logger.debug(f"Not in cluster, using kube config: {e}")
                 config.load_kube_config()  # For local development
 
         self.apps_v1 = client.AppsV1Api()
