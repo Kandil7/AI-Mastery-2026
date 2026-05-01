@@ -15,6 +15,18 @@ from .transformers import (
     DecoderLayer,
     Transformer,
 )
+from .diffusion import (
+    DiffusionConfig,
+    NoiseSchedule,
+    DDPM,
+    LatentDiffusionModel,
+    ClassifierFreeGuidance,
+    create_diffusion_model,
+    UNet,
+    SinusoidalPositionEmbeddings,
+    ResBlock,
+    AttentionBlock,
+)
 
 __all__ = [
     # Neural Networks
@@ -37,4 +49,15 @@ __all__ = [
     "EncoderLayer",
     "DecoderLayer",
     "Transformer",
+    # Diffusion Models
+    "DiffusionConfig",
+    "NoiseSchedule",
+    "DDPM",
+    "LatentDiffusionModel",
+    "ClassifierFreeGuidance",
+    "create_diffusion_model",
+    "UNet",
+    "SinusoidalPositionEmbeddings",
+    "ResBlock",
+    "AttentionBlock",
 ]
